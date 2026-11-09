@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,9 +40,20 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 
+/** Provides the single named preference file used by the wallet layer. */
 fun provideWalletSharedPrefs(app: Context): SharedPreferences =
+    // The Koin qualifier is WALLET_PREFERENCES; the actual file name is AnonConfig.PREFS.
     app.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
 
+/**
+ * Koin graph for process-scoped services and screen-scoped ViewModels.
+ *
+ * `WalletState`, `AnonWalletHandler`, and `TorService` are singletons because they mirror
+ * the single managed wallet and the single embedded Tor runtime. ViewModels are declared
+ * with `viewModel` so they survive configuration changes. `WALLET_PREFERENCES` is the Koin
+ * qualifier for the shared preference file; do not create a second preference file for
+ * those values.
+ */
 val appModule = module {
     single(named(WALLET_PREFERENCES)) { provideWalletSharedPrefs(androidApplication()) }
     single { TorService(get(named(WALLET_PREFERENCES))) }

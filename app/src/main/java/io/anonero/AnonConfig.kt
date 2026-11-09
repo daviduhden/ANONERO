@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  * Copyright (c) 2017-2023 m2049r
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +35,7 @@ import kotlin.math.pow
 
 val jsonDecoder = Json { ignoreUnknownKeys = true }
 
-/*
+/**
  * Process-wide paths and build constants.
  *
  * This object is deliberately small and static: it holds the application context, the
@@ -53,7 +53,7 @@ object AnonConfig {
     const val XMR_DECIMALS = 12
     val ONE_XMR = Math.round(10.0.pow(XMR_DECIMALS.toDouble()))
     const val MAX_LOG_SIZE = 250
-    const val PREFS = "anonPref"
+    const val PREFS = "anonPref" // actual SharedPreferences file; WALLET_PREFERENCES is the Koin qualifier
     var context: AnonApplication? = null
     private var walletFound: Boolean = false
 
@@ -70,6 +70,8 @@ object AnonConfig {
     const val IMPORT_SIGNED_TX_FILE = "import_signed_tx"
 
 
+    // The stageNet build type adds ".stagenet" to the application ID; all other builds use
+    // mainnet. The network is a build property, not a user setting.
     fun getNetworkType(): NetworkType {
         if (BuildConfig.APPLICATION_ID.lowercase().contains("stagenet")) {
             return NetworkType.NetworkType_Stagenet
@@ -100,6 +102,7 @@ object AnonConfig {
     }
 
 
+    /* Legacy, asynchronous flag. Do not use as the source of truth for wallet presence. */
     fun isWalletFileExist(): Boolean {
         return walletFound
     }
@@ -125,12 +128,22 @@ object AnonConfig {
         return walletDir
     }
 
+    /*
+     * Legacy asynchronous presence flag. UI wallet existence is decided by
+     * WalletProfileStore.anyWalletExists; this helper is not a process-start barrier and
+     * must not be used to gate onboarding or wallet opening.
+     */
     fun initWalletState() {
         MainScope().launch(Dispatchers.IO) {
             walletFound = getDefaultWalletFile(context!!).exists()
         }
     }
 
+    /*
+     * Fixed cache names used by airgapped export/import flows. Add any new name here and to
+     * the wipe/startup cleanup so plaintext transaction material does not survive a process
+     * restart.
+     */
     fun clearSpendCacheFiles(context: Context) {
         val files = arrayListOf(
             EXPORT_OUTPUT_FILE,

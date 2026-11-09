@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,16 @@
 package io.anonero.util
 
 
-const val WALLET_PREFERENCES = "walletPref"
+/*
+ * Keys stored in the `AnonConfig.PREFS` file (actual name `anonPref`).
+ *
+ * `WALLET_PREFERENCES` is the Koin qualifier used to inject that same file; it is not a
+ * second preference file. Main and decoy profiles deliberately use different key names for
+ * credentials and restore height. Anything that can differ per profile must go through
+ * `WalletProfileStore` rather than reading a raw constant. Changing a key name requires a
+ * migration; these names are part of the on-device format.
+ */
+const val WALLET_PREFERENCES = "walletPref" // Koin qualifier; the file is AnonConfig.PREFS
 
 
 const val PREFS_PASSPHRASE_HASH = "passPhraseHash"

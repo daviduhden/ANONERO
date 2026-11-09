@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,17 @@ fun startAnonService(context: Context) {
     context.startForegroundService(intent)
 }
 
+/**
+ * Foreground service that keeps wallet synchronization alive while the UI is backgrounded.
+ *
+ * The service owns no wallet. It observes [WalletState] and publishes status/progress and
+ * incoming-transaction notifications; `AnonApplication` and [AnonWalletHandler] own the
+ * wallet lifecycle. Android may restart a sticky service, so the service must be safe to
+ * start without a live wallet; all reads are nullable and notification updates are guarded.
+ *
+ * Notification text is routed through [StealthMode] so a locked device does not disclose
+ * balances, heights, addresses, or the product name.
+ */
 class AnonNeroService : Service() {
 
     private val TAG: String = AnonNeroService::class.java.simpleName

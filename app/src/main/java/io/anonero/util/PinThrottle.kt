@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import android.content.SharedPreferences
 import android.os.SystemClock
 import androidx.core.content.edit
 
-/*
+/**
  * A rate limit for the lock-screen PIN.
  *
  * The PIN is all that stands between a stolen phone and the Keystore-wrapped wallet secret

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,6 +74,13 @@ private val Context.logsStore: DataStore<List<AnonLog>> by dataStore(
 )
 
 
+/**
+ * Persisted application log shown in the Logs screen.
+ *
+ * `AnonLogTree` writes this store; stealth mode suppresses persistence entirely. The store
+ * is capped and pruned, is cleared on a successful unlock and on secure wipe, and must
+ * never receive seeds, passphrases, PINs, wallet passwords, or node credentials.
+ */
 class LogRepository(private val context: Context) {
 
     // Expose a Flow to observe the list of items

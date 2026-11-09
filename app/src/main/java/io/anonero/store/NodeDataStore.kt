@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,13 @@ private val Context.nodeDataStore: DataStore<List<Node>> by dataStore(
 )
 
 
+/**
+ * Persisted list of saved nodes.
+ *
+ * Node records include RPC credentials, so the DataStore file is app-private but not
+ * Keystore-encrypted. Treat the Android app sandbox as the protection boundary. Entries are
+ * de-duplicated by their serialized node string, and [clearAll] is part of secure wipe.
+ */
 class NodesRepository(private val context: Context) {
 
     // Expose a Flow to observe the list of items
@@ -95,7 +102,7 @@ class NodesRepository(private val context: Context) {
     }
 
 
-    // Add a new item to the list
+    // Read the current list without observing future changes.
     suspend fun getAll() : List<Node> {
         try {
             return context.nodeDataStore.data.first();
