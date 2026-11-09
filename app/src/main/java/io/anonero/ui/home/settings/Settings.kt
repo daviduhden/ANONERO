@@ -20,6 +20,7 @@ package io.anonero.ui.home.settings
 
 import AnonNeroTheme
 import android.content.SharedPreferences
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box

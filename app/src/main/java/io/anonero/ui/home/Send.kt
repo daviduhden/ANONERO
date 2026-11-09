@@ -194,11 +194,11 @@ class SendViewModel : ViewModel() {
                         priority = PendingTransaction.Priority.Priority_Default,
                         keyImages = arrayListOf()
                     )
-                    if (!pendingTx.getErrorString().isNullOrEmpty()) {
+                    if (!pendingTx?.getErrorString().isNullOrEmpty()) {
                         throw Exception(pendingTx.getErrorString())
                     }
 
-                    writeUnsignedTransaction(pendingTx)
+                    pendingTx?.let { writeUnsignedTransaction(it) }
                     pendingTx
                 } else {
                     if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
