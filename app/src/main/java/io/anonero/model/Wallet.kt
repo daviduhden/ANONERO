@@ -361,18 +361,18 @@ class Wallet {
     @Throws(Exception::class)
     fun createTransaction(
         dst_addr: String?,
-    	amount: Long,
-    	sweepAll: Boolean = false,
-    	mixin_count: Int = 0,
-    	priority: PendingTransaction.Priority = PendingTransaction.Priority.Priority_Default,
-    	selectedUtxos: List<CoinsInfo> = arrayListOf()
+        amount: Long,
+        sweepAll: Boolean = false,
+        mixin_count: Int = 0,
+        priority: PendingTransaction.Priority = PendingTransaction.Priority.Priority_Default,
+        selectedUtxos: List<CoinsInfo> = arrayListOf()
     ): PendingTransaction {
-    	disposePendingTransaction()
+        disposePendingTransaction()
         val priority: Int = priority.ordinal
-    	val preferredInputs = selectedUtxos.map { it.key }.toCollection(ArrayList())
-    	if (selectedUtxos.isNotEmpty() && !sweepAll) {
-		checkSelectedAmounts(preferredInputs, amount, false)
-    	}
+        val preferredInputs = selectedUtxos.map { it.key }.toCollection(ArrayList())
+        if (selectedUtxos.isNotEmpty() && !sweepAll) {
+            checkSelectedAmounts(preferredInputs, amount, false)
+        }
         val txHandle =
             if (sweepAll) createSweepTransaction(
                 dst_addr!!, "", mixin_count, priority,

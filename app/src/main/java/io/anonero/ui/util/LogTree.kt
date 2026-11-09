@@ -55,6 +55,8 @@ class AnonLogTree(
         return !stealth && (BuildConfig.DEBUG || priority >= Log.INFO)
     }
 
+    // This is the Timber tree itself; using Timber here would recurse into this method.
+    @Suppress("LogNotTimber")
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         // Timber has already appended t's stack trace to message
         val item = AnonLog(date = Date().time, message = message, priority = priority, tag = tag ?: "Anon")

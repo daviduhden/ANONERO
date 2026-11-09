@@ -48,9 +48,9 @@ fun SettingsSectionHeader(title: String, modifier: Modifier = Modifier) {
 fun SettingsSwitchItem(
     title: String,
     checked: Boolean,
-    supporting: String? = null,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    supporting: String? = null,
 ) {
     ListItem(
         modifier = modifier
@@ -74,9 +74,9 @@ fun SettingsSwitchItem(
 @Composable
 fun SettingsActionItem(
     title: String,
-    supporting: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    supporting: String? = null,
 ) {
     ListItem(
         modifier = modifier
