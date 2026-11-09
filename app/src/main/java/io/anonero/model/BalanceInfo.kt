@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,13 @@
 package io.anonero.model
 
 
+/**
+ * Atomic-unit balance split between spendable and locked outputs.
+ *
+ * "Locked" here means outputs that are not yet unlocked by wallet2 (for example, recent
+ * coinbase outputs or time-locked outputs), not outputs frozen by the user. Use
+ * `Wallet`/`Coins` for freeze state. Amounts are atomic units (`1 XMR = 10^12`).
+ */
 class BalanceInfo(val rawUnlocked: Long, val rawLocked: Long) {
 
     val isUnlockedBalanceZero: Boolean

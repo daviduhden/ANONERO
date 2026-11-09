@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,13 @@
 
 package io.anonero.model;
 
+/**
+ * A Kotlin wrapper for a transaction object owned by wallet2.
+ *
+ * [handle] is a raw native pointer encoded as a `Long`. It is not a stable identifier and
+ * must never be persisted, sent over IPC, or dereferenced after the wallet that owns it
+ * has been closed. Implementations are [PendingTransaction] and [UnsignedTransaction].
+ */
 interface StagingTransaction {
     var handle: Long
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +57,11 @@ object VersionAsIntSerializer : KSerializer<Int> {
     }
 }
 
+/**
+ * Versioned backup envelope. The version selects how the wallet files inside the archive
+ * are keyed: v2 is PIN-keyed, v3 is passphrase-keyed, and v1 is the legacy format detected
+ * by its `Salted__` header before this JSON is read.
+ */
 @Serializable
 data class BackupPayload(
     val backup: Backup,
@@ -89,6 +94,13 @@ data class BackupMeta(
     val timestamp: Long
 )
 
+/**
+ * Wallet data and secret material inside an encrypted backup.
+ *
+ * [seed] is the recovery mnemonic and is plaintext inside the encrypted envelope. Never log
+ * this object or write it outside the encrypted archive. The `neroPayload` is present only
+ * when the backup came from a view-only wallet.
+ */
 @Serializable
 data class WalletBackup(
     val address: String,

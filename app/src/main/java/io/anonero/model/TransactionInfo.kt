@@ -6,7 +6,7 @@ import android.os.Parcelable
 import android.os.Parcelable.Creator
 import kotlinx.serialization.Serializable
 
-/*
+/**
  * One wallet2 transaction as exposed to the UI and history.
  *
  * The primary constructor is called from JNI; field order and types are part of that

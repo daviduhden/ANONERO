@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,17 @@ enum class NodeFields(val value: String) {
     }
 }
 
+/**
+ * A saved Monero daemon or LWS endpoint.
+ *
+ * [host] is stored without a scheme; [rpcPort] is the wallet RPC port. [networkType] must
+ * match the build's network. [trusted] is legacy metadata and is not the live trust flag
+ * used for LWS; the wallet layer sets trust explicitly on the native wallet.
+ *
+ * The string form is `user:password@host:port/network/name`, with optional credentials
+ * and label. Parsing is intentionally strict because the value can be restored from a
+ * backup or pasted by a user.
+ */
 @Serializable
 open class Node {
     var networkType: NetworkType? = null

@@ -1,5 +1,12 @@
 package io.anonero.model
 
+/**
+ * Monero network selector passed across JNI.
+ *
+ * [value] is the integer expected by wallet2 (`0` mainnet, `1` testnet, `2` stagenet).
+ * [toString] is the persisted/display name used by node settings; [toStringForBackUp]
+ * preserves the historical `NetworkType_*` spelling used inside encrypted backups.
+ */
 enum class NetworkType(val value: Int) {
     NetworkType_Mainnet(0), NetworkType_Testnet(1), NetworkType_Stagenet(2);
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,13 @@ package io.anonero.model
 
 import com.sparrowwallet.hummingbird.UR
 
+/**
+ * UR registry types used by ANONERO's airgapped transaction exchange.
+ *
+ * The strings and tags are part of the interchange format and must match the UR
+ * implementation on the other side. See `AnonUrTypes` consumers in `Send.kt`,
+ * `SpendQRExchange.kt`, and `QRScanner.kt`.
+ */
 enum class AnonUrRegistryTypes(val type: String, val tag: Int) {
     XMR_OUTPUT("xmr-output", 610),
     XMR_KEY_IMAGE("xmr-keyimage", 611),
@@ -41,4 +48,3 @@ enum class AnonUrRegistryTypes(val type: String, val tag: Int) {
     }
 
 }
-

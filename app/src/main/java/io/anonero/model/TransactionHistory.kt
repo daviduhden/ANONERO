@@ -4,7 +4,7 @@ import timber.log.Timber
 
 private const val TAG = "TransactionHistory"
 
-/*
+/**
  * Wallet-owned transaction list for one account.
  *
  * [handle] is a `jlong` borrowed from wallet2; it is valid only while the owning

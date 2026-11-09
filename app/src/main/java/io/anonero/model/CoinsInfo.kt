@@ -1,6 +1,6 @@
 package io.anonero.model
 
-/*
+/**
  * One wallet output as reported by wallet2 through the patched Coins API.
  *
  * [key] is the key image (used by coin control), [pub_key] is the output public key

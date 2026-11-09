@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package io.anonero.model
 
 import java.math.BigDecimal
 
-/*
+/**
  * wallet2's load-time summary of an unsigned set, parsed into review rows.
  *
  * UnsignedTransaction.confirmationMessage is built by checkLoadedTx from splitted_dsts --

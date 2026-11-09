@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,13 @@ import kotlinx.serialization.Serializable
 import org.json.JSONObject
 
 
+/**
+ * View-only key material used by the NERO flavor and by backups.
+ *
+ * It contains the public address and private view key, never the spend key. The payload is
+ * sensitive: the view key reveals all incoming transactions and balances. Do not log it or
+ * place it in an unencrypted file.
+ */
 @Serializable
 class NeroKeyPayload(
     val primaryAddress: String,

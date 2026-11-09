@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,12 @@
 
 package io.anonero.model
 
-/* A Monero subaddress account inside one wallet file (not a separate wallet). */
+/**
+ * A Monero subaddress account inside one wallet file (not a separate wallet).
+ *
+ * Balances are atomic units. [index] is the wallet2 major account index used by
+ * `Wallet.setAccountIndex`.
+ */
 data class AccountInfo(
     val index: Int,
     val label: String,

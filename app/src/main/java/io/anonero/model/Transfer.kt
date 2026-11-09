@@ -5,6 +5,13 @@ import android.os.Parcelable
 import android.os.Parcelable.Creator
 import kotlinx.serialization.Serializable
 
+/**
+ * One destination of a wallet2 transaction.
+ *
+ * This is the per-output amount/address pair exposed by `TransactionInfo.transfers`.
+ * [amount] is in atomic units. The list can be absent for transactions whose transfer
+ * details wallet2 does not report; callers must handle a null list.
+ */
 @Serializable
 class Transfer : Parcelable {
     var amount: Long
