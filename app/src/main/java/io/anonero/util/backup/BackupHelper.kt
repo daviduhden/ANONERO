@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ import io.anonero.util.PREFS_PASSPHRASE_HASH
 import io.anonero.util.RESTORE_HEIGHT
 import io.anonero.util.RestoreTarget
 import io.anonero.util.RestoreTargetNotEmptyException
+import io.anonero.util.MAX_RESTORE_HEIGHT
 import io.anonero.util.WALLET_PREFERENCES
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -62,6 +63,18 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class NetworkMismatchException : Exception()
+/**
+ * Encrypted backup export and restore.
+ *
+ * The current writer emits a zip of the active wallet files plus `anon.json`, encrypted
+ * with the v2/v3 AEAD envelope. The wallet copy is re-keyed to the seed passphrase so it
+ * restores on another device; the live wallet is never re-keyed. Older backups remain
+ * readable: v1 is the legacy `Salted__` CBC format, v2 is AEAD with PIN-keyed wallet files,
+ * and v3 is AEAD with passphrase-keyed wallet files.
+ *
+ * The decoy profile is intentionally excluded from export: a backup restores into MAIN, and
+ * exporting the decoy would either overwrite the legitimate wallet or leak decoy history.
+ */
 object BackupHelper {
     // 3: wallet files inside the zip are keyed to the seed passphrase (portable).
     // 2 and below: keyed to the PIN of the phone that made the backup -- which is also
@@ -75,6 +88,14 @@ object BackupHelper {
     )
     val nodeRepository: NodesRepository by inject(NodesRepository::class.java)
 
+    /**
+     * Creates a v3 encrypted backup of the active MAIN wallet.
+     *
+     * Preconditions: a managed wallet exists and the active profile is not the decoy.
+     * Side effects: pauses refresh, stores the wallet, copies only the active wallet's
+     * files, re-keys the copy to [seedPassphrase], clears the cache, and leaves the live
+     * wallet untouched. The returned file is in `cache/backup/`.
+     */
     suspend fun createBackUp(seedPassphrase: String, context: Context): String {
         if (AnonConfig.viewOnly) {
             require(seedPassphrase.length >= 8) { "Backup passphrase is too short" }
@@ -132,7 +153,12 @@ object BackupHelper {
         )
         val json = Json.encodeToString(backUpPayload)
 
-        context.cacheDir.deleteRecursively()
+        // Clear only transient backup/airgapped artifacts. Deleting the whole cache would
+        // also remove the live Tor cache and the cache log file while Tor may be running.
+        AnonConfig.clearSpendCacheFiles(context)
+        listOf("tmp_backup", "backup", "backup.zip", "backup.anon", "tmp_extract").forEach { name ->
+            File(context.cacheDir, name).deleteRecursively()
+        }
 
         val tmpBackupDir = File(context.cacheDir, "tmp_backup")
         if (tmpBackupDir.exists()) {
@@ -141,7 +167,10 @@ object BackupHelper {
         val date = Date()
         val sdf = SimpleDateFormat("dd_MM_yyyy' 'HH_mm_a", Locale.getDefault())
         val timeStamp: String = sdf.format(date)
-        val backupFile = File(context.cacheDir, "${R.string.app_name}_backup_$timeStamp.zip")
+        // Keep the unencrypted ZIP inside the transient tmp_backup directory so a crash
+        // between zip() and encryptFile() is cleaned by the startup purge. Never leave the
+        // seed-bearing archive in the cache root.
+        val backupFile = File(tmpBackupDir, "backup.zip")
         tmpBackupDir.mkdirs()
         try {
             val tmpBackupFile = File(tmpBackupDir, "anon.json")
@@ -151,16 +180,18 @@ object BackupHelper {
             // every refresh, and a store() landing mid-copy throws. Pause + settle, copy,
             // then resume. The store() is what puts the live sync state into the cache file.
             wallet.pauseRefresh()
-            wallet.store()
             // keep the live wallet paused until the copy is re-keyed and closed
             try {
+                if (!wallet.store()) throw java.io.IOException("Could not store the wallet")
                 // Copy only the active wallet's files. Copying the whole directory would
                 // put the decoy wallet (if configured) inside a backup of the legitimate
                 // wallet, which destroys the separation between the two profiles.
                 val walletFiles = walletDir.listFiles()
                     ?: throw java.io.IOException("Could not list wallet files")
                 walletFiles.filter {
-                    it.isFile && (it.name == walletName || it.name.startsWith("$walletName."))
+                    it.isFile && (it.name == walletName ||
+                        it.name == "$walletName.keys" ||
+                        it.name == "$walletName.address.txt")
                 }.forEach { it.copyTo(File(tmpBackupDir, it.name), overwrite = true) }
                 // The live wallet is keyed to the device secret W, which exists only in this
                 // phone's Keystore, so a raw copy opens nowhere else. Re-key the COPY to the seed
@@ -178,7 +209,9 @@ object BackupHelper {
                         if (!copy.setPassword(seedPassphrase)) {
                             throw Exception("backup copy could not be re-keyed: ${copy.status.errorString}")
                         }
-                        copy.store()
+                        if (!copy.store()) {
+                            throw Exception("backup copy could not be stored: ${copy.status.errorString}")
+                        }
                     } finally {
                         manager.closeUnmanaged(copy)
                     }
@@ -256,30 +289,47 @@ object BackupHelper {
             return false
         }
         val manager = WalletManager.instance ?: return false
-        var opened = manager.openWallet(walletFile.path, passPhrase)
-        if (!opened.status.isOk) {
-            runCatching { manager.close(opened) }
-            opened = manager.openWallet(walletFile.path, pin)
+        // openWallet throws when wallet2 cannot open the file. A failed passphrase must
+        // still fall back to the PIN for legacy v2 backups, so do not let that exception
+        // skip the second attempt.
+        var openedWithPin = false
+        var opened = runCatching { manager.openWallet(walletFile.path, passPhrase) }.getOrNull()
+        if (opened?.status?.isOk != true) {
+            opened?.let { runCatching { manager.close(it) } }
+            openedWithPin = true
+            opened = runCatching { manager.openWallet(walletFile.path, pin) }.getOrNull()
         }
-        if (!opened.status.isOk) {
+        if (opened?.status?.isOk != true) {
             Timber.tag(TAG).e("restore: neither passphrase nor PIN opened the restored wallet")
-            runCatching { manager.close(opened) }
+            opened?.let { runCatching { manager.close(it) } }
             return false
         }
+        val wallet = opened
+        var bound = false
         return try {
             val w = WalletKey.newSecret()
-            if (!opened.setPassword(w)) {
-                throw Exception("setPassword failed: ${opened.status?.errorString}")
+            if (!wallet.setPassword(w)) {
+                throw Exception("setPassword failed: ${wallet.status?.errorString}")
             }
-            opened.store()
+            if (!wallet.store()) {
+                throw Exception("store failed after re-key")
+            }
             WalletKey.store(context, walletName, w)
-            prefs.edit(commit = true) { putString(PREFS_PIN_HASH, PinHash.hash(pin)) }
+            val committed = prefs.edit()
+                .putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                .commit()
+            if (!committed) throw Exception("could not persist the restored PIN hash")
+            bound = true
             true
         } catch (e: Exception) {
-            Timber.tag(TAG).e("restore: failed to bind wallet to device")
+            Timber.tag(TAG).e(e, "restore: failed to bind wallet to device")
+            // Best effort: put the in-memory wallet back on the credential that opened it
+            // so a later store cannot leave the file keyed to an unrecorded secret.
+            val original = if (openedWithPin) pin else passPhrase
+            runCatching { wallet.setPassword(original); wallet.store() }
             false
         } finally {
-            runCatching { manager.close(opened) }
+            if (!bound) runCatching { manager.close(wallet) }
         }
     }
 
@@ -322,6 +372,13 @@ object BackupHelper {
         return backup;
     }
 
+    /**
+     * Restores an already-decrypted backup payload into MAIN.
+     *
+     * Requires an empty MAIN target. A failure after copying files removes only MAIN so a
+     * configured decoy survives. The restored wallet is re-keyed to a fresh device secret
+     * and bound to [pin]; the caller must have verified the passphrase and PIN.
+     */
     suspend fun restoreBackUp(backupPayload: BackupPayload, passPhrase: String, pin: String): Boolean {
         try {
             val context = requireNotNull(AnonConfig.context)
@@ -340,39 +397,18 @@ object BackupHelper {
 
             val anonDir = AnonConfig.getDefaultWalletDir(context)
 
-            val v1Node = backupPayload.backup.node
-            walletPrefs.edit(commit = true) {
-                putString(NodeFields.RPC_HOST.value, v1Node.host)
-                putInt(NodeFields.RPC_PORT.value, v1Node.rpcPort)
-                putString(NodeFields.RPC_USERNAME.value, v1Node.username)
-                putString(NodeFields.RPC_PASSWORD.value, v1Node.password)
-                putString(NodeFields.RPC_NETWORK.value, v1Node.networkType)
-            }
-
             val wallet = backupPayload.backup.wallet
-            val nodes = backupPayload.backup.nodes;
+            val restoreHeight = wallet.restoreHeight ?: 0L
+            require(restoreHeight in 0..MAX_RESTORE_HEIGHT) { "Invalid restore height" }
+            val v1Node = backupPayload.backup.node
+            val nodes = backupPayload.backup.nodes
 
-            nodes.forEach {
-                nodeRepository.addItem(it)
-            }
-            if (nodes.isEmpty() && v1Node.host.isNotEmpty()) {
-                val node = Node().apply {
-                    host = v1Node.host
-                    rpcPort = v1Node.rpcPort
-                    username = v1Node.username
-                    password = v1Node.password
-                    networkType = AnonConfig.getNetworkType()
-                }
-                nodes.forEach {
-                    nodeRepository.addItem(node)
-                }
-            }
             walletPrefs.edit(commit = true) {
                 putString(
                     PREFS_PASSPHRASE_HASH,
-                    KeyStoreHelper.getCrazyPass(AnonConfig.context, passPhrase)
+                    KeyStoreHelper.getCrazyPass(context, passPhrase)
                 )
-                putLong(RESTORE_HEIGHT, wallet.restoreHeight ?: 0L)
+                putLong(RESTORE_HEIGHT, restoreHeight)
             }
             val decoyName = WalletProfile.DECOY.walletName
             extractDestination.listFiles()?.forEach { entry ->
@@ -381,7 +417,52 @@ object BackupHelper {
                 if (entry.name == decoyName || entry.name.startsWith("$decoyName.")) return@forEach
                 entry.copyTo(File(anonDir, entry.name), true)
             }
-            if (bindRestoredWallet(passPhrase, pin)) return true
+            val bound = try {
+                bindRestoredWallet(passPhrase, pin)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "restore: failed to bind restored wallet")
+                false
+            }
+            if (bound) {
+                val restored = WalletManager.instance?.wallet
+                val expectedAddress = wallet.primaryAddress.ifEmpty { wallet.address }
+                val identityMatches = restored != null &&
+                    (expectedAddress.isEmpty() || restored.address == expectedAddress) &&
+                    restored.isWatchOnly() == AnonConfig.viewOnly
+                if (!identityMatches) {
+                    Timber.tag(TAG).e("restore: restored wallet identity does not match backup")
+                    restored?.let { runCatching { WalletManager.instance?.close(it) } }
+                    WalletProfileStore.removeProfile(context, walletPrefs, WalletProfile.MAIN)
+                    return false
+                }
+                // Persist node settings only after the wallet is bound. A failed restore must
+                // not leave a malicious or stale v1 node as the active configuration.
+                try {
+                    walletPrefs.edit(commit = true) {
+                        putString(NodeFields.RPC_HOST.value, v1Node.host)
+                        putInt(NodeFields.RPC_PORT.value, v1Node.rpcPort)
+                        putString(NodeFields.RPC_USERNAME.value, v1Node.username)
+                        putString(NodeFields.RPC_PASSWORD.value, v1Node.password)
+                        putString(NodeFields.RPC_NETWORK.value, v1Node.networkType)
+                    }
+                    nodes.forEach { nodeRepository.addItem(it) }
+                    if (nodes.isEmpty() && v1Node.host.isNotEmpty()) {
+                        val node = Node().apply {
+                            host = v1Node.host
+                            rpcPort = v1Node.rpcPort
+                            username = v1Node.username
+                            password = v1Node.password
+                            networkType = AnonConfig.getNetworkType()
+                        }
+                        nodeRepository.addItem(node)
+                    }
+                } catch (e: Exception) {
+                    // The wallet is already restored and bound; a node-list failure must not
+                    // remove it. The user can configure a node from Settings.
+                    Timber.tag(TAG).w(e, "restore: failed to persist backup node settings")
+                }
+                return true
+            }
             // Copied but unbound files open nowhere. Remove only the main profile: a
             // configured decoy wallet must survive a failed main restore.
             WalletProfileStore.removeProfile(

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,23 @@
 
 package io.anonero.model
 
+/**
+ * A wallet2 unsigned transaction set loaded from disk or imported over QR/UR.
+ *
+ * The set contains the real outputs `sign()` will construct. [confirmationMessage] is
+ * wallet2's own summary of those outputs, and [SigningSummary] parses it for review.
+ * The scalar `address`, `amount`, and `fee` getters are advisory metadata; do not build a
+ * review solely from them.
+ *
+ * [sign] signs this loaded object. Do not reload the file and sign a different snapshot
+ * after the user has reviewed this one. The [handle] is owned by wallet2 and is valid
+ * only while the owning wallet remains open.
+ */
 class UnsignedTransaction internal constructor(override var handle: Long) : StagingTransaction {
+    internal fun invalidate() {
+        handle = 0L
+    }
+
     enum class Status {
         Status_Ok,
         Status_Error,

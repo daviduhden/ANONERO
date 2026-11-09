@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,14 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * Backup encryption formats.
+ *
+ * New backups use `encryptFile`/`decryptFile`: `ANONBAK2` magic, PBKDF2-HMAC-SHA256 at
+ * 600,000 iterations, AES-256-GCM with a 12-byte IV and 128-bit tag. The legacy string
+ * methods and the `Salted__` v1 reader exist only to keep old backups restorable; do not
+ * use them for new data.
+ */
 object EncryptUtil {
 
     const val DEFAULT_ITR = 11000
@@ -117,8 +125,14 @@ object EncryptUtil {
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
         val decrypted = cipher.doFinal(cipherText)
-        // Last byte of the decrypted text is the number of padding bytes needed to remove
-        val plaintext = decrypted.copyOfRange(0, decrypted.size - decrypted.last().toInt())
+        if (decrypted.isEmpty()) throw IllegalArgumentException("Empty backup payload")
+        // Last byte is PKCS#5/7 padding. Treat it as unsigned; a negative Java byte would
+        // otherwise underflow the copy range.
+        val padding = decrypted.last().toInt() and 0xFF
+        if (padding !in 1..16 || padding > decrypted.size) {
+            throw IllegalArgumentException("Invalid backup padding")
+        }
+        val plaintext = decrypted.copyOfRange(0, decrypted.size - padding)
         return plaintext.toString(Charsets.UTF_8)
 
     }
@@ -147,17 +161,45 @@ object EncryptUtil {
      * -- or worse, plausible garbage. v1 files restore exactly as they always did.
      */
     fun decryptFile(key: String, inputFile: File, outputFile: File) {
-        val magic = ByteArray(8)
-        FileInputStream(inputFile).use { it.read(magic) }
+        val magic = ByteArray(V2_MAGIC.length)
+        FileInputStream(inputFile).use { input ->
+            if (!readFully(input, magic)) throw IllegalArgumentException("Backup header is truncated")
+        }
         if (magic.decodeToString() == V2_MAGIC) return decryptFileV2(key, inputFile, outputFile)
         decryptFileV1(key, inputFile, outputFile)
     }
 
+    private fun readFully(input: java.io.InputStream, buffer: ByteArray): Boolean {
+        var offset = 0
+        while (offset < buffer.size) {
+            val read = input.read(buffer, offset, buffer.size - offset)
+            if (read < 0) return false
+            offset += read
+        }
+        return true
+    }
+
+    private fun skipFully(input: java.io.InputStream, count: Long) {
+        var remaining = count
+        while (remaining > 0) {
+            val skipped = input.skip(remaining)
+            if (skipped <= 0) {
+                if (input.read() < 0) throw IllegalArgumentException("Backup header is truncated")
+                remaining -= 1
+            } else {
+                remaining -= skipped
+            }
+        }
+    }
+
     private fun decryptFileV2(key: String, inputFile: File, outputFile: File) {
         FileInputStream(inputFile).use { input ->
-            input.skip(V2_MAGIC.length.toLong())
-            val salt = ByteArray(V2_SALT_BYTES).also { input.read(it) }
-            val iv = ByteArray(V2_IV_BYTES).also { input.read(it) }
+            skipFully(input, V2_MAGIC.length.toLong())
+            val salt = ByteArray(V2_SALT_BYTES)
+            val iv = ByteArray(V2_IV_BYTES)
+            if (!readFully(input, salt) || !readFully(input, iv)) {
+                throw IllegalArgumentException("Backup header is truncated")
+            }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, v2Key(key, salt), GCMParameterSpec(V2_TAG_BITS, iv))
             CipherInputStream(BufferedInputStream(input), cipher).use { decrypted ->
@@ -167,33 +209,33 @@ object EncryptUtil {
     }
 
     private fun decryptFileV1(key: String, inputFile: File, outputFile: File) {
-        val fis = FileInputStream(inputFile)
-        val prefix = ByteArray(16)
-        fis.read(prefix)
-        //Extract salt from the input file, 0-8 is the salt prefix, 8-16 is the salt
-        val salt = prefix.copyOfRange(8, 16)
-        var keySpec: SecretKeySpec?
-        var ivSpec: IvParameterSpec?
-        PKCS5S2ParametersGenerator(SHA256Digest()).let { generator ->
-            generator.init(key.toByteArray(), salt, DEFAULT_ITR)
-            (generator.generateDerivedMacParameters(48 * 8) as KeyParameter).key.let { secretKey ->
-                val bytes = secretKey.copyOfRange(0, 32)
-                keySpec = SecretKeySpec(bytes, "AES")
-                ivSpec = IvParameterSpec(secretKey.copyOfRange(32, secretKey.size))
-                generator.password.fill('*'.code.toByte())
-                secretKey.fill('*'.code.toByte())
+        FileInputStream(inputFile).use { fis ->
+            val prefix = ByteArray(16)
+            if (!readFully(fis, prefix)) throw IllegalArgumentException("Backup header is truncated")
+            if (!prefix.copyOfRange(0, 8).contentEquals(SALT_PREFIX.toByteArray())) {
+                throw IllegalArgumentException("Unknown backup format")
+            }
+            //Extract salt from the input file, 0-8 is the salt prefix, 8-16 is the salt
+            val salt = prefix.copyOfRange(8, 16)
+            var keySpec: SecretKeySpec?
+            var ivSpec: IvParameterSpec?
+            PKCS5S2ParametersGenerator(SHA256Digest()).let { generator ->
+                generator.init(key.toByteArray(), salt, DEFAULT_ITR)
+                (generator.generateDerivedMacParameters(48 * 8) as KeyParameter).key.let { secretKey ->
+                    val bytes = secretKey.copyOfRange(0, 32)
+                    keySpec = SecretKeySpec(bytes, "AES")
+                    ivSpec = IvParameterSpec(secretKey.copyOfRange(32, secretKey.size))
+                    generator.password.fill('*'.code.toByte())
+                    secretKey.fill('*'.code.toByte())
+                }
+            }
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+            val cis = CipherInputStream(BufferedInputStream(fis), cipher)
+            cis.use { decrypted ->
+                outputFile.outputStream().use { decrypted.copyTo(it, BUFFER_SIZE) }
             }
         }
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
-        val fileInputStream = inputFile.inputStream()
-        // Skip the salt prefix and salt
-        fileInputStream.skip(16)
-        val cis = CipherInputStream(BufferedInputStream(fileInputStream), cipher)
-        val fos = outputFile.outputStream()
-        cis.copyTo(fos, BUFFER_SIZE)
-        cis.close()
-        fos.close()
     }
 
 }

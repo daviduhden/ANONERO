@@ -8,6 +8,18 @@ import java.util.Locale
 
 private const val TAG = "WalletManager"
 
+/**
+ * Process-wide owner of the currently open wallet.
+ *
+ * A [WalletManager] creates and opens wallet2 objects through JNI and keeps at most one
+ * *managed* wallet in [wallet]. The managed wallet is the one the UI observes through
+ * `WalletState`. Explicitly unmanaged wallets are used for work that
+ * must not replace the live wallet: creating the decoy and re-keying a backup copy.
+ *
+ * Native wallet calls can block on disk or network I/O. Call this class off the Android
+ * main thread. The singleton is created lazily by [instance]; [AnonConfig] decides the
+ * network type at process start.
+ */
 class WalletManager {
     var networkType = NetworkType.NetworkType_Mainnet
     var wallet: Wallet? = null
@@ -46,6 +58,7 @@ class WalletManager {
     ): Wallet {
         val walletHandle =
             createWalletJ(aFile.absolutePath, password, passphrase, language, networkType.value)
+        if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         if (wallet.status.isOk) {
@@ -60,7 +73,13 @@ class WalletManager {
 //                wallet.setRestoreHeight(restoreHeight)
 //            }
 //            Log.d("WalletManager.kt", "Changed Restore Height from $oldHeight to ${wallet.getRestoreHeight()}")
-            wallet.setPassword(password) // this rewrites the keys file (which contains the restore height)
+            // This rewrites the keys file (which contains the restore height). If it fails,
+            // the caller must not proceed with a wallet whose keys file is inconsistent.
+            if (!wallet.setPassword(password)) {
+                throw IllegalStateException("Wallet password update failed")
+            }
+        } else {
+            throw IllegalStateException("Wallet creation failed: ${wallet.status.errorString}")
         }
         return wallet
     }
@@ -75,9 +94,13 @@ class WalletManager {
         passphrase: String,
         language: String,
         height: Long
-    ): Wallet = Wallet(
-        createWalletJ(aFile.absolutePath, password, passphrase, language, networkType.value)
-    )
+    ): Wallet {
+        val handle = createWalletJ(
+            aFile.absolutePath, password, passphrase, language, networkType.value
+        )
+        if (handle == 0L) throw IllegalStateException("Wallet creation failed")
+        return Wallet(handle)
+    }
 
     private external fun createWalletJ(
         path: String,
@@ -89,6 +112,7 @@ class WalletManager {
 
     fun openWallet(path: String, password: String): Wallet {
         val walletHandle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
+        if (walletHandle == 0L) throw IllegalStateException("Wallet open failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         return wallet
@@ -98,8 +122,11 @@ class WalletManager {
      * Opens a second wallet without making it the managed live one -- for working on a
      * copy while the real wallet stays open. Close it with [closeUnmanaged].
      */
-    fun openWalletUnmanaged(path: String, password: String): Wallet =
-        Wallet(openWalletJ(path, password, networkType.value, AnonConfig.viewOnly))
+    fun openWalletUnmanaged(path: String, password: String): Wallet {
+        val handle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
+        if (handle == 0L) throw IllegalStateException("Wallet open failed")
+        return Wallet(handle)
+    }
 
     fun closeUnmanaged(wallet: Wallet): Boolean = closeJ(wallet)
 
@@ -122,6 +149,7 @@ class WalletManager {
             mnemonic, offset,
             networkType.value, restoreHeight
         )
+        if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         return wallet
@@ -142,6 +170,7 @@ class WalletManager {
             mnemonic, offset,
             networkType.value
         )
+        if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         return wallet
@@ -162,6 +191,7 @@ class WalletManager {
             language, networkType.value, restoreHeight,
             addressString, viewKeyString, spendKeyString
         )
+        if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         return wallet
@@ -186,6 +216,7 @@ class WalletManager {
             networkType.value, deviceName, restoreHeight,
             "5:20"
         )
+        if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         return wallet
@@ -202,13 +233,19 @@ class WalletManager {
     external fun closeJ(wallet: Wallet?): Boolean
     fun close(wallet: Wallet): Boolean {
         unmanageWallet(wallet)
-        val closed = closeJ(wallet)
-        if (!closed) {
-            // in case we could not close it
-            // we manage it again
+        return try {
+            val closed = closeJ(wallet)
+            if (!closed) {
+                // in case we could not close it
+                // we manage it again
+                manageWallet(wallet)
+            }
+            closed
+        } catch (e: Exception) {
+            // A native exception must not leave the wallet unmanaged and unreachable.
             manageWallet(wallet)
+            throw e
         }
-        return closed
     }
 
     fun walletExists(aFile: File): Boolean {
@@ -231,12 +268,13 @@ class WalletManager {
     // this should not be called on the main thread as it connects to the node (and takes a long time)
     fun setDaemon(node: Node?) {
         if (node != null) {
-            daemonAddress = node.address
             require(networkType === node.networkType) { "network type does not match" }
+            daemonAddress = node.address
             daemonUsername = node.username
             daemonPassword = node.password
             daemonAddress?.let { addr -> setDaemonAddressJ(addr) }
-            Timber.tag(TAG).i("setDaemon:  %s", daemonAddress)
+            // The node address can identify the user's chosen server; do not persist it in logs.
+            Timber.tag(TAG).i("setDaemon: configured")
         } else {
             daemonAddress = null
             daemonUsername = ""

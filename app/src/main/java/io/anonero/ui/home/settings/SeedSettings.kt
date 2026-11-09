@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,6 +154,9 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     // nothing secret is composed until the passphrase checks out: the blur behind the
     // dialog is a no-op below Android 12
     var verified by remember { mutableStateOf(false) }
+    var viewKeyText by remember { mutableStateOf("") }
+    var spendKeyText by remember { mutableStateOf("") }
+    var restoreHeightText by remember { mutableStateOf("") }
 
     val walletState = koinInject<WalletState>()
     val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
@@ -171,11 +174,39 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             legacySeed = placeholderSeed
             passPhrase = ""
             neroPayload = ""
+            viewKeyText = ""
+            spendKeyText = ""
+            restoreHeightText = ""
             // Dialogs have their own window and must not cover the PIN overlay.
             passPhraseDialog = false
         } else if (!verified) {
             passPhraseDialog = true
         }
+    }
+
+    LaunchedEffect(verified, locked) {
+        if (!verified || locked) {
+            viewKeyText = ""
+            spendKeyText = ""
+            restoreHeightText = ""
+            return@LaunchedEffect
+        }
+        // Never read wallet2 keys during composition or on the main thread.
+        val values = withContext(Dispatchers.IO) {
+            val w = WalletManager.instance?.wallet
+            if (w == null) {
+                Triple("", "", "")
+            } else {
+                Triple(
+                    runCatching { w.getSecretViewKey() }.getOrDefault(""),
+                    runCatching { w.getSecretSpendKey() }.getOrDefault(""),
+                    runCatching { w.getRestoreHeight().toString() }.getOrDefault(""),
+                )
+            }
+        }
+        viewKeyText = values.first
+        spendKeyText = values.second
+        restoreHeightText = values.third
     }
 
     val backgroundBlur: Float by animateFloatAsState(
@@ -209,7 +240,10 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
         seedJob = scope.launch {
             val seeds = withContext(Dispatchers.IO) {
                 val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
-                val hashedPass = KeyStoreHelper.getCrazyPass(AnonConfig.context, enteredPassphrase)
+                val appContext = AnonConfig.context?.applicationContext
+                val hashedPass = appContext?.let {
+                    KeyStoreHelper.getCrazyPass(it, enteredPassphrase)
+                } ?: ""
                 currentCoroutineContext().ensureActive()
                 if (hash == hashedPass && !walletState.backgroundSync) {
                     val seed = getWalletSeed(enteredPassphrase)?.split(" ")
@@ -507,7 +541,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         supportingContent = {
                             // private keys are not selectable: a copy lands in the clipboard and its history
                             Text(
-                                text = if (verified && !locked) "${wallet?.getSecretViewKey()}" else "••••••••",
+                                text = if (verified && !locked) viewKeyText else "••••••••",
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                         }
@@ -529,7 +563,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         },
                         supportingContent = {
                             Text(
-                                text = if (verified && !locked) "${wallet?.getSecretSpendKey()}" else "••••••••",
+                                text = if (verified && !locked) spendKeyText else "••••••••",
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                         }
@@ -553,7 +587,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         supportingContent = {
                             SelectionContainer {
                                 Text(
-                                    text = "${wallet?.getRestoreHeight() ?: ""}",
+                                    text = restoreHeightText,
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
                             }

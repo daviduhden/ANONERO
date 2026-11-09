@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,23 +79,29 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.anonero.AnonConfig
+import io.anonero.model.node.NodeFields
 import io.anonero.services.AnonWalletHandler
 import io.anonero.store.LogRepository
 import io.anonero.store.NodesRepository
 import io.anonero.ui.MainActivity
 import io.anonero.util.KeyStoreHelper
 import io.anonero.util.PREFS_PASSPHRASE_HASH
+import io.anonero.util.SecureClipboard
 import io.anonero.util.WalletProfileStore
-import io.anonero.util.WalletSession
 import io.anonero.util.ShakeConfig
 import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WALLET_PROXY
+import io.anonero.util.WALLET_PROXY_PORT
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
 import io.anonero.util.backup.BackupHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
@@ -106,6 +112,13 @@ import io.anonero.R
 
 private const val TAG = "SecureWipe"
 
+/**
+ * Executes a profile-scoped secure wipe after the UI has verified the seed passphrase.
+ *
+ * It stops the foreground service, closes the active wallet, removes only that profile's
+ * files/Keystore secret/hashes, clears shared non-credential state (nodes, logs, cache), and
+ * resets the PIN throttle. A failed wallet close aborts before removing profile data.
+ */
 class SecureWipeViewModel(
     private val anonWalletHandler: AnonWalletHandler,
     private val sharedPreferences: SharedPreferences,
@@ -119,46 +132,70 @@ class SecureWipeViewModel(
     private val _wipeProgress = MutableLiveData(0.1f)
     val wipeProgress: LiveData<Float> = _wipeProgress
 
+    @Volatile
+    var lastWipeFailed: Boolean = false
+        private set
+
     fun wipe(passPhrase: String, activity: Activity): Job {
+        lastWipeFailed = false
         return viewModelScope.launch(Dispatchers.IO) {
-            (activity as MainActivity).stopNotificationService()
-            _wipeProgress.postValue(.3f)
-            _wipeProgressMessage.postValue(R.string.wiping_wallet)
-            anonWalletHandler.wipe(passPhrase)
-            delay(1000)
-            _wipeProgress.postValue(.5f)
-            _wipeProgressMessage.postValue(R.string.wallet_cleared)
-            delay(1200)
-            _wipeProgress.postValue(.6f)
-            _wipeProgressMessage.postValue(R.string.clearing_preferences)
-            // AnonWalletHandler.wipe removed only this profile's keys. Clearing the whole
-            // preference file here would delete the other profile's PIN gate and strand
-            // its wallet files, so only shared, non-credential state is cleared.
-            sharedPreferences.edit {
-                remove("pin_attempts")
-                remove("pin_last_attempt")
-                if (!WalletSession.isDecoy) {
-                    remove(io.anonero.util.PREFS_LWS_ENABLED)
-                    remove(io.anonero.util.PREFS_LWS_HOST)
-                    remove(io.anonero.util.PREFS_LWS_PORT)
+            try {
+                withContext(NonCancellable) {
+                    (activity as? MainActivity)?.stopNotificationService()
+                    AnonConfig.context?.applicationContext?.let { SecureClipboard.clear(it) }
+                    _wipeProgress.postValue(.3f)
+                    _wipeProgressMessage.postValue(R.string.wiping_wallet)
+                    anonWalletHandler.wipe(passPhrase)
+                    delay(1000)
+                    _wipeProgress.postValue(.5f)
+                    _wipeProgressMessage.postValue(R.string.wallet_cleared)
+                    delay(1200)
+                    _wipeProgress.postValue(.6f)
+                    _wipeProgressMessage.postValue(R.string.clearing_preferences)
+                    // AnonWalletHandler.wipe removed only this profile's keys. Clearing the whole
+                    // preference file here would delete the other profile's PIN gate and strand
+                    // its wallet files, so only shared, non-credential state is cleared.
+                    sharedPreferences.edit {
+                        remove("pin_attempts")
+                        remove("pin_last_attempt")
+                        // Network identity is shared by both profiles. Clear it on every
+                        // wipe so the decoy cannot inherit the main node/LWS endpoint.
+                        remove(io.anonero.util.PREFS_LWS_ENABLED)
+                        remove(io.anonero.util.PREFS_LWS_HOST)
+                        remove(io.anonero.util.PREFS_LWS_PORT)
+                        remove(NodeFields.RPC_HOST.value)
+                        remove(NodeFields.RPC_PORT.value)
+                        remove(NodeFields.RPC_USERNAME.value)
+                        remove(NodeFields.RPC_PASSWORD.value)
+                        remove(NodeFields.RPC_NETWORK.value)
+                        remove(NodeFields.NODE_NAME.value)
+                        remove(WALLET_PROXY)
+                        remove(WALLET_PROXY_PORT)
+                    }
+                    delay(800)
+                    _wipeProgress.postValue(.7f)
+                    _wipeProgressMessage.postValue(R.string.clearing_nodes)
+                    nodesRepository.clearAll()
+                    delay(1200)
+                    _wipeProgressMessage.postValue(R.string.clearing_logs)
+                    delay(1000)
+                    logRepository.clear()
+                    // cache holds the last exported backup and any extracted restore
+                    BackupHelper.cleanCacheDir()
+                    AnonConfig.disposeState()
+                    _wipeProgress.postValue(.8f)
+                    _wipeProgressMessage.postValue(R.string.logs_cleared)
+                    delay(1200)
+                    _wipeProgress.postValue(1f)
+                    _wipeProgressMessage.postValue(R.string.wallet_wiped_successfully)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                lastWipeFailed = true
+                Timber.tag(TAG).e(e, "secure wipe failed")
+                _wipeProgressMessage.postValue(R.string.wipe_failed)
             }
-            delay(800)
-            _wipeProgress.postValue(.7f)
-            _wipeProgressMessage.postValue(R.string.clearing_nodes)
-            nodesRepository.clearAll()
-            delay(1200)
-            _wipeProgressMessage.postValue(R.string.clearing_logs)
-            delay(1000)
-            logRepository.clear()
-            // cache holds the last exported backup and any extracted restore
-            BackupHelper.cleanCacheDir()
-            AnonConfig.disposeState()
-            _wipeProgress.postValue(.8f)
-            _wipeProgressMessage.postValue(R.string.logs_cleared)
-            delay(1200)
-            _wipeProgress.postValue(1f)
-            _wipeProgressMessage.postValue(R.string.wallet_wiped_successfully)
         }
     }
 
@@ -179,6 +216,7 @@ fun SecureWipe(
     var passPhraseDialog by remember { mutableStateOf(true) }
     var passPhrase by remember { mutableStateOf("") }
     var errorRes by remember { mutableStateOf<Int?>(null) }
+    var wipeStarted by remember { mutableStateOf(false) }
     val errorShake = rememberShakeController()
     val scope = rememberCoroutineScope()
     val progressMessage by secureWipeViewModel.wipeProgressMessage.observeAsState(null)
@@ -187,7 +225,7 @@ fun SecureWipe(
     val activity = LocalActivity.current
 
     BackHandler {
-        progressMessage != null
+        wipeStarted || progressMessage != null
     }
 
 
@@ -219,18 +257,20 @@ fun SecureWipe(
     fun clearWallet() {
         scope.launch(Dispatchers.IO) {
             requestClearScreen(true)
+            val appContext = AnonConfig.context?.applicationContext ?: return@launch
             val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
             val hashedPass =
-                KeyStoreHelper.getCrazyPass(AnonConfig.context, passPhrase)
+                KeyStoreHelper.getCrazyPass(appContext, passPhrase)
             if (hash == hashedPass) {
                 val seed = getWalletSeed(passPhrase)?.split(" ")
                 if (seed != null) {
+                    wipeStarted = true
                     passPhraseDialog = false
                     HapticFeedbackConstants.CONTEXT_CLICK
                     activity?.let { activity ->
                         secureWipeViewModel.wipe(passPhrase, activity)
                             .invokeOnCompletion {
-                                if (it == null) {
+                                if (it == null && !secureWipeViewModel.lastWipeFailed) {
                                     view.performHapticFeedback(
                                         HapticFeedbackConstants.CONTEXT_CLICK
                                     )
@@ -238,7 +278,9 @@ fun SecureWipe(
                                         goToHome()
                                     }
                                 } else {
-                                    Timber.tag(TAG).e(it)
+                                    it?.let { failure ->
+                                        Timber.tag(TAG).e(failure)
+                                    }
                                     errorRes = R.string.wipe_failed
                                     requestClearScreen(false)
                                 }

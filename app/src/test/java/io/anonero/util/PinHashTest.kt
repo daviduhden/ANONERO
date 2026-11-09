@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,14 @@ class PinHashTest {
         val stored = PinHash.hash("1234")
         assertTrue(PinHash.matchesOrDummy("1234", stored))
         assertFalse(PinHash.matchesOrDummy("1235", stored))
+    }
+
+    @Test
+    fun `stored iteration counts and lengths are bounded`() {
+        val parts = PinHash.hash("1234").split(":")
+        assertFalse(PinHash.matches("1234", "v2:1:${parts[2]}:${parts[3]}"))
+        assertFalse(PinHash.matches("1234", "v2:999999999:${parts[2]}:${parts[3]}"))
+        assertFalse(PinHash.matches("1234", "v2:210000:AAAA:${parts[3]}"))
     }
 
     @Test

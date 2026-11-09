@@ -20,6 +20,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,6 +36,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.asLiveData
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import io.anonero.AnonApplication
@@ -62,6 +64,7 @@ import io.anonero.util.WALLET_USE_TOR
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -72,6 +75,21 @@ import timber.log.Timber
 
 private const val TAG = "MainActivity"
 
+/**
+ * Single Android activity and Compose host.
+ *
+ * Responsibilities that must remain here rather than in a composable:
+ * - applying the per-app locale before the view tree is created;
+ * - installing the splash screen before `super.onCreate`;
+ * - setting `FLAG_SECURE` for every window content;
+ * - deciding whether the lock overlay is shown from [WalletState.backgroundSyncFlow];
+ * - entering background sync when the user leaves the app or the screen turns off;
+ * - closing the wallet, stopping Tor and the foreground service, and killing the process
+ *   on a real finish.
+ *
+ * The activity does not own the wallet. It delegates open/close/sync to the services and
+ * survives configuration changes without closing the wallet.
+ */
 class MainActivity : ComponentActivity() {
 
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -152,8 +170,14 @@ class MainActivity : ComponentActivity() {
                 val themeMode by ThemeStore.mode.collectAsState()
                 AnonNeroTheme(mode = themeMode) {
                     val navController = rememberNavController()
-                    navController.addOnDestinationChangedListener { x, destination, d ->
-                        Timber.tag(TAG).d("destination changed to ${destination.route}")
+                    DisposableEffect(navController) {
+                        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                            Timber.tag(TAG).d("destination changed to ${destination.route}")
+                        }
+                        navController.addOnDestinationChangedListener(listener)
+                        onDispose {
+                            navController.removeOnDestinationChangedListener(listener)
+                        }
                     }
                     val showLockScreen by walletState.backgroundSyncFlow.asLiveData().observeAsState(walletState.backgroundSync)
                     Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
@@ -274,22 +298,28 @@ class MainActivity : ComponentActivity() {
             super.onDestroy()
             return
         }
-        scope.launch(Dispatchers.IO) {
-            WalletManager.instance?.wallet?.let {
-                it.store()
-                it.close()
+        // Do not kill the process until the wallet has stored and closed. The close runs
+        // off the main thread with a bounded wait; cancellation of the UI scope must not
+        // cancel this job before it finishes.
+        val closeScope = CoroutineScope(Dispatchers.IO)
+        closeScope.launch {
+            withTimeoutOrNull(5_000) {
+                WalletManager.instance?.wallet?.let {
+                    it.store()
+                    it.close()
+                }
             }
-        }.invokeOnCompletion {
-            if (it != null) {
-                Timber.tag(TAG).e(it)
+        }.invokeOnCompletion { failure ->
+            if (failure != null) {
+                Timber.tag(TAG).e(failure)
             }
+            torService.dispose()
+            scope.cancel()
+            // the service is START_STICKY: left started, Android reads the kill below as a crash
+            // and restarts the app headless a second later, notification and Tor included
+            stopNotificationService()
+            Process.killProcess(Process.myPid())
         }
-        torService.dispose()
-        scope.cancel()
         super.onDestroy()
-        // the service is START_STICKY: left started, Android reads the kill below as a crash
-        // and restarts the app headless a second later, notification and Tor included
-        stopNotificationService()
-        Process.killProcess(Process.myPid())
     }
 }

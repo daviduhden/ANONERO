@@ -20,7 +20,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import timber.log.Timber
 
-/*
+/**
  * Android Keystore integration for the legacy CrAzYpass gate and the modern
  * Keystore-wrapped wallet secret.
  *
@@ -183,6 +183,7 @@ object KeyStoreHelper {
         ).edit().remove(wallet).apply()
     }
 
+    @Synchronized
     private fun getOrCreateWalletSecretKey(alias: String): SecretKey {
         val ks = KeyStore.getInstance(SecurityConstants.KEYSTORE_PROVIDER_ANDROID_KEYSTORE)
         try {
@@ -225,6 +226,7 @@ object KeyStoreHelper {
         return kg.generateKey()
     }
 
+    @Synchronized
     @Throws(GeneralSecurityException::class)
     fun saveWalletSecret(context: Context, wallet: String, secret: String) {
         val key = getOrCreateWalletSecretKey(WALLET_SECRET_PREFIX + wallet)
@@ -291,18 +293,20 @@ object KeyStoreHelper {
             Context.MODE_PRIVATE
         ).getString(WALLET_SECRET_PREFIX + wallet, "").isNullOrEmpty()
 
+    @Synchronized
     fun removeWalletSecret(context: Context, wallet: String) {
-        try {
-            val ks = KeyStore.getInstance(SecurityConstants.KEYSTORE_PROVIDER_ANDROID_KEYSTORE)
-            ks.load(null)
-            ks.deleteEntry(WALLET_SECRET_PREFIX + wallet)
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e)
-        }
-        context.getSharedPreferences(
+        val prefs = context.getSharedPreferences(
             SecurityConstants.WALLET_PASS_PREFS_NAME,
             Context.MODE_PRIVATE
-        ).edit().remove(WALLET_SECRET_PREFIX + wallet).apply()
+        )
+        // Remove the reference first: if the alias deletion fails, the wrapper is not
+        // left pointing at a key that no longer exists, and a retry can delete it.
+        if (!prefs.edit().remove(WALLET_SECRET_PREFIX + wallet).commit()) {
+            throw GeneralSecurityException("could not remove wallet secret reference")
+        }
+        val ks = KeyStore.getInstance(SecurityConstants.KEYSTORE_PROVIDER_ANDROID_KEYSTORE)
+        ks.load(null)
+        ks.deleteEntry(WALLET_SECRET_PREFIX + wallet)
     }
 
     /* What actually protects W: `strongbox` | `tee` | `software` | `unknown`. */

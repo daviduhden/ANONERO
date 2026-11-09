@@ -1,6 +1,18 @@
 package io.anonero.model
 
+/**
+ * A wallet2 pending transaction, before or after commit.
+ *
+ * The native object is created by `Wallet.createTransaction*` and is owned by wallet2.
+ * [handle] is a borrowed pointer; the wallet releases it through `Wallet.disposeTransaction`
+ * when the wallet replaces or closes the pending transaction. A transaction with a non-OK
+ * [status] must not be committed or treated as broadcast.
+ */
 class PendingTransaction internal constructor(override var handle: Long) : StagingTransaction {
+    internal fun invalidate() {
+        handle = 0L
+    }
+
     val status: Status
         get() = Status.values()[getStatusJ()]
 

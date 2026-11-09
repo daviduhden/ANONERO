@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,21 @@ class InvalidPin : Exception("invalid pin")
 private const val TAG = "AnonWalletHandler"
 
 class UnableToCloseWallet : Exception()
+class UnableToWipeWallet : Exception()
 
+/**
+ * Coordinates wallet profile selection and the managed wallet's lifecycle.
+ *
+ * This class is the boundary between UI intent and wallet2: it resolves a PIN to a
+ * [WalletProfile], opens the corresponding wallet (or the decoy), applies the proxy,
+ * configures the daemon and LWS, starts refresh/background sync, and wipes the active
+ * profile. It deliberately keeps the live wallet in [WalletManager] rather than owning a
+ * second handle.
+ *
+ * See the repository `AGENTS.md` for the security invariants. The important local rules
+ * are: fail closed on a missing Keystore secret, never cross profiles, and never
+ * initialize/connect a wallet without applying its network policy first.
+ */
 class AnonWalletHandler(
     private val prefs: SharedPreferences,
     private val walletState: WalletState,
@@ -69,16 +83,30 @@ class AnonWalletHandler(
 
     init {
         scope.launch {
-            torService.socksFlow.collect {
+            torService.socksFlow.collect { socket ->
                 val wallet = WalletManager.instance?.wallet
-                if (prefs.getBoolean(WALLET_USE_TOR, true) && wallet?.isInitialized == true) {
+                if (socket == null) {
+                    // Tor restarted or stopped. Never reuse the old port; pause until a
+                    // fresh endpoint is published.
+                    if (wallet?.isInitialized == true) {
+                        wallet.pauseRefresh()
+                        walletState.setConnectionStatus(
+                            Wallet.ConnectionStatus.ConnectionStatus_Disconnected
+                        )
+                        walletState.setLoading(false)
+                    }
+                } else if (prefs.getBoolean(WALLET_USE_TOR, true) &&
+                    wallet?.isInitialized == true
+                ) {
                     try {
-                        setProxy(it.address.value, it.port.value)
+                        setProxy(socket.address.value, socket.port.value)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: Exception) {
                         wallet.pauseRefresh()
-                        walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+                        walletState.setConnectionStatus(
+                            Wallet.ConnectionStatus.ConnectionStatus_Disconnected
+                        )
                         walletState.setLoading(false)
                         Timber.tag(TAG).e("Could not update Tor proxy; refresh paused")
                     }
@@ -93,20 +121,19 @@ class AnonWalletHandler(
         val walletFile = WalletProfileStore.walletFile(context, profile)
         val walletName = walletFile.name
 
-        // Opening the decoy after the legitimate wallet was already open must not leave
-        // the legitimate keys, listeners, or history in memory. The normal app flow opens
-        // only once per process; this guard covers a retry after a failed unlock.
+        // Opening any profile must not leave a previous wallet, its listener, or its keys
+        // referenced. This also covers a retry after a failed open: the failed wallet may
+        // still be managed with a non-OK status, and replacing it would leak its native
+        // handle. A close failure is fatal; do not leave two profiles reachable.
         val current = WalletManager.instance?.wallet
-        if (current != null && WalletSession.profile != profile) {
+        if (current != null) {
             val closed = runCatching {
                 current.pauseRefresh()
                 current.close()
-            }.onFailure { Timber.tag(TAG).e(it, "could not close previous profile wallet") }
+            }.onFailure { Timber.tag(TAG).e(it, "could not close previous wallet") }
                 .getOrDefault(false)
             if (!closed) {
-                // Refuse to leave one profile's keys and history referenced while opening
-                // another; a restart is safer than a half-switched process.
-                Timber.tag(TAG).e("could not close previous profile wallet")
+                Timber.tag(TAG).e("could not close previous wallet")
                 throw InvalidPin()
             }
             WalletSession.reset()
@@ -139,7 +166,10 @@ class AnonWalletHandler(
         }
 
         if (anonWallet?.status?.isOk != true) {
-            Timber.tag(TAG).e("openWallet error: %s", anonWallet?.status?.errorString)
+            val error = anonWallet?.status?.errorString
+            runCatching { anonWallet?.close() }
+                .onFailure { Timber.tag(TAG).e(it, "could not close failed wallet") }
+            Timber.tag(TAG).e("openWallet error: %s", error)
             throw InvalidPin()
         }
         WalletSession.select(profile)
@@ -171,11 +201,16 @@ class AnonWalletHandler(
             if (!wallet.setPassword(key)) {
                 throw Exception("setPassword failed: ${wallet.status.errorString}")
             }
-            wallet.store()
+            if (!wallet.store()) {
+                throw Exception("store failed after re-key")
+            }
             WalletKey.store(context, walletName, key)
             // the gate must match this exact PIN, which just opened the wallet; always
             // rewrite it rather than trusting whatever was there
-            prefs.edit(commit = true) { putString(PREFS_PIN_HASH, PinHash.hash(pin)) }
+            val committed = prefs.edit()
+                .putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                .commit()
+            if (!committed) throw Exception("could not persist the migrated PIN hash")
             snapshots.forEach { (snapshot, _) -> snapshot.delete() }
             Timber.tag(TAG).i("wallet migrated to a keystore-bound key")
         } catch (e: Exception) {
@@ -184,7 +219,8 @@ class AnonWalletHandler(
             // Put the open wallet back on the PIN first: it keeps storing on every refresh,
             // and a store keyed to the abandoned secret would undo a file-level rollback.
             // That re-writes keys and cache from memory, current and PIN-keyed.
-            val restoredInMemory = !rekeyed || runCatching { wallet.setPassword(pin) }.getOrDefault(false)
+            val restoredInMemory = !rekeyed ||
+                runCatching { wallet.setPassword(pin) && wallet.store() }.getOrDefault(false)
             if (!restoredInMemory) {
                 runCatching {
                     snapshots.forEach { (snapshot, live) ->
@@ -215,7 +251,7 @@ class AnonWalletHandler(
         val rpcPort = if (lwsActive) lws.port else prefs.getInt(NodeFields.RPC_PORT.value, Node.defaultRpcPort)
         val rpcUsername = if (lwsActive) "" else prefs.getString(NodeFields.RPC_USERNAME.value, "")
         val rpcPassphrase = if (lwsActive) "" else prefs.getString(NodeFields.RPC_PASSWORD.value, "")
-        val offline = !AnonConfig.viewOnly && host.isNullOrEmpty()
+        val offline = host.isNullOrEmpty()
         walletState.setOffline(offline)
         wallet.setOffline(offline)
         //nothing to load without a node/LWS
@@ -307,7 +343,7 @@ class AnonWalletHandler(
         val useTor = prefs.getBoolean(WALLET_USE_TOR, true)
         val lwsActive = LwsConfig.load(prefs).enabled || WalletManager.instance?.wallet?.isLightWallet == true
         check(!lwsActive || useTor) { "LWS requires built-in Tor" }
-        if (useTor || proxyHost.isNullOrBlank()) {
+        if (useTor) {
             torService.start()
             var waited = 0L
             while (torService.socks == null) {
@@ -387,13 +423,15 @@ class AnonWalletHandler(
         return "$formattedHost:$port"
     }
 
-    fun setProxy(proxy: String?, port: Int?) {
-        Timber.tag(TAG).d("setProxy %s%s", proxy, port.toString())
+    fun setProxy(proxy: String?, port: Int?, persist: Boolean = true) {
+        Timber.tag(TAG).d("setProxy: updating endpoint")
         //disable proxy
         if (proxy == null && port == null) {
-            prefs.edit(commit = true) {
-                remove(WALLET_PROXY)
-                remove(WALLET_PROXY_PORT)
+            if (persist) {
+                prefs.edit(commit = true) {
+                    remove(WALLET_PROXY)
+                    remove(WALLET_PROXY_PORT)
+                }
             }
         } else {
             val proxyHost = requireNotNull(proxy) { "Proxy host required" }
@@ -415,8 +453,10 @@ class AnonWalletHandler(
                 throw IllegalStateException("Wallet proxy was rejected")
             }
             prefs.edit(commit = true) {
-                putString(WALLET_PROXY, proxyHost)
-                putInt(WALLET_PROXY_PORT, proxyPort)
+                if (persist) {
+                    putString(WALLET_PROXY, proxyHost)
+                    putInt(WALLET_PROXY_PORT, proxyPort)
+                }
             }
         }
     }
@@ -432,20 +472,36 @@ class AnonWalletHandler(
     }
 
     fun wipe(passPhrase: String): Boolean {
-        WalletManager.instance?.wallet?.pauseRefresh()
-        WalletManager.instance?.wallet?.stopBackgroundSync(passPhrase)
-        WalletManager.instance?.setDaemon(null)
-        if (WalletManager.instance?.wallet?.close() == true) {
-            AnonConfig.context?.let { context ->
-                // Remove only the active profile. Wiping from the decoy must not destroy
-                // the legitimate wallet's files, keys, or PIN.
-                WalletProfileStore.removeProfile(context, prefs, WalletSession.profile)
+        val context = AnonConfig.context ?: throw UnableToWipeWallet()
+        val manager = WalletManager.instance ?: throw UnableToWipeWallet()
+        val wallet = manager.wallet ?: throw UnableToWipeWallet()
+        val walletName = WalletProfileStore.activeWalletName(context)
+        val password = try {
+            if (WalletKey.exists(context, walletName)) {
+                WalletKey.load(context, walletName)
+            } else {
+                passPhrase
             }
-            return true
-        } else {
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "wipe: wallet password unavailable")
+            throw UnableToWipeWallet()
+        }
+        wallet.pauseRefresh()
+        if (walletState.backgroundSyncRunning && !wallet.stopBackgroundSync(password)) {
+            // Do not remove profile data while the spend key may still be live.
+            Timber.tag(TAG).e("wipe: stopBackgroundSync failed")
+            throw UnableToWipeWallet()
+        }
+        manager.setDaemon(null)
+        if (!wallet.close()) {
             throw UnableToCloseWallet()
         }
-
+        // Remove only the active profile. Wiping from the decoy must not destroy the
+        // legitimate wallet's files, keys, or PIN. A failed removal is not success.
+        if (!WalletProfileStore.removeProfile(context, prefs, WalletSession.profile)) {
+            throw UnableToWipeWallet()
+        }
+        return true
     }
 
 }

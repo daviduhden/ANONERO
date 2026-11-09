@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import java.io.File
 import java.security.SecureRandom
 import timber.log.Timber
 
-/*
+/**
  * The wallet2 password is no longer the PIN. It is a high-entropy random secret W,
  * wrapped by a non-exportable Android Keystore key (KeyStoreHelper's per-wallet key).
  * Extracted keys files are useless without this device's Keystore, since W cannot be
@@ -70,18 +70,33 @@ object WalletKey {
      *    encrypted with a secret that was never stored, so restore the legacy keys.
      */
     fun recoverInterruptedMigration(context: Context, walletBasePath: String, wallet: String) {
-        val pairs = migrationSnapshots(walletBasePath).filter { (snapshot, _) -> snapshot.exists() }
-        if (pairs.isEmpty()) return
+        val snapshots = migrationSnapshots(walletBasePath)
+        val keysPair = snapshots[0]
+        val cachePair = snapshots[1]
+        val anySnapshot = keysPair.first.exists() || cachePair.first.exists()
+        if (!anySnapshot) return
         if (exists(context, wallet)) {
-            pairs.forEach { (snapshot, _) -> snapshot.delete() }
+            snapshots.forEach { (snapshot, _) -> snapshot.delete() }
             Timber.tag("WalletKey").i("migration confirmed; stale snapshot removed")
-        } else {
-            // wallet2 derives the cache key from the password too, so the keys file and
-            // the cache must go back together or the wallet will not open
-            pairs.forEach { (snapshot, live) -> snapshot.copyTo(live, overwrite = true) }
-            pairs.forEach { (snapshot, _) -> snapshot.delete() }
-            Timber.tag("WalletKey").w("migration interrupted; restored legacy keys and cache")
+            return
         }
+        // No wrapped key: the migration did not finish. The keys file may be encrypted
+        // with a secret that was never stored. Restore the keys snapshot if it exists;
+        // restore the cache only when its snapshot also exists, otherwise delete the
+        // possibly re-keyed cache and let wallet2 rebuild it from the restore height.
+        if (!keysPair.first.exists()) {
+            Timber.tag("WalletKey")
+                .e("migration recovery incomplete: keys snapshot missing; seed recovery required")
+            return
+        }
+        keysPair.first.copyTo(keysPair.second, overwrite = true)
+        if (cachePair.first.exists()) {
+            cachePair.first.copyTo(cachePair.second, overwrite = true)
+        } else {
+            cachePair.second.delete()
+        }
+        snapshots.forEach { (snapshot, _) -> snapshot.delete() }
+        Timber.tag("WalletKey").w("migration interrupted; restored legacy keys and cache")
     }
 
     /* (snapshot, live file) for the keys file and the cache, both password-keyed. */

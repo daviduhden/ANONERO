@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/*
+/**
  * Reduces casual visual and notification exposure. It is not an anonymity guarantee:
  * the Android system, screen-capture-privileged apps, a rooted device, or a forensic
  * image can still observe much of what the app does. FLAG_SECURE (set unconditionally in
@@ -75,12 +75,18 @@ object StealthMode {
         if (isEnabled(prefs)) "New activity" else normal
 }
 
-/*
+/**
  * Copies to the system clipboard and removes the entry again after a short delay, unless
  * the user has copied something else in the meantime. A clipboard manager (including the
  * OS on newer versions) may still retain history; this reduces, not eliminates, exposure.
  */
 object SecureClipboard {
+    /** Removes the current clipboard entry, if this app can. */
+    fun clear(context: Context) {
+        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        manager.clearPrimaryClip()
+    }
+
     fun copy(context: Context, text: String, clearAfterMs: Long = 60_000L) {
         val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("address", text)
@@ -102,7 +108,7 @@ object SecureClipboard {
     }
 }
 
-/*
+/**
  * A Monero light-wallet server compatible with the MyMonero/LWS REST API that wallet2
  * speaks in light-wallet mode. Only the wallet's view key and public address are sent;
  * the spend key never leaves the device. The server can still see every incoming

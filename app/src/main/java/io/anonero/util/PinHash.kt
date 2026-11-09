@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
-/*
+/**
  * A real hash for the lock-screen PIN check.
  *
  * PREFS_PIN_HASH historically held CrazyPassEncoder.encode(pin) -- reversible base-32,
@@ -41,8 +41,11 @@ object PinHash {
 
     private const val PREFIX = "v2"
     private const val ITERATIONS = 210_000
+    private const val MIN_ITERATIONS = 100_000
+    private const val MAX_ITERATIONS = 1_000_000
     private const val SALT_BYTES = 16
     private const val KEY_BITS = 256
+    private const val KEY_BYTES = KEY_BITS / 8
 
     fun hash(pin: String): String {
         val salt = ByteArray(SALT_BYTES).also { SecureRandom().nextBytes(it) }
@@ -61,8 +64,10 @@ object PinHash {
             val parts = stored.split(":")
             if (parts.size != 4) return false
             val iterations = parts[1].toIntOrNull() ?: return false
+            if (iterations !in MIN_ITERATIONS..MAX_ITERATIONS) return false
             val salt = runCatching { Base64.getDecoder().decode(parts[2]) }.getOrNull() ?: return false
             val expected = runCatching { Base64.getDecoder().decode(parts[3]) }.getOrNull() ?: return false
+            if (salt.size != SALT_BYTES || expected.size != KEY_BYTES) return false
             return constantTimeEquals(derive(pin, salt, iterations), expected)
         }
         // legacy: the reversible encoding, compared the way the lock screen always did

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,6 +123,8 @@ enum class ProxyValidationError(@StringRes val messageRes: Int) {
 }
 
 
+// Accepts IPv4 and the full eight-group IPv6 form. Compressed IPv6 (::) is intentionally
+// not accepted by this UI validator; a valid compressed address may be rejected here.
 fun isNumericAddress(address: String): Boolean {
     val ipv4Pattern = Pattern.compile(
         "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
@@ -160,13 +162,13 @@ class ProxySettingsViewModel(
             torService.socksFlow.collect {
                 val socks = torService.socks
                 if (anonPrefs.getBoolean(WALLET_USE_TOR, true) && socks != null) {
-                    setProxy(socks.address.value, socks.port.value)
+                    setProxy(socks.address.value, socks.port.value, persist = false)
                 }
             }
         }
     }
 
-    fun setProxy(proxy: String, port: Int): Job {
+    fun setProxy(proxy: String, port: Int, persist: Boolean = true): Job {
         _proxyLoading.postValue(true)
         return viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -178,7 +180,7 @@ class ProxySettingsViewModel(
                     addressValidationError.postValue(ProxyValidationError.INVALID_PORT)
                     return@launch
                 }
-                anonWalletHandler.setProxy(proxy = proxy, port = port)
+                anonWalletHandler.setProxy(proxy = proxy, port = port, persist = persist)
                 updateProxyState()
                 if (!anonPrefs.getBoolean(WALLET_USE_TOR, true)) {
                     torService.stop()
@@ -199,14 +201,6 @@ class ProxySettingsViewModel(
     private fun updateProxyState() {
         _proxyAddress.postValue(anonWalletHandler.getProxy())
         _useManualProxy.postValue(!anonPrefs.getBoolean(WALLET_USE_TOR, true))
-        val socks = torService.socks
-        if (anonPrefs.getBoolean(WALLET_USE_TOR, true) && socks != null) {
-            anonPrefs.edit(commit = true) {
-                putString(WALLET_PROXY, socks.address.value)
-                    .putInt(WALLET_PROXY_PORT, socks.port.value)
-            }
-            _proxyAddress.postValue(anonWalletHandler.getProxy())
-        }
     }
 
     fun enableTor(enable: Boolean) {
@@ -219,11 +213,25 @@ class ProxySettingsViewModel(
         }
         addressValidationError.postValue(null)
         if (enable) {
-            anonPrefs.edit(commit = true) { putBoolean(WALLET_USE_TOR, true) }
+            // The Tor SOCKS port is ephemeral and must never be persisted as a manual
+            // proxy. Require an explicit manual endpoint if Tor is disabled later.
+            anonPrefs.edit(commit = true) {
+                putBoolean(WALLET_USE_TOR, true)
+                remove(WALLET_PROXY)
+                remove(WALLET_PROXY_PORT)
+            }
+            _proxyAddress.postValue(null)
             _useManualProxy.postValue(false)
             torService.start()
         } else {
-            anonPrefs.edit(commit = true) { putBoolean(WALLET_USE_TOR, false) }
+            anonPrefs.edit(commit = true) {
+                putBoolean(WALLET_USE_TOR, false)
+                // Clear any endpoint inherited from Tor or a previous session. The user
+                // must enter a manual proxy explicitly before the wallet can connect.
+                remove(WALLET_PROXY)
+                remove(WALLET_PROXY_PORT)
+            }
+            _proxyAddress.postValue(null)
             _useManualProxy.postValue(true)
         }
     }
@@ -436,9 +444,10 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                         ).invokeOnCompletion { error ->
                             if (error == null) {
                                 scope.launch(Dispatchers.Main) {
+                                    val appContext = AnonConfig.context ?: return@launch
                                     Toast.makeText(
-                                        AnonConfig.context,
-                                        AnonConfig.context?.getString(R.string.proxy_updated) ?: "",
+                                        appContext,
+                                        appContext.getString(R.string.proxy_updated),
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }

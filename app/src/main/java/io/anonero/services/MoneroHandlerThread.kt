@@ -7,12 +7,18 @@ import io.anonero.model.WalletManager
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
-/*
- * Handy class for starting a new thread that has a looper. The looper can then be
- * used to create handler classes. Note that start() must still be called.
- * The started Thread has a stck size of STACK_SIZE (=5MB)
+/**
+ * Wallet2 listener and refresh coordinator for the managed wallet.
+ *
+ * It runs on its own thread because wallet2 callbacks and some wallet operations need more
+ * stack than the UI thread provides and must stay off the main thread. [refreshed] decides
+ * whether to resume, reconnect, or re-index the wallet for full-node and LWS modes; [updated]
+ * re-reads history and publishes state.
+ *
+ * The thread is a listener, not a general-purpose executor. Do not submit long tasks to it.
+ * A reconnect re-initializes the native wallet and, for LWS, logs in again with the trust
+ * flag disabled.
  */
-
 class MoneroHandlerThread(private val wallet: Wallet, private val walletState: WalletState) :
     Thread(null, null, "MoneroHandler", THREAD_STACK_SIZE), WalletListener {
 
@@ -31,7 +37,7 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
     }
 
     override fun moneyReceived(txId: String?, amount: Long) {
-        Timber.tag(name).d("moneyReceived: %s", amount)
+        // Do not log the amount; logs are persisted and may be shared by the user.
         WalletManager.instance?.wallet?.store()
     }
 
@@ -78,7 +84,9 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
                 tryRestartConnection()
             } else {
                 wallet.setSynchronized()
-                wallet.store()
+                if (!wallet.store()) {
+                    Timber.tag(name).w("could not persist refreshed wallet state")
+                }
                 refresh(true)
                 walletState.setLoading(false)
             }
@@ -101,7 +109,9 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
                     updateSyncProgress(wallet.getBlockChainHeight())
                 }
                 wallet.setSynchronized()
-                wallet.store()
+                if (!wallet.store()) {
+                    Timber.tag(name).w("could not persist refreshed wallet state")
+                }
                 refresh(true)
                 walletState.setLoading(false)
             }
@@ -119,6 +129,8 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
                 // Login must succeed after every init before refresh is restarted.
                 wallet.setTrustedDaemon(false)
                 check(wallet.lightWalletLogin()) { "LWS login failed" }
+                // LWS stays untrusted after a successful login as well.
+                wallet.setTrustedDaemon(false)
             } else {
                 // Preserve the existing full-node trust policy after init.
                 wallet.setTrustedDaemon(true)

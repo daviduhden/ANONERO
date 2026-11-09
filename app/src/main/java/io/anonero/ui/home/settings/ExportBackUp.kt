@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,6 +112,13 @@ import java.io.File
 
 private const val TAG = "ExportBackUp"
 
+/**
+ * Export-state holder for encrypted backups.
+ *
+ * It validates the passphrase/confirmation, delegates archive creation to [BackupHelper],
+ * and exposes progress/error state. Backups are not available for the decoy profile; the
+ * decoy is recovered from its seed.
+ */
 class ExportBackUpViewModel : ViewModel() {
 
     private val backupFile = MutableLiveData<File?>(null)
@@ -178,7 +185,7 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                 } else {
                     withContext(Dispatchers.IO) {
                         val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
-                        hash == KeyStoreHelper.getCrazyPass(AnonConfig.context, candidate)
+                        hash == KeyStoreHelper.getCrazyPass(context, candidate)
                     }
                 }
             } catch (cancelled: CancellationException) {

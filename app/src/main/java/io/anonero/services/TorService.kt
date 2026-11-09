@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,14 +37,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 
 private const val TAG = "TorService"
 
-/*
+/**
  * Owns the embedded Tor daemon and publishes its SOCKS endpoint to the wallet layer.
  *
  * The service is stateful: [start]/[restart] set `wanted` and [stop]/[dispose] clear it.
@@ -65,21 +68,19 @@ class TorService(prefs: SharedPreferences) {
         Timber.tag(TAG).w(e, "Tor action failed")
     })
 
-    private val _socksSharedFlow =
-        MutableSharedFlow<IPSocketAddress>(replay = 1)
+    private val _socksState = MutableStateFlow<IPSocketAddress?>(null)
 
     private val _torLogs =
         MutableSharedFlow<String>(
             replay = 20, onBufferOverflow = BufferOverflow.DROP_OLDEST,
             extraBufferCapacity = 50
         )
-    private var _socks: IPSocketAddress? = null
 
     // set by start()/restart(), cleared by stop()/dispose(): Tor is supposed to be running
     @Volatile
     private var wanted = false
-    val socks get() = _socks
-    val socksFlow get() = _socksSharedFlow
+    val socks get() = _socksState.value
+    val socksFlow: StateFlow<IPSocketAddress?> get() = _socksState.asStateFlow()
     val torLogs: Flow<String> get() = _torLogs.asSharedFlow()
 
     val runtime: TorRuntime = TorRuntime.Builder(environment = AnonConfig.getTorConfig(scope)) {
@@ -99,7 +100,7 @@ class TorService(prefs: SharedPreferences) {
             // the daemon went down without stop() -- killed, or a start that failed: drop the
             // dead port and start again; the new port reaches the wallet through socksFlow
             if (state.daemon.isOff && wanted) {
-                _socks = null
+                _socksState.value = null
                 scope.launch {
                     delay(10_000)
                     if (wanted) runtime.startDaemonAsync()
@@ -108,11 +109,8 @@ class TorService(prefs: SharedPreferences) {
         }
         observerStatic(RuntimeEvent.LISTENERS) {
             val socketAddr = it.socks.firstOrNull()
-            if (socketAddr != null) {
-                _socks = socketAddr
-                scope.launch {
-                    _socksSharedFlow.emit(socketAddr) // Ensure the value is emitted
-                }
+            if (socketAddr != null && wanted) {
+                _socksState.value = socketAddr
             }
         }
         config { _ ->
@@ -132,7 +130,7 @@ class TorService(prefs: SharedPreferences) {
 
     fun stop() {
         wanted = false
-        _socks = null
+        _socksState.value = null
         scope.launch {
             runtime.stopDaemonAsync()
         }
@@ -141,6 +139,7 @@ class TorService(prefs: SharedPreferences) {
 
     fun restart() {
         wanted = true
+        _socksState.value = null
         scope.launch {
             runtime.restartDaemonAsync()
         }
@@ -148,6 +147,7 @@ class TorService(prefs: SharedPreferences) {
 
     fun dispose() {
         wanted = false
+        _socksState.value = null
         scope.launch {
             runtime.stopDaemonAsync()
         }.invokeOnCompletion {

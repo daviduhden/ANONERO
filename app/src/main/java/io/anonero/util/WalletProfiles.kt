@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,11 @@ package io.anonero.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.core.content.edit
 import io.anonero.AnonConfig
 import timber.log.Timber
 import java.io.File
 
-/*
+/**
  * Which wallet file the current process has open.
  *
  * The profile is deliberately not persisted: every process start begins on MAIN and the
@@ -61,7 +60,7 @@ object WalletSession {
     }
 }
 
-/*
+/**
  * File, Keystore-alias, and preference-key layout for both profiles.
  *
  * The two wallets live in the same app-private directory but have different file names,
@@ -125,25 +124,36 @@ object WalletProfileStore {
      * what makes a wipe performed from the decoy profile non-destructive to the real
      * wallet.
      */
-    fun removeProfile(context: Context, prefs: SharedPreferences, profile: WalletProfile) {
+    fun removeProfile(context: Context, prefs: SharedPreferences, profile: WalletProfile): Boolean {
+        var ok = true
         val keyName = walletFile(context, profile).name
         walletFiles(context, profile).forEach { file ->
-            if (!file.delete()) Timber.tag(TAG).w("could not delete %s", file.name)
-        }
-        runCatching { WalletKey.remove(context, keyName) }
-            .onFailure { Timber.tag(TAG).e(it, "could not remove wallet key") }
-        prefs.edit(commit = true) {
-            if (profile.isDecoy) {
-                remove(PREFS_DURESS_PIN_HASH)
-                remove(PREFS_DECOY_PASSPHRASE_HASH)
-                remove(PREFS_DECOY_CONFIGURED)
-                remove(DECOY_RESTORE_HEIGHT)
-            } else {
-                remove(PREFS_PIN_HASH)
-                remove(PREFS_PASSPHRASE_HASH)
-                remove(RESTORE_HEIGHT)
+            if (!file.delete() && file.exists()) {
+                Timber.tag(TAG).w("could not delete %s", file.name)
+                ok = false
             }
         }
+        runCatching { WalletKey.remove(context, keyName) }
+            .onFailure {
+                Timber.tag(TAG).e(it, "could not remove wallet key")
+                ok = false
+            }
+        val editor = prefs.edit()
+        if (profile.isDecoy) {
+            editor.remove(PREFS_DURESS_PIN_HASH)
+            editor.remove(PREFS_DECOY_PASSPHRASE_HASH)
+            editor.remove(PREFS_DECOY_CONFIGURED)
+            editor.remove(DECOY_RESTORE_HEIGHT)
+        } else {
+            editor.remove(PREFS_PIN_HASH)
+            editor.remove(PREFS_PASSPHRASE_HASH)
+            editor.remove(RESTORE_HEIGHT)
+        }
+        if (!editor.commit()) {
+            Timber.tag(TAG).e("could not commit profile removal for %s", profile.walletName)
+            ok = false
+        }
+        return ok
     }
 
     /*

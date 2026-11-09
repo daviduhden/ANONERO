@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import io.anonero.services.NOTIFICATION_ID
 import io.anonero.services.TorService
 import io.anonero.services.WalletState
 import io.anonero.store.LogRepository
+import io.anonero.util.SecureClipboard
 import io.anonero.util.WalletProfileStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -37,6 +38,14 @@ import timber.log.Timber
 
 private const val TAG = "AppViewModel"
 
+/**
+ * Activity-scoped coordinator for opening the wallet and starting its service.
+ *
+ * It does not implement wallet behavior: [openWallet] delegates profile/PIN resolution and
+ * Keystore handling to [AnonWalletHandler], then resets session-scoped state (logs and
+ * notifications). [startService] starts the wallet service asynchronously; callers must
+ * wait for [WalletState] before assuming the wallet is synchronized.
+ */
 class AppViewModel(
     private val walletState: WalletState,
     private val torService: TorService,
@@ -83,6 +92,8 @@ class AppViewModel(
                 AnonConfig.context?.let { context ->
                     (context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
                         as? android.app.NotificationManager)?.cancel(NOTIFICATION_ID + 1)
+                    // A copied address or signature must not cross into the other profile.
+                    SecureClipboard.clear(context)
                 }
             }
             opened

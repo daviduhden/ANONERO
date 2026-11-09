@@ -8,6 +8,22 @@ import java.util.Locale
 
 private const val TAG = "Wallet"
 
+/**
+ * Kotlin facade over one native wallet2 wallet handle.
+ *
+ * The object itself is a thin wrapper: [handle] is a raw pointer owned by the native
+ * layer, and every `external` method forwards to the JNI adapter in
+ * `app/src/main/cpp/anonero.cpp`. It is valid only while [WalletManager] still owns the
+ * wallet; closing the wallet makes the handle unusable.
+ *
+ * [accountIndex] is the active subaddress account, shared by balance, history, and
+ * transaction construction. It is not a wallet identity: all accounts belong to the same
+ * wallet file and keys. A [Wallet] created for the decoy profile is a different native
+ * wallet, not another account.
+ *
+ * Methods that mutate wallet state or store it to disk block on native I/O. Use them off
+ * the main thread and keep the managed instance in [WalletManager].
+ */
 class Wallet {
     var isSynchronized = false
     var isInitialized = false
@@ -63,7 +79,10 @@ class Wallet {
     val name: String
         get() = getPath()?.let { File(it).name }.toString()
 
+    /** Returns the recovery words for display/backup. Treat the result as a secret. */
     external fun getSeed(offset: String?): String?
+
+    /** Returns legacy-mnemonic recovery words. Treat the result as a secret. */
     external fun getLegacySeed(offset: String?): String?
     external fun isPolyseedSupported(offset: String?): Boolean
     external fun getSeedLanguage(): String?
@@ -159,7 +178,10 @@ class Wallet {
     //    virtual bool createWatchOnly(const std::string &path, const std::string &password, const std::string &language) const = 0;
     //    virtual void setRefreshFromBlockHeight(uint64_t refresh_from_block_height) = 0;
     external fun getIntegratedAddress(paymentId: String?): String?
+    /** Returns the private view key. Only use for explicit key export/backup flows. */
     external fun getSecretViewKey(): String
+
+    /** Returns the private spend key. Only use for explicit key export/backup flows. */
     external fun getSecretSpendKey(): String
 
     fun store(): Boolean {
@@ -189,9 +211,9 @@ class Wallet {
         var proxyAddress = WalletManager.instance?.proxy
         var message = "init("
         if (daemonAddress != null) {
-            message = "${message}\n$daemonAddress"
+            // Do not log the endpoint: it can identify the user's chosen node.
+            message = "${message}\ndaemon_address = configured"
         } else {
-            Timber.tag(TAG).i("")
             message = "${message}\ndaemon_address == null"
             daemonAddress = ""
         }
@@ -209,7 +231,7 @@ class Wallet {
             daemonPassword = ""
         }
         if (proxyAddress != null) {
-            message = "${message}\nproxy : $proxyAddress"
+            message = "${message}\nproxy = configured"
         } else {
             message = "${message}\nproxy_address = null"
             proxyAddress = ""
@@ -296,11 +318,16 @@ class Wallet {
     //TODO virtual void setAutoRefreshInterval(int millis) = 0;
     //TODO virtual int autoRefreshInterval() const = 0;
     private fun disposePendingTransaction() {
-        if (pendingTransaction != null) {
-            disposeTransaction(pendingTransaction)
-            pendingTransaction = null
-            unsignedTransaction = null
+        pendingTransaction?.let {
+            disposeTransaction(it)
+            it.invalidate()
         }
+        pendingTransaction = null
+        unsignedTransaction?.let {
+            disposeUnsignedTransaction(it)
+            it.invalidate()
+        }
+        unsignedTransaction = null
     }
 
     fun createSweepTransaction(
@@ -311,6 +338,7 @@ class Wallet {
         disposePendingTransaction()
         val _priority = priority.ordinal
         val txHandle = createSweepTransaction(dstAddr, "", 0, _priority, accountIndex, keyImages)
+        if (txHandle == 0L) return null
         pendingTransaction = PendingTransaction(txHandle)
         unsignedTransaction = null
         return pendingTransaction
@@ -324,6 +352,12 @@ class Wallet {
 
     external fun signAndExportJ(inputFile: String?, outputFile: String?): String?
 
+    /*
+     * Builds a pending transaction for the active account. selectedUtxos are key images
+     * from coin control; when non-empty, checkSelectedAmounts verifies the selection before
+     * wallet2 constructs anything. sweepAll uses the native sweep path and ignores the
+     * amount. The returned transaction replaces any previous pending transaction.
+     */
     @Throws(Exception::class)
     fun createTransaction(
         dst_addr: String?,
@@ -339,17 +373,18 @@ class Wallet {
     	if (selectedUtxos.isNotEmpty() && !sweepAll) {
             checkSelectedAmounts(preferredInputs, amount, false)
     	}
-    	val txHandle =
+        val txHandle =
             if (sweepAll) createSweepTransaction(
-            	dst_addr!!, "", mixin_count, priority,
-            	accountIndex, preferredInputs
+                dst_addr!!, "", mixin_count, priority,
+                accountIndex, preferredInputs
             ) else createTransactionJ(
-            	dst_addr!!, "", amount, mixin_count, priority,
-             	accountIndex, preferredInputs
+                dst_addr!!, "", amount, mixin_count, priority,
+                accountIndex, preferredInputs
             )
-    	pendingTransaction = PendingTransaction(txHandle)
-    	unsignedTransaction = null
-    	return pendingTransaction!!
+        if (txHandle == 0L) throw Exception("transaction construction returned no transaction")
+        pendingTransaction = PendingTransaction(txHandle)
+        unsignedTransaction = null
+        return pendingTransaction!!
     }
 
     /*
@@ -451,6 +486,11 @@ class Wallet {
     }
 
 
+    /*
+     * Coin-control guard: the selected outputs must exceed the requested amount, leaving
+     * value for the fee. This is a preflight check; wallet2 still performs authoritative
+     * selection and fee calculation.
+     */
     @Throws(java.lang.Exception::class)
     private fun checkSelectedAmounts(selectedUtxos: List<String>, amount: Long, sendAll: Boolean) {
         if (!sendAll) {
@@ -461,7 +501,8 @@ class Wallet {
                 }
             }
             if (amountSelected <= amount) {
-                Timber.tag("Wallet").e("insufficient wallet balance- Available/Selected: $amountSelected, amount: $amount")
+                // Do not log selected/requested amounts; logs are persisted and shareable.
+                Timber.tag("Wallet").e("insufficient selected balance")
                 throw java.lang.Exception("insufficient wallet balance")
             }
         }
@@ -475,12 +516,14 @@ class Wallet {
     fun createSweepUnmixableTransaction(): PendingTransaction? {
         disposePendingTransaction()
         val txHandle = createSweepUnmixableTransactionJ()
+        if (txHandle == 0L) return null
         pendingTransaction = PendingTransaction(txHandle)
         return pendingTransaction
     }
 
     private external fun createSweepUnmixableTransactionJ(): Long
     private external fun disposeTransaction(pendingTransaction: PendingTransaction?)
+    private external fun disposeUnsignedTransaction(unsignedTransaction: UnsignedTransaction?)
     private external fun getHistoryJ(): Long
     private external fun getCoinsJ(): Long
 
@@ -492,10 +535,10 @@ class Wallet {
     // the JNI side returns "Imported" or the wallet error string, like importOutputs
     external fun importKeyImages(filename: String?): String?
     fun loadUnsignedTransaction(inputFile: String?): UnsignedTransaction? {
+        disposePendingTransaction()
         val unsignedTx: Long = loadUnsignedTx(inputFile)
         val loaded = if (unsignedTx == 0L) null else UnsignedTransaction(unsignedTx)
         unsignedTransaction = loaded
-        if (loaded != null) pendingTransaction = null
         return loaded
     }
 
@@ -575,7 +618,8 @@ class Wallet {
         val timeStamp = SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US).format(Date())
         addSubaddress(accountIndex, timeStamp)
         val subaddress = getLastSubaddress(accountIndex)
-        Timber.tag("Wallet").i("${getNumSubaddresses(accountIndex) - 1} : ${subaddress}")
+        // Do not log the subaddress itself; it is a wallet identifier.
+        Timber.tag("Wallet").i("created subaddress #%d", getNumSubaddresses(accountIndex) - 1)
         return subaddress
     }
 
@@ -641,12 +685,6 @@ class Wallet {
 
         @JvmStatic
         external fun getDisplayAmount(amount: Long): String
-
-        @JvmStatic
-        external fun getAmountFromString(amount: String?): Long
-
-        @JvmStatic
-        external fun getAmountFromDouble(amount: Double): Long
 
         @JvmStatic
         external fun generatePaymentId(): String

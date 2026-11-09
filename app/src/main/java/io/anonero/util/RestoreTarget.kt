@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,14 @@ import java.nio.file.attribute.BasicFileAttributes
 
 class RestoreTargetNotEmptyException : IOException("Restore target is unavailable")
 
-/* Existing and partially created profiles require explicit recovery or wipe, not replacement. */
+/** Far above the current chain height; rejects absurd or overflowing restore points. */
+const val MAX_RESTORE_HEIGHT = 100_000_000L
+
+/**
+ * Existing and partially created profiles require explicit recovery or wipe, not
+ * replacement. Broken symlinks and directories are treated as occupied so a restore
+ * cannot hide a keys file or snapshot behind an unexpected filesystem entry.
+ */
 internal object RestoreTarget {
     fun requireEmpty(
         directory: File,
