@@ -21,4 +21,14 @@
     <issue id="UnusedResources">
         <ignore path="src/main/res/raw/words.txt" />
     </issue>
+    <!-- Brand artwork is intentionally detailed; keep the original paths. -->
+    <issue id="VectorPath">
+        <ignore path="src/main/res/drawable/anon_notification.xml" />
+        <ignore path="src/main/res/drawable/ic_anon.xml" />
+        <ignore path="src/main/res/drawable/ic_launcher_foreground.xml" />
+    </issue>
+    <issue id="VectorRaster">
+        <ignore path="src/main/res/drawable/anon_notification.xml" />
+        <ignore path="src/main/res/drawable/ic_anon.xml" />
+    </issue>
 </lint>
