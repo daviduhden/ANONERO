@@ -4,7 +4,8 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `42699227920` | `0006659` | `workflow_dispatch` | failure | native | JVM tests, Android Lint (0 errors, 0 warnings), JNI, i18n, and policy pass; native fails on missing patches; assemble/instrumented skipped |
+| `42700250719` | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native blocked on missing patches |
+| `42699227920` | `0006659` | `workflow_dispatch` | failure | native | Lint 0 errors / 0 warnings; native blocked |
 | `42698560608` | `2788e92` | `workflow_dispatch` | failure | native | Lint had 2 warnings left; fixed afterwards |
 | `42697719108` | `dda6cde` | `workflow_dispatch` | failure | native | Lint clean except icon/vector warnings; fixed afterwards |
 | `42695062606` | `746ecf4` | `workflow_dispatch` | failure | native | Lint errors cleared; structural warnings reduced |
@@ -219,6 +220,57 @@ the missing patch series, so `assemble` and `instrumented` are skipped. The two 
   signature/link validation still requires a real build.
 - **Status:** implemented; native CI blocked.
 
+### CI-014 — Android Lint: 35 errors from Compose context rules
+
+- **Run:** `42692380022`.
+- **Jobs:** Android Lint (`anonDebug`, `neroDebug`).
+- **Diagnostic:** `ContextCastToActivity` in `Settings.kt` and 34
+  `LocalContextGetResourceValueCall` errors across 12 Compose files.
+- **Root cause:** the new lint job surfaced pre-existing Compose rules: casting
+  `LocalContext` to `Activity`, and reading resources through `LocalContext.current`
+  instead of the configuration-aware composition locals.
+- **Pattern search:** every `LocalContext.current as? Activity` and every
+  `context.getString(...)` in the UI tree.
+- **Correction:** use `LocalActivity.current` and `LocalResources.current`; also clean
+  nullable-safe-call, indentation, Koin preview, KTX preference, haptic API, resource, and
+  launcher-icon warnings.
+- **Regression check:** the `lint` job is mandatory; final run `42700250719` reports zero
+  errors and zero warnings for both flavors.
+- **Status:** verified in CI.
+
+### CI-015 — Kotlin compiler warnings in the first clean compile
+
+- **Runs:** `42692380022`, `42694063725`.
+- **Diagnostics:** elvis on a non-null `String`, unnecessary safe calls, redundant
+  `toString`, deprecated `String.capitalize`, Koin `KoinApplication(application = ...)`,
+  and deprecated framework overrides in `MainActivity`.
+- **Root cause:** fixes in CI-003..CI-009 left redundant null handling, and modern Kotlin
+  flags deprecated APIs that no earlier run had reached.
+- **Pattern search:** every warning emitted by `compileAnonDebugKotlin` and
+  `compileNeroDebugKotlin`, then a search for the same API usage.
+- **Correction:** remove redundant checks, migrate the Koin preview to
+  `koinConfiguration { }`, use `replaceFirstChar`, and suppress `DEPRECATION` plus
+  `OVERRIDE_DEPRECATION` only on the three global framework overrides that cannot use the
+  Activity Result API.
+- **Regression check:** the `unit` job compiles both flavors; final run `42700250719`
+  emits zero `w:` compiler diagnostics.
+- **Status:** verified in CI.
+
+### CI-016 — Lint fix briefly broke nullable sweep handling
+
+- **Run:** `42693644972`.
+- **Jobs:** JVM unit tests, Android Lint (compile phase).
+- **Diagnostic:** `Only safe (?.) ... on a nullable receiver of type
+  PendingTransaction?` in `Send.kt`.
+- **Root cause:** removing "unnecessary" safe calls mechanically also removed them from
+  the `createSweepTransaction` branch, which returns `PendingTransaction?`.
+- **Pattern search:** both transaction-construction branches and the nullable return type.
+- **Correction:** restore safe calls in the sweep branch only; the non-null
+  `createTransaction` branch keeps direct calls. Add the missing `LocalActivity` import.
+- **Regression check:** the next run (`42694063725`) compiled both flavors and passed JVM
+  tests.
+- **Status:** verified in CI.
+
 ## Warning inventory
 
 ### W-001 — `sdkmanager` deprecation
@@ -257,7 +309,8 @@ the missing patch series, so `assemble` and `instrumented` are skipped. The two 
 ## Missing evidence
 
 - JVM tests pass on `dd692a8` and later.
-- Android Lint passes with zero errors and zero warnings on `0006659`.
+- Android Lint passes with zero errors and zero warnings on `0006659` and later.
+- Kotlin compilation emits zero `w:` diagnostics on `e0afc7f`.
 - The assemble/link job has never run because `native` fails first.
 - No C++ warning report.
 - No native link, instrumented, release, signing, sanitizer, or fuzz run.

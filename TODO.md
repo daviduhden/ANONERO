@@ -23,8 +23,8 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
-- [ ] Re-run the manual Tests workflow after the CI-003..CI-013 fixes; confirm JVM unit
-      tests, Android Lint, and the new assemble/link job pass for both flavors.
+- [ ] Re-run the manual Tests workflow after restoring the native inputs; JVM tests,
+      Android Lint (0/0), JNI, i18n, and policy already pass on run `42700250719`.
 - [ ] Turn on `-Werror` for the project-owned C++ target once the native build is
       reproducible and warning-free.
 - [ ] Add sanitizer/fuzz jobs (ASan/UBSan/TSan/LeakSanitizer) after native inputs are

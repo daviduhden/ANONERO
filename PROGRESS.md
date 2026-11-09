@@ -144,6 +144,10 @@ records progress; it is not a release note and does not claim CI validation.
   skipped, plus release lint, unsigned `SHA256SUMS` verification, 16 KB zipalignment
   checks, exact checksum/APK set equality, `run_attempt` artifact names, and unambiguous
   `refs/tags/` resolution.
+- Manual CI run `42700250719` confirms: JVM unit tests pass, Android Lint reports zero
+  errors and zero warnings for both flavors, Kotlin compilation emits zero warnings, and
+  JNI/i18n/policy gates pass. `native`, `assemble`, and `instrumented` remain blocked by
+  the missing Monero patch series.
 
 ## Pending validation
 

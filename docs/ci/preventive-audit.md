@@ -2,9 +2,10 @@
 
 ## Status
 
-This is a static audit of the current tree. It does not replace a successful build. The
-last available run (`42686398569`) failed before producing a clean APK; native and
-instrumented evidence remains blocked by the missing Monero patch series/submodule.
+This is a static audit followed by manual CI validation. Run `42700250719` passes JVM
+unit tests, Android Lint (zero errors and zero warnings for both flavors), JNI symbol
+parity, localization, and the architecture policy. The native job still fails on the
+missing Monero patch series, so `assemble` and `instrumented` are skipped.
 
 ## Warning policy
 
