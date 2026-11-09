@@ -55,6 +55,11 @@ then maintainability.
 - Re-evaluate OpenSSL 4.x, Polyseed/utf8proc, Debian base/snapshot, and targetSdk only with
   native/device evidence.
 - Keep Actions pinned to full SHAs and release signing isolated.
+- Keep `docs/ci/` current; every compile error, warning, crash, test failure, and sanitizer
+  diagnosis requires a root cause, a global pattern search, and a regression check.
+- Add Android Lint and project-owned C++ warning gates, then move to `-Werror` when the
+  native build is reproducible. Add sanitizer/fuzz coverage only with a working native
+  matrix.
 
 ## 6. Documentation and maintainability
 

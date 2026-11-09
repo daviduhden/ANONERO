@@ -23,10 +23,19 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
+- [ ] Re-run the manual Tests workflow after the CI-003..CI-013 fixes; confirm JVM unit
+      tests, Android Lint, and the new assemble/link job pass for both flavors.
+- [ ] Turn on `-Werror` for the project-owned C++ target once the native build is
+      reproducible and warning-free.
+- [ ] Add sanitizer/fuzz jobs (ASan/UBSan/TSan/LeakSanitizer) after native inputs are
+      restored; document emulator/runtime limits.
+- [ ] Extend JNI contract checks to signatures/constructor descriptors where derivable
+      statically.
 - [ ] Add a restore fixture for a v2 PIN-keyed backup whose external passphrase differs
       from the PIN, and verify both open attempts and the rollback path.
 - [ ] Move remaining main-thread wallet reads out of composition (`HomeGraph`, seed/key
-      screens, transaction detail) into `Dispatchers.IO` state producers.
+      screens, `SeedSettings` address/NERO export, `Send` coin reads, transaction detail)
+      into `Dispatchers.IO` state producers.
 - [ ] Add a native/JNI test fixture for signed-transaction binding once the wallet2 getter
       exists.
 - [ ] Test backup interruption between ZIP and encryption and assert no plaintext remains.

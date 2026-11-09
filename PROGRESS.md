@@ -1,8 +1,7 @@
 # Development progress
 
-Baseline: `ed8b097`, followed by the hardening commits through `92e36a4`, plus the
-Kotlin/C++ documentation cleanup in the working tree. This file records progress; it is
-not a release note and does not claim CI validation.
+Baseline: `ed8b097`, followed by the hardening commits through `52d67d4`. This file
+records progress; it is not a release note and does not claim CI validation.
 
 ## Completed in the current cycle
 
@@ -63,7 +62,7 @@ not a release note and does not claim CI validation.
   documentation for the current implementation.
 - Added the dependency audit record and the agent instruction/skill set.
 
-### Security-hardening cycle (working tree, static review)
+### Security-hardening cycle (committed, static review)
 
 - Exact-amount path: the normal send flow and URI amounts no longer pass through `Double`
   or wallet2's forgiving parser. `SendScreenRoute.amount` is atomic `Long`,
@@ -115,6 +114,37 @@ not a release note and does not claim CI validation.
 - `kmp-tor` remains: it is Kotlin Multiplatform, not a separate native runtime, and is
   the Tor transport integration.
 
+### CI compile-failure and warning cycle
+
+- Audited all three accessible Actions runs. Run `42686398569` (manual, `52d67d4`) exposed
+  resource escaping, missing imports, nullable values, a missing SharedPreferences KTX
+  import, and ViewModel property resolution inside a coroutine. All are fixed; CI is
+  pending.
+- Added `docs/ci/` with run-level failure records, warning inventory, root causes,
+  equivalent-pattern searches, and pending evidence.
+- Extended `scripts/check-i18n.py` to reject unescaped apostrophes and invalid Android
+  string escapes, preventing a recurrence of the AAPT failure.
+- Added an Android Lint job for both flavors with HTML/XML report uploads, and included
+  Gradle problems reports in unit-test artifact uploads.
+- Enabled `-Wall -Wextra -Wpedantic` for the project-owned C++ target and marked external
+  include trees as SYSTEM so third-party headers do not pollute project warnings. Native
+  compilation and `-Werror` remain pending a reproducible native build.
+- Added the permanent policy that every compile error, warning, test failure, crash, JNI
+  or sanitizer diagnostic requires root-cause analysis, a global pattern search, a
+  regression check, and a `docs/ci/` entry.
+- Corrected a stale `SeedRestoreInputTest` that contradicted `MAX_RESTORE_HEIGHT`; it would
+  have failed on the first run that reached test execution.
+- Added cancellation rethrows to `Send`, `PayToMany`, and `ReviewTransaction`, and reset
+  the broadcast state when cancellation happens before submission.
+- Hardened the JNI adapter further: invalidated handles on close, fixed a `return value`
+  in a `void` export, made coin-control key images fail closed, checked
+  `GetMethodID`/`NewObject` in object factories, and guarded every wallet/coins/history
+  handle dereference.
+- Added an `assemble` job that links `libanonero.so` even when instrumented tests are
+  skipped, plus release lint, unsigned `SHA256SUMS` verification, 16 KB zipalignment
+  checks, exact checksum/APK set equality, `run_attempt` artifact names, and unambiguous
+  `refs/tags/` resolution.
+
 ## Pending validation
 
 - **Native build:** the Monero submodule and wallet-API patch series are absent. The
@@ -143,5 +173,5 @@ See [`ROADMAP.md`](ROADMAP.md) and [`TODO.md`](TODO.md). The immediate order is:
 4. Harden remaining JNI string/array paths and document handle lifetime limits.
 5. Validate Tor/LWS, lock/decoy, and backup flows on a device.
 
-No commit or push has been made. All changes remain in the working tree pending explicit
-supervisor authorization.
+Commits through `52d67d4` were pushed. The CI compile-failure fixes, workflow gates, and
+documentation were committed afterwards.

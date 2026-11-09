@@ -56,7 +56,7 @@ by `external-libs/` and linked as static archives. The app does not compile wall
 | `TransactionHistory` | `Monero::TransactionHistory*` | Borrowed from the wallet; valid while the wallet is open |
 | `Coins` | `Monero::Coins*` | Borrowed from the wallet; valid while the wallet is open |
 | `PendingTransaction` | `Monero::PendingTransaction*` | Created by wallet transaction methods; disposed by `Wallet.disposeTransaction` or when the wallet replaces it |
-| `UnsignedTransaction` | `Monero::UnsignedTransaction*` | Loaded from an unsigned file; no public Kotlin disposer, so it must not outlive the wallet |
+| `UnsignedTransaction` | `Monero::UnsignedTransaction*` | Loaded from an unsigned file; disposed through `disposeUnsignedTransaction` and released before `Wallet.close` |
 | `MyWalletListener` | native listener object | Allocated by `setListenerJ`; deleting it requires deleting the global Java reference |
 | `CoinsInfo`, `TransactionInfo`, `Transfer` | Kotlin objects constructed from C++ | Owned by Kotlin after construction |
 
@@ -72,10 +72,12 @@ IPC, or use them after `WalletManager.close`.
   attached it. Do not call `DetachCurrentThread` on an already-attached thread.
 - Callbacks must be short and must not block. The Kotlin listener updates state and returns.
 - The current adapter delivers `updated`, `refreshed`, `newBlock`, and
-  `unconfirmedMoneyReceived`. `moneySpent`/`moneyReceived` are only logged on the C++ side.
-- `setListenerJ` clears the old listener, deletes its global reference, and installs a new
-  one. Replacing a listener without deleting the old reference leaks a Java object and its
-  callback target.
+  `unconfirmedMoneyReceived`. `moneySpent`/`moneyReceived` are no-ops in this adapter.
+- `setListenerJ` deletes the previous listener and its global reference before installing a
+  new one, including when the wallet handle is already invalid. Replacing a listener
+  without deleting the old reference leaks a Java object and its callback target.
+- `Wallet.close` invalidates the Kotlin handle after wallet2 releases the object; later
+  adapter calls fail closed instead of dereferencing a dangling pointer.
 
 ## 6. Error and failure mapping
 
@@ -119,7 +121,8 @@ Two positional hazards are deliberate checks:
 ## 8. Transaction-specific contracts
 
 - `Wallet.createTransactionJ`, `createTransactionMultDestJ`, and
-  `createSweepTransaction` return a `jlong` handle. `0` means construction failed.
+  `createSweepTransaction` return a `jlong` handle. `0` means construction failed; all
+  three validate nulls, ranges, and exceptions before returning.
 - `PendingTransaction.commit("", true)` commits immediately; a non-empty filename asks
   wallet2 to write an unsigned/signed file instead.
 - `UnsignedTransaction.confirmationMessageJ` returns wallet2's summary built from

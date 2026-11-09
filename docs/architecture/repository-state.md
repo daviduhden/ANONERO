@@ -7,10 +7,10 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 
 - Date: 2026-11-09
 - Audit baseline: `ed8b097` (`docs: add Apache-2.0 license headers and normalize comment style`)
-- Current cycle: hardening commits through `92e36a4` plus the Kotlin/C++ documentation
-  cleanup.
-- Working tree: many uncommitted copyright-line and final-newline normalization
-  edits. They are user work and were not modified.
+- Current cycle: hardening commits through `52d67d4`; the CI compile-failure fixes and
+  `docs/ci/` inventory were committed afterwards.
+- Working tree: the copyright/newline normalization was committed in `52d67d4`; no
+  uncommitted changes remain after this cycle.
 - Scope: repository structure, build files, Android/Kotlin sources, C++ JNI adapter,
   native build scripts, CI workflows, tests, resources, and existing agent
   instructions.
@@ -128,9 +128,8 @@ design.
 The instruction pass added documentation and instructions only. A separate dependency
 update then changed build configuration, native pins, CI workflow settings, and
 documentation; it did not change Kotlin application source. A documentation pass then added
-KDoc/comments and Markdown; it did not change behavior. The pre-existing uncommitted
-copyright/newline edits were left untouched. No commit, tag, or push was performed; all
-outputs remain in the working tree pending explicit supervisor authorization.
+KDoc/comments and Markdown; it did not change behavior. The copyright/newline normalization
+was committed in `52d67d4`. The CI compile-failure fixes were committed afterwards.
 
 ## Known gaps and follow-ups
 
