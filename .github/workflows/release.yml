@@ -189,13 +189,13 @@ jobs:
           echo "Tag: $TAG"
           echo "Release: $IS_RELEASE (prerelease=$IS_PRERELEASE)"
 
-      # Kotlin/C++ is the permanent architecture; do not add a Rust build path.
+      # Kotlin/Compose and C++/JNI are the permanent architecture.
       - name: Enforce the Kotlin and C++ architecture policy
         shell: bash
         run: |
           set -euo pipefail
-          if find . \( -name Cargo.toml -o -name Cargo.lock -o -name build.rs -o -name '*.rs' \) -not -path './external-libs/*' -not -path './.git/*' -print -quit | grep -q .; then
-            echo "::error::Project-owned Rust crates conflict with the Kotlin/C++ architecture policy."
+          if find . -name '*.java' -not -path './external-libs/*' -not -path './.git/*' -print -quit | grep -q .; then
+            echo "::error::Project-owned Java conflicts with the Kotlin/C++ architecture policy."
             exit 1
           fi
 

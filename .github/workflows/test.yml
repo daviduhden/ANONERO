@@ -202,12 +202,12 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Reject project-owned Rust crates
+      - name: Reject project-owned Java sources
         shell: bash
         run: |
           set -euo pipefail
-          if find . \( -name Cargo.toml -o -name Cargo.lock -o -name build.rs -o -name '*.rs' \) -not -path './.git/*' -not -path './external-libs/*' -print -quit | grep -q .; then
-            echo "::error::Project-owned Rust crates conflict with the Kotlin/C++ architecture policy."
+          if find . -name '*.java' -not -path './.git/*' -not -path './external-libs/*' -print -quit | grep -q .; then
+            echo "::error::Project-owned Java conflicts with the Kotlin/C++ architecture policy."
             exit 1
           fi
 
