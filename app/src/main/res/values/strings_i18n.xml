@@ -43,10 +43,8 @@
     <string name="decoy_settings_supporting">Separate wallet opened by an alternate PIN</string>
     <string name="pin_changed_success">PIN changed successfully</string>
     <string name="pin_change_error">Error changing PIN. Check logs for more details</string>
-    <string name="normal_pin_differs_duress">The normal PIN must differ from the duress PIN</string>
     <string name="duress_pin_differs_normal">The duress PIN must differ from the normal PIN</string>
     <string name="wallet_not_open">Wallet not open</string>
-    <string name="set_password_failed">Could not set the wallet password: %1$s</string>
 
     <string name="accounts">Accounts</string>
     <string name="new_account">New account</string>
@@ -114,12 +112,10 @@
     <string name="remove_decoy_wallet">REMOVE DECOY WALLET</string>
     <string name="enter_duress_pin">Enter duress PIN</string>
     <string name="new_duress_pin">New duress PIN</string>
-    <string name="duress_pin_differs">The duress PIN must differ from the normal PIN</string>
     <string name="decoy_passphrase_differs">The decoy passphrase must differ from the main passphrase</string>
     <string name="app_context_unavailable">Application context unavailable</string>
     <string name="decoy_exists">A decoy wallet already exists; remove it first</string>
     <string name="decoy_creation_failed">Could not create decoy wallet</string>
-    <string name="decoy_write_failed">Could not write decoy wallet: %1$s</string>
     <string name="decoy_seed_failed">Could not read decoy seed</string>
     <string name="decoy_credentials_failed">Could not persist decoy credentials</string>
     <string name="decoy_configured_help">Duress PIN is configured. The decoy wallet opens with it from the initial lock screen after a cold start; an already-open main session is not hot-switched. Unlock it that way to reach its Receive and Send screens.</string>
@@ -152,7 +148,6 @@
     <string name="notification_channel_wallet">Wallet service</string>
     <string name="notification_channel_wallet_activity">Wallet activity</string>
     <string name="tor_daemon_suffix"> | Tor Daemon: %1$s</string>
-    <string name="notification_channel_transactions">Transactions</string>
 
     <string name="allow">Allow</string>
     <string name="open_app_settings">Open App Settings</string>
@@ -163,11 +158,9 @@
     <string name="update">Update</string>
     <string name="could_not_unlock_wallet">Could not unlock the wallet. Try again, or restart the app.</string>
 
-    <string name="backup_failed">Backup failed: %1$s</string>
     <string name="backup_failed_generic">Backup failed</string>
     <string name="file_saved">File saved</string>
     <string name="could_not_save_file">Could not save the file</string>
-    <string name="unknown_error">Unknown error</string>
     <string name="success">Success</string>
     <string name="what_will_be_signed">What will be signed</string>
     <string name="signed_tx">SIGNED TX</string>
@@ -202,9 +195,7 @@
     <string name="remove_node">Remove</string>
     <string name="node_label">NODE</string>
     <string name="daemon_height">Daemon Height: %1$s</string>
-    <string name="error_connecting">Error connecting to server: %1$s</string>
     <string name="disable_lws_restart">Disable LWS and restart before connecting a node</string>
-    <string name="error_prefix">Error: %1$s</string>
 
     <string name="key_images_imported">Key images imported</string>
     <string name="ok">OK</string>
@@ -233,10 +224,6 @@
     <plurals name="coins_selected_count">
         <item quantity="one">%1$d coin selected</item>
         <item quantity="other">%1$d coins selected</item>
-    </plurals>
-    <plurals name="recipients_count">
-        <item quantity="one">%1$d recipient</item>
-        <item quantity="other">%1$d recipients</item>
     </plurals>
     <plurals name="blocks_left_count">
         <item quantity="one">%1$s block left</item>

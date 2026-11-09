@@ -43,10 +43,8 @@
     <string name="decoy_settings_supporting">Monedero independiente abierto con un PIN alternativo</string>
     <string name="pin_changed_success">PIN cambiado correctamente</string>
     <string name="pin_change_error">Error al cambiar el PIN. Consulte los registros para más detalles</string>
-    <string name="normal_pin_differs_duress">El PIN normal debe ser distinto del PIN de coacción</string>
     <string name="duress_pin_differs_normal">El PIN de coacción debe ser distinto del PIN normal</string>
     <string name="wallet_not_open">El monedero no está abierto</string>
-    <string name="set_password_failed">No se pudo establecer la contraseña del monedero: %1$s</string>
 
     <string name="accounts">Cuentas</string>
     <string name="new_account">Nueva cuenta</string>
@@ -114,12 +112,10 @@
     <string name="remove_decoy_wallet">ELIMINAR MONEDERO SEÑUELO</string>
     <string name="enter_duress_pin">Introduzca el PIN de coacción</string>
     <string name="new_duress_pin">Nuevo PIN de coacción</string>
-    <string name="duress_pin_differs">El PIN de coacción debe ser distinto del PIN normal</string>
     <string name="decoy_passphrase_differs">La frase de paso del señuelo debe ser distinta de la frase de paso principal</string>
     <string name="app_context_unavailable">El contexto de la aplicación no está disponible</string>
     <string name="decoy_exists">Ya existe un monedero señuelo; elimínelo primero</string>
     <string name="decoy_creation_failed">No se pudo crear el monedero señuelo</string>
-    <string name="decoy_write_failed">No se pudo escribir el monedero señuelo: %1$s</string>
     <string name="decoy_seed_failed">No se pudo leer la semilla del señuelo</string>
     <string name="decoy_credentials_failed">No se pudieron guardar las credenciales del señuelo</string>
     <string name="decoy_configured_help">El PIN de coacción está configurado. El monedero señuelo se abre con él desde la pantalla de bloqueo inicial tras un inicio en frío; una sesión principal ya abierta no se cambia en caliente. Desbloquéelo así para acceder a sus pantallas de Recibir y Enviar.</string>
@@ -152,7 +148,6 @@
     <string name="notification_channel_wallet">Servicio del monedero</string>
     <string name="notification_channel_wallet_activity">Actividad del monedero</string>
     <string name="tor_daemon_suffix"> | Daemon de Tor: %1$s</string>
-    <string name="notification_channel_transactions">Transacciones</string>
 
     <string name="allow">Permitir</string>
     <string name="open_app_settings">Abrir ajustes de la app</string>
@@ -163,11 +158,9 @@
     <string name="update">Actualizar</string>
     <string name="could_not_unlock_wallet">No se pudo desbloquear el monedero. Inténtelo de nuevo o reinicie la app.</string>
 
-    <string name="backup_failed">Error en la copia de seguridad: %1$s</string>
     <string name="backup_failed_generic">Error en la copia de seguridad</string>
     <string name="file_saved">Archivo guardado</string>
     <string name="could_not_save_file">No se pudo guardar el archivo</string>
-    <string name="unknown_error">Error desconocido</string>
     <string name="success">Correcto</string>
     <string name="what_will_be_signed">Qué se va a firmar</string>
     <string name="signed_tx">TX FIRMADA</string>
@@ -202,9 +195,7 @@
     <string name="remove_node">Eliminar</string>
     <string name="node_label">NODO</string>
     <string name="daemon_height">Altura del daemon: %1$s</string>
-    <string name="error_connecting">Error al conectar con el servidor: %1$s</string>
     <string name="disable_lws_restart">Desactive LWS y reinicie antes de conectar un nodo</string>
-    <string name="error_prefix">Error: %1$s</string>
 
     <string name="key_images_imported">Imágenes de clave importadas</string>
     <string name="ok">Aceptar</string>
@@ -234,11 +225,6 @@
         <item quantity="one">%1$d moneda seleccionada</item>
         <item quantity="many">%1$d de monedas seleccionadas</item>
         <item quantity="other">%1$d monedas seleccionadas</item>
-    </plurals>
-    <plurals name="recipients_count">
-        <item quantity="one">%1$d destinatario</item>
-        <item quantity="many">%1$d de destinatarios</item>
-        <item quantity="other">%1$d destinatarios</item>
     </plurals>
     <plurals name="blocks_left_count">
         <item quantity="one">queda %1$s bloque</item>

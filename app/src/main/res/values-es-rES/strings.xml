@@ -71,11 +71,7 @@
     <string name="constructing_transaction">CONSTRUYENDO TRANSACCIÓN…</string>
     <string name="invalid_address">dirección no válida</string>
     <string name="amount">Cantidad</string>
-    <string name="sweeping_balance">Saldo a barrer:</string>
-    <string name="minus_fees">(menos comisiones)</string>
     <string name="available_balance">Saldo disponible:</string>
-    <string name="_1_coin_selected">1 moneda seleccionada</string>
-    <string name="coins_selected">monedas seleccionadas</string>
     <string name="scan_key_images">ESCANEAR IMÁGENES DE CLAVE</string>
     <string name="key_images">IMÁGENES DE CLAVE</string>
     <string name="scan_unsigned_tx">ESCANEAR TRANSACCIÓN SIN FIRMAR</string>
@@ -149,12 +145,10 @@
     <string name="settings_change_pin">Cambiar PIN</string>
     <string name="settings_export_backup">Exportar copia de seguridad</string>
     <string name="settings_secure_wipe">Borrado seguro</string>
-    <string name="settings_logs">Registros</string>
     <string name="settings_app_version">%1$s %2$s</string>
     <string name="total">Total</string>
     <string name="finish">FINALIZAR</string>
     <string name="broadcast_tx">PUBLICAR TRANSACCIÓN</string>
-    <string name="unable_to_broadcast_transaction">No se puede publicar la transacción\n %1$s</string>
     <string name="broadcast_in_progress">PUBLICANDO TRANSACCIÓN…</string>
     <string name="fee">Comisión</string>
     <string name="export_as_file">Exportar como archivo</string>

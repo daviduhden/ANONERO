@@ -70,11 +70,7 @@
     <string name="constructing_transaction">正在构建交易…</string>
     <string name="invalid_address">地址无效</string>
     <string name="amount">金额</string>
-    <string name="sweeping_balance">正在清空余额：</string>
-    <string name="minus_fees">（扣除手续费）</string>
     <string name="available_balance">可用余额：</string>
-    <string name="_1_coin_selected">已选择 1 个代币</string>
-    <string name="coins_selected">个代币已选择</string>
     <string name="scan_key_images">扫描密钥映像</string>
     <string name="key_images">密钥映像</string>
     <string name="scan_unsigned_tx">扫描未签名交易</string>
@@ -148,12 +144,10 @@
     <string name="settings_change_pin">更改 PIN</string>
     <string name="settings_export_backup">导出备份</string>
     <string name="settings_secure_wipe">安全擦除</string>
-    <string name="settings_logs">日志</string>
     <string name="settings_app_version">%1$s %2$s</string>
     <string name="total">总计</string>
     <string name="finish">完成</string>
     <string name="broadcast_tx">广播交易</string>
-    <string name="unable_to_broadcast_transaction">无法广播交易\n %1$s</string>
     <string name="broadcast_in_progress">正在发送交易…</string>
     <string name="fee">手续费</string>
     <string name="export_as_file">导出为文件</string>
@@ -191,10 +185,8 @@
     <string name="decoy_settings_supporting">用备用 PIN 打开的独立钱包</string>
     <string name="pin_changed_success">PIN 更改成功</string>
     <string name="pin_change_error">更改 PIN 时出错。请查看日志了解详情</string>
-    <string name="normal_pin_differs_duress">普通 PIN 必须与胁迫 PIN 不同</string>
     <string name="duress_pin_differs_normal">胁迫 PIN 必须与普通 PIN 不同</string>
     <string name="wallet_not_open">钱包未打开</string>
-    <string name="set_password_failed">无法设置钱包密码：%1$s</string>
 
     <string name="accounts">账户</string>
     <string name="new_account">新账户</string>
@@ -262,12 +254,10 @@
     <string name="remove_decoy_wallet">移除诱饵钱包</string>
     <string name="enter_duress_pin">输入胁迫 PIN</string>
     <string name="new_duress_pin">新胁迫 PIN</string>
-    <string name="duress_pin_differs">胁迫 PIN 必须与普通 PIN 不同</string>
     <string name="decoy_passphrase_differs">诱饵口令必须与主口令不同</string>
     <string name="app_context_unavailable">应用上下文不可用</string>
     <string name="decoy_exists">诱饵钱包已存在；请先移除它</string>
     <string name="decoy_creation_failed">无法创建诱饵钱包</string>
-    <string name="decoy_write_failed">无法写入诱饵钱包：%1$s</string>
     <string name="decoy_seed_failed">无法读取诱饵助记词</string>
     <string name="decoy_credentials_failed">无法保存诱饵凭据</string>
     <string name="decoy_configured_help">胁迫 PIN 已配置。冷启动后，在初始锁定界面使用该 PIN 即可打开诱饵钱包；已打开的主会话不会热切换。请以该方式解锁，以访问其接收和发送界面。</string>
@@ -300,7 +290,6 @@
     <string name="notification_channel_wallet">钱包服务</string>
     <string name="notification_channel_wallet_activity">钱包活动</string>
     <string name="tor_daemon_suffix"> | Tor 守护进程：%1$s</string>
-    <string name="notification_channel_transactions">交易</string>
 
     <string name="allow">允许</string>
     <string name="open_app_settings">打开应用设置</string>
@@ -311,11 +300,9 @@
     <string name="update">更新</string>
     <string name="could_not_unlock_wallet">无法解锁钱包。请重试或重启应用。</string>
 
-    <string name="backup_failed">备份失败：%1$s</string>
     <string name="backup_failed_generic">备份失败</string>
     <string name="file_saved">文件已保存</string>
     <string name="could_not_save_file">无法保存文件</string>
-    <string name="unknown_error">未知错误</string>
     <string name="success">成功</string>
     <string name="what_will_be_signed">将要签名的内容</string>
     <string name="signed_tx">已签名交易</string>
@@ -350,9 +337,7 @@
     <string name="remove_node">移除</string>
     <string name="node_label">节点</string>
     <string name="daemon_height">守护进程高度：%1$s</string>
-    <string name="error_connecting">连接服务器时出错：%1$s</string>
     <string name="disable_lws_restart">请先禁用 LWS 并重启，然后再连接节点</string>
-    <string name="error_prefix">错误：%1$s</string>
 
     <string name="key_images_imported">密钥映像已导入</string>
     <string name="ok">确定</string>
@@ -380,9 +365,6 @@
 
     <plurals name="coins_selected_count">
         <item quantity="other">已选择 %1$d 个代币</item>
-    </plurals>
-    <plurals name="recipients_count">
-        <item quantity="other">%1$d 位收款人</item>
     </plurals>
     <plurals name="blocks_left_count">
         <item quantity="other">剩余 %1$s 个区块</item>

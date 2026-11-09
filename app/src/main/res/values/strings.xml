@@ -71,11 +71,7 @@
     <string name="constructing_transaction">CONSTRUCTING TX…</string>
     <string name="invalid_address">invalid address</string>
     <string name="amount">Amount</string>
-    <string name="sweeping_balance">Sweeping balance:</string>
-    <string name="minus_fees">(minus fees)</string>
     <string name="available_balance">Available balance:</string>
-    <string name="_1_coin_selected">1 coin selected</string>
-    <string name="coins_selected">coins selected</string>
     <string name="scan_key_images">SCAN KEY IMAGES</string>
     <string name="key_images">KEY IMAGES</string>
     <string name="scan_unsigned_tx">SCAN UNSIGNED TX</string>
@@ -149,12 +145,10 @@
     <string name="settings_change_pin">Change PIN</string>
     <string name="settings_export_backup">Export Backup</string>
     <string name="settings_secure_wipe">Secure Wipe</string>
-    <string name="settings_logs">Logs</string>
     <string name="settings_app_version">%1$s %2$s</string>
     <string name="total">Total</string>
     <string name="finish">FINISH</string>
     <string name="broadcast_tx">BROADCAST TX</string>
-    <string name="unable_to_broadcast_transaction">Unable to broadcast transaction\n %1$s</string>
     <string name="broadcast_in_progress">SENDING TX…</string>
     <string name="fee">Fee</string>
     <string name="export_as_file">Export as file</string>

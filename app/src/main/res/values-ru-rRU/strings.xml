@@ -70,11 +70,7 @@
     <string name="constructing_transaction">СОЗДАНИЕ ТРАНЗАКЦИИ…</string>
     <string name="invalid_address">неверный адрес</string>
     <string name="amount">Сумма</string>
-    <string name="sweeping_balance">Перенос баланса:</string>
-    <string name="minus_fees">(за вычетом комиссии)</string>
     <string name="available_balance">Доступный баланс:</string>
-    <string name="_1_coin_selected">1 монета выбрана</string>
-    <string name="coins_selected">монет выбрано</string>
     <string name="scan_key_images">СКАНИРОВАТЬ ОБРАЗЫ КЛЮЧЕЙ</string>
     <string name="key_images">ОБРАЗЫ КЛЮЧЕЙ</string>
     <string name="scan_unsigned_tx">СКАНИРОВАТЬ НЕПОДПИСАННУЮ ТРАНЗАКЦИЮ</string>
@@ -148,12 +144,10 @@
     <string name="settings_change_pin">Изменить PIN</string>
     <string name="settings_export_backup">Экспортировать резервную копию</string>
     <string name="settings_secure_wipe">Безопасное удаление</string>
-    <string name="settings_logs">Журналы</string>
     <string name="settings_app_version">%1$s %2$s</string>
     <string name="total">Итого</string>
     <string name="finish">ГОТОВО</string>
     <string name="broadcast_tx">ОТПРАВИТЬ ТРАНЗАКЦИЮ</string>
-    <string name="unable_to_broadcast_transaction">Не удалось отправить транзакцию\n %1$s</string>
     <string name="broadcast_in_progress">ОТПРАВКА ТРАНЗАКЦИИ…</string>
     <string name="fee">Комиссия</string>
     <string name="export_as_file">Экспортировать как файл</string>
@@ -191,10 +185,8 @@
     <string name="decoy_settings_supporting">Отдельный кошелёк, открываемый альтернативным PIN</string>
     <string name="pin_changed_success">PIN успешно изменён</string>
     <string name="pin_change_error">Ошибка при изменении PIN. Подробности в журналах</string>
-    <string name="normal_pin_differs_duress">Обычный PIN должен отличаться от PIN принуждения</string>
     <string name="duress_pin_differs_normal">PIN принуждения должен отличаться от обычного PIN</string>
     <string name="wallet_not_open">Кошелёк не открыт</string>
-    <string name="set_password_failed">Не удалось задать пароль кошелька: %1$s</string>
 
     <string name="accounts">Счета</string>
     <string name="new_account">Новый счёт</string>
@@ -262,12 +254,10 @@
     <string name="remove_decoy_wallet">УДАЛИТЬ ЛОЖНЫЙ КОШЕЛЁК</string>
     <string name="enter_duress_pin">Введите PIN принуждения</string>
     <string name="new_duress_pin">Новый PIN принуждения</string>
-    <string name="duress_pin_differs">PIN принуждения должен отличаться от обычного PIN</string>
     <string name="decoy_passphrase_differs">Парольная фраза ложного кошелька должна отличаться от основной</string>
     <string name="app_context_unavailable">Контекст приложения недоступен</string>
     <string name="decoy_exists">Ложный кошелёк уже существует; сначала удалите его</string>
     <string name="decoy_creation_failed">Не удалось создать ложный кошелёк</string>
-    <string name="decoy_write_failed">Не удалось записать ложный кошелёк: %1$s</string>
     <string name="decoy_seed_failed">Не удалось прочитать seed-фразу ложного кошелька</string>
     <string name="decoy_credentials_failed">Не удалось сохранить учётные данные ложного кошелька</string>
     <string name="decoy_configured_help">PIN принуждения настроен. Ложный кошелёк открывается с ним с начального экрана блокировки после холодного запуска; уже открытая основная сессия не переключается на лету. Разблокируйте его так, чтобы перейти к экранам «Получить» и «Отправить».</string>
@@ -300,7 +290,6 @@
     <string name="notification_channel_wallet">Служба кошелька</string>
     <string name="notification_channel_wallet_activity">Активность кошелька</string>
     <string name="tor_daemon_suffix"> | Демон Tor: %1$s</string>
-    <string name="notification_channel_transactions">Транзакции</string>
 
     <string name="allow">Разрешить</string>
     <string name="open_app_settings">Открыть настройки приложения</string>
@@ -311,11 +300,9 @@
     <string name="update">Обновить</string>
     <string name="could_not_unlock_wallet">Не удалось разблокировать кошелёк. Повторите попытку или перезапустите приложение.</string>
 
-    <string name="backup_failed">Ошибка резервного копирования: %1$s</string>
     <string name="backup_failed_generic">Ошибка резервного копирования</string>
     <string name="file_saved">Файл сохранён</string>
     <string name="could_not_save_file">Не удалось сохранить файл</string>
-    <string name="unknown_error">Неизвестная ошибка</string>
     <string name="success">Успешно</string>
     <string name="what_will_be_signed">Что будет подписано</string>
     <string name="signed_tx">ПОДПИСАННАЯ ТРАНЗАКЦИЯ</string>
@@ -350,9 +337,7 @@
     <string name="remove_node">Удалить</string>
     <string name="node_label">УЗЕЛ</string>
     <string name="daemon_height">Высота демона: %1$s</string>
-    <string name="error_connecting">Ошибка подключения к серверу: %1$s</string>
     <string name="disable_lws_restart">Отключите LWS и перезапустите приложение перед подключением узла</string>
-    <string name="error_prefix">Ошибка: %1$s</string>
 
     <string name="key_images_imported">Образы ключей импортированы</string>
     <string name="ok">ОК</string>
@@ -383,12 +368,6 @@
         <item quantity="few">Выбрано %1$d монеты</item>
         <item quantity="many">Выбрано %1$d монет</item>
         <item quantity="other">Выбрано %1$d монеты</item>
-    </plurals>
-    <plurals name="recipients_count">
-        <item quantity="one">%1$d получатель</item>
-        <item quantity="few">%1$d получателя</item>
-        <item quantity="many">%1$d получателей</item>
-        <item quantity="other">%1$d получателя</item>
     </plurals>
     <plurals name="blocks_left_count">
         <item quantity="one">остался %1$s блок</item>
