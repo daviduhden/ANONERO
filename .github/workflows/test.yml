@@ -25,6 +25,11 @@ on:
         required: false
         type: boolean
         default: true
+      ref:
+        description: Git ref (tag, branch, or SHA) to check out
+        required: false
+        type: string
+        default: ""
     outputs:
       native_artifact:
         description: Native Monero/JNI archives for the caller
@@ -36,9 +41,11 @@ on:
         required: false
         type: boolean
         default: true
-  pull_request:
-  push:
-    branches: [main]
+      ref:
+        description: Git ref (tag, branch, or SHA) to check out
+        required: false
+        type: string
+        default: ""
 
 # Tests never need write access or production secrets.
 permissions:
@@ -52,13 +59,32 @@ env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
   ANDROID_MIN_SDK: '29'
   ANDROID_COMPILE_SDK: '37'
+  ANDROID_COMPILE_SDK_MINOR: '2'
+  # Keep NDK/CMake aligned with app/build.gradle.kts and external-libs/build.sh.
   ANDROID_BUILD_TOOLS: '37.0.0'
-  ANDROID_NDK: '29.0.14206865'
-  ANDROID_CMAKE: '3.31.6'
+  ANDROID_NDK: '30.0.16248370'
+  ANDROID_CMAKE: '4.1.2'
 
 jobs:
+  authorize:
+    name: Owner authorization
+    # workflow_dispatch and workflow_call are not owner-only by themselves: any
+    # collaborator with write access can dispatch, and a caller can chain this workflow.
+    # This job is the single gate; every other job needs it, so a non-owner run has no
+    # executable jobs. Repository settings must still protect workflow files and secrets.
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Confirm repository owner
+        shell: bash
+        run: |
+          echo "Owner authorization passed"
+
   unit:
     name: JVM unit tests
+    needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -68,6 +94,16 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
 
       - name: Set up Java 17
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -85,7 +121,7 @@ jobs:
           printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
           sdkmanager --install \
             "platform-tools" \
-            "platforms;android-${ANDROID_COMPILE_SDK}.0" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
             "build-tools;${ANDROID_BUILD_TOOLS}"
           test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
 
@@ -118,6 +154,7 @@ jobs:
 
   jni-contract:
     name: JNI symbol contract
+    needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -127,6 +164,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Compare Kotlin external declarations and JNI exports
         shell: bash
@@ -134,6 +172,7 @@ jobs:
 
   i18n:
     name: Localization resources
+    needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -143,6 +182,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Check resource parity and hardcoded UI text
         shell: bash
@@ -150,6 +190,7 @@ jobs:
 
   native-language-policy:
     name: Kotlin and C++ architecture policy
+    needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -159,6 +200,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Reject project-owned Rust crates
         shell: bash
@@ -171,6 +213,7 @@ jobs:
 
   native:
     name: Build native Monero/JNI archives
+    needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
@@ -206,6 +249,22 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Verify pinned native inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -f external-libs/monero/Makefile ]] || {
+            echo "::error::Monero submodule is not initialized; run checkout with submodules."
+            exit 1
+          }
+          shopt -s nullglob
+          patches=(external-libs/patches/*.patch)
+          (( ${#patches[@]} > 0 )) || {
+            echo "::error::Pinned ANONERO Monero patch series is missing from external-libs/patches/."
+            exit 1
+          }
 
       - name: Build native archives
         shell: bash
@@ -241,8 +300,8 @@ jobs:
 
   instrumented:
     name: Instrumented tests (API ${{ matrix.api-level }})
-    needs: native
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || inputs.run_instrumented }}
+    needs: [authorize, native]
+    if: ${{ inputs.run_instrumented }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -265,6 +324,16 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
 
       - name: Set up Java 17
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -282,7 +351,7 @@ jobs:
           printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
           sdkmanager --install \
             "platform-tools" \
-            "platforms;android-${ANDROID_COMPILE_SDK}.0" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
             "build-tools;${ANDROID_BUILD_TOOLS}" \
             "ndk;${ANDROID_NDK}" \
             "cmake;${ANDROID_CMAKE}"
@@ -342,7 +411,7 @@ jobs:
           done
 
       - name: Run instrumented tests on API ${{ matrix.api-level }}
-        uses: ReactiveCircus/android-emulator-runner@e93c997dcab69054e999e3924af3d21c4a736e13 # v2.9.0
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}

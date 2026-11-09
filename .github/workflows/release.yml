@@ -19,9 +19,21 @@ name: Build and publish APKs
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
+    inputs:
+      tag:
+        description: Existing release tag to build, for example v1.2.3
+        required: true
+        type: string
+      publish:
+        description: Publish signed APKs to GitHub Releases
+        required: false
+        type: boolean
+        default: false
+      run_instrumented:
+        description: Run the API 35 emulator tests
+        required: false
+        type: boolean
+        default: true
 
 # Default to read-only. Only the publish job gets contents: write.
 permissions:
@@ -36,25 +48,43 @@ concurrency:
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
   # The APK verification below rejects any output whose manifest reports another
-  # minSdk. compileSdk/targetSdk remain independent (37).
+  # minSdk. compileSdk is 37.2; targetSdk remains 37.0.
   ANDROID_MIN_SDK: '29'
   ANDROID_COMPILE_SDK: '37'
+  ANDROID_COMPILE_SDK_MINOR: '2'
+  # Keep NDK/CMake aligned with app/build.gradle.kts and external-libs/build.sh.
   ANDROID_BUILD_TOOLS: '37.0.0'
-  ANDROID_NDK: '29.0.14206865'
-  ANDROID_CMAKE: '3.31.6'
+  ANDROID_NDK: '30.0.16248370'
+  ANDROID_CMAKE: '4.1.2'
 
 jobs:
+  authorize:
+    name: Owner authorization
+    # Manual dispatch is not owner-only by itself. This job is the executable gate:
+    # every other job needs it, so a non-owner dispatch has no runnable jobs.
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Confirm repository owner
+        shell: bash
+        run: |
+          echo "Owner authorization passed"
+
   test:
     name: Required test suite
+    needs: authorize
     uses: ./.github/workflows/test.yml
     permissions:
       contents: read
     with:
-      run_instrumented: true
+      run_instrumented: ${{ inputs.run_instrumented }}
+      ref: ${{ inputs.tag }}
 
   build:
     name: Build and verify unsigned APKs
-    needs: test
+    needs: [authorize, test]
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
@@ -87,12 +117,25 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ inputs.tag }}
           submodules: false
           persist-credentials: false
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
 
       - name: Determine version and verify tag
         id: meta
         shell: bash
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           VERSION="$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
@@ -102,35 +145,35 @@ jobs:
             exit 1
           fi
 
-          TAG=""
-          IS_RELEASE="false"
-          IS_PRERELEASE="false"
-
-          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-              echo "::error::Tag '$TAG' is not a valid release tag"
-              exit 1
-            fi
-            CORE="${TAG#v}"
-            CORE="${CORE%%[+-]*}"
-            if [[ "$CORE" != "$VERSION" ]]; then
-              echo "::error::Tag core version '$CORE' does not match app versionName '$VERSION'"
-              exit 1
-            fi
-            TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
-            HEAD_COMMIT="$(git rev-parse HEAD)"
-            if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
-              echo "::error::Tag '$TAG' does not point at the checked-out commit"
-              exit 1
-            fi
-            IS_RELEASE="true"
-            if [[ "${TAG#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
-              IS_PRERELEASE="true"
-            fi
+          TAG="${TAG_INPUT:-}"
+          if [[ -z "$TAG" ]]; then
+            echo "::error::A tag input is required; enter an existing v* release tag."
+            exit 1
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not a valid release tag"
+            exit 1
+          fi
+          CORE="${TAG#v}"
+          CORE="${CORE%%[+-]*}"
+          if [[ "$CORE" != "$VERSION" ]]; then
+            echo "::error::Tag core version '$CORE' does not match app versionName '$VERSION'"
+            exit 1
+          fi
+          TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+          if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+            echo "::error::Tag '$TAG' does not point at the checked-out commit"
+            exit 1
           fi
 
-          ARTIFACT_VERSION="${TAG:-$VERSION}"
+          IS_RELEASE="true"
+          IS_PRERELEASE="false"
+          if [[ "${TAG#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+            IS_PRERELEASE="true"
+          fi
+
+          ARTIFACT_VERSION="$TAG"
           SOURCE_SHA="$(git rev-parse HEAD)"
           {
             echo "source_sha=$SOURCE_SHA"
@@ -143,7 +186,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           echo "Version: $VERSION"
-          echo "Tag: ${TAG:-<manual build>}"
+          echo "Tag: $TAG"
           echo "Release: $IS_RELEASE (prerelease=$IS_PRERELEASE)"
 
       # Kotlin/C++ is the permanent architecture; do not add a Rust build path.
@@ -198,7 +241,7 @@ jobs:
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager --install \
             "platform-tools" \
-            "platforms;android-${ANDROID_COMPILE_SDK}.0" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
             "build-tools;${ANDROID_BUILD_TOOLS}" \
             "ndk;${ANDROID_NDK}" \
             "cmake;${ANDROID_CMAKE}"
@@ -351,7 +394,7 @@ jobs:
 
   sign:
     name: Sign and checksum APKs
-    needs: build
+    needs: [authorize, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -459,12 +502,14 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [build, sign]
-    if: github.event_name == 'push' && needs.build.outputs.is_release == 'true'
+    needs: [authorize, build, sign]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish == true && needs.build.outputs.is_release == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Publishing needs write access to create/upload release assets. The job is behind
+    # the owner gate and the protected release environment.
     permissions:
-      contents: write
+      contents: write # create/upload release assets; gated by owner job and environment
     environment: release
     env:
       GH_TOKEN: ${{ github.token }}
@@ -478,6 +523,7 @@ jobs:
         with:
           ref: ${{ needs.build.outputs.tag }}
           fetch-depth: 0
+          fetch-tags: true
           submodules: false
           persist-credentials: false
 
@@ -493,10 +539,6 @@ jobs:
           SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" != "refs/tags/$TAG" ]]; then
-            echo "::error::Workflow ref does not match release tag $TAG"
-            exit 1
-          fi
           TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
           if [[ "$TAG_COMMIT" != "$SOURCE_SHA" ]]; then
             echo "::error::Release tag moved after the build; refusing to publish"
