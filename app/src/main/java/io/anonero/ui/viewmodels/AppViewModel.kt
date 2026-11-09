@@ -107,7 +107,6 @@ class AppViewModel(
         walletHandler.scope.launch {
             walletHandler.startService()
         }.invokeOnCompletion {
-            it?.printStackTrace()
             if (it != null)
                 Timber.tag(TAG).e(it)
         }

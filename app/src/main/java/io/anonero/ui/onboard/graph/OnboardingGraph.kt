@@ -74,6 +74,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import timber.log.Timber
 
 
 @Serializable
@@ -220,6 +221,7 @@ fun NavGraphBuilder.onboardingGraph(
                     walletState.setProfile(WalletSession.profile)
                     walletHandler.scope.launch { walletHandler.startService() }
                     runCatching { startAnonService(context) }
+                        .onFailure { Timber.tag("OnboardingGraph").e(it, "wallet service did not start") }
                     val prefs = AnonConfig.context?.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
                     //a backup of an offline signer has no node
                     if (prefs?.getString(NodeFields.RPC_HOST.value, "").isNullOrEmpty()) {
@@ -310,6 +312,7 @@ fun NavGraphBuilder.onboardingGraph(
                             walletState.setProfile(WalletSession.profile)
                             walletHandler.scope.launch { walletHandler.startService() }
                             runCatching { startAnonService(context) }
+                                .onFailure { Timber.tag("OnboardingGraph").e(it, "wallet service did not start") }
                             delay(600)
                             if (AnonConfig.viewOnly || onboardViewModel.getMode() == Mode.RESTORE) {
                                 navController.navigate(Home) {

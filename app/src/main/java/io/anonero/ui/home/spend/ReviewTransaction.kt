@@ -211,6 +211,7 @@ class ReviewTransactionViewModel : ViewModel() {
         broadcastingTx.postValue(BroadcastState.IN_PROGRESS)
 
         return viewModelScope.launch(Dispatchers.IO) {
+            var submitted = false
             try {
                 val wallet = WalletManager.instance?.wallet
                 if (wallet == null) {
@@ -222,6 +223,7 @@ class ReviewTransactionViewModel : ViewModel() {
                     if (!wallet.send(tx)) {
                         throw Exception("Failed to send transaction")
                     }
+                    submitted = true
                 } else {
                     if (!signedTxFile.exists()) {
                         throw Exception("Signed transaction file not found")
@@ -236,6 +238,7 @@ class ReviewTransactionViewModel : ViewModel() {
                         throw Exception(error)
                     }
                     signedTxFile.delete()
+                    submitted = true
                     Timber.tag(TAG).d("Transaction broadcasted...")
                 }
                 // The transaction is already broadcast at this point. A later refresh/store
@@ -246,10 +249,17 @@ class ReviewTransactionViewModel : ViewModel() {
                     wallet.startRefresh()
                     wallet.refreshHistory()
                     wallet.store()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     Timber.tag(TAG).w(e, "post-broadcast refresh failed")
                 }
             } catch (cancelled: CancellationException) {
+                // If nothing was submitted, do not leave the screen stuck in IN_PROGRESS:
+                // STAGING is the only state that allows a deliberate retry.
+                if (!submitted) {
+                    broadcastingTx.postValue(BroadcastState.STAGING)
+                }
                 throw cancelled
             } catch (ex: Exception) {
                 _broadcastError = ex
@@ -311,9 +321,10 @@ fun ReviewTransactionScreen(
                 navigateToHome.invoke()
             },
             onCtaCalled = {
+                val wasSignedTx = qrScannerParam?.exportType == ExportType.SIGNED_TX
                 qrScannerParam = null
                 showScanner = true
-                if (qrScannerParam?.exportType == ExportType.SIGNED_TX) {
+                if (wasSignedTx) {
                     navigateToHome.invoke()
                 }
             },
@@ -360,13 +371,13 @@ fun ReviewTransactionScreen(
     val context = LocalContext.current;
     val ctaText = if (AnonConfig.viewOnly) {
         if (!viewModel.isUnsignedTransaction() && !readyToBroadcast) {
-            stringResource(R.string.confirm).capitalize()
+            stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
         } else {
             stringResource(R.string.broadcast_tx)
         }
     } else {
         if (viewModel.isUnsignedTransaction()) {
-           stringResource(R.string.confirm).capitalize()
+           stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
         } else {
             stringResource(R.string.broadcast_tx)
         }

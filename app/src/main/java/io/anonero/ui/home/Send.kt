@@ -107,6 +107,7 @@ import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.util.Formats
 import io.anonero.util.MoneroAmount
 import io.anonero.util.backup.BackupHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -218,6 +219,8 @@ class SendViewModel : ViewModel() {
                     pendingTx?.let { writeUnsignedTransaction(it) }
                     pendingTx
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
                 Timber.tag(TAG).e(e)
@@ -422,6 +425,8 @@ fun SendScreen(
                     Timber.tag(TAG).i("prepare: Pending tx is null")
                     //show error
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e)
             } finally {

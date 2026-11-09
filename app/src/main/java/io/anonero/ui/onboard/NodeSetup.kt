@@ -156,7 +156,8 @@ fun SetupNodeComposable(
                 ListItem(
                     headlineContent = {
                         Text(
-                            text = stringResource(R.string.node).capitalize(),
+                            text = stringResource(R.string.node)
+                                .replaceFirstChar { it.titlecase() },
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(start = 4.dp)
                         )

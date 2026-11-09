@@ -74,6 +74,7 @@ import io.anonero.services.WalletState
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.util.Formats
 import io.anonero.util.MoneroAmount
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -149,6 +150,8 @@ class PayToManyViewModel : ViewModel() {
                     return@withContext null
                 }
                 pending
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e)
                 _error.value = PayToManyError.CONSTRUCTION_FAILED
