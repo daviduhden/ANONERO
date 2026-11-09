@@ -11,7 +11,7 @@ authoritative for security, language, build, and Git policy.
   - `unit`: JVM unit tests for `anon` and `nero`.
   - `jni-contract`: `scripts/check-jni-contract.py`.
   - `i18n`: `scripts/check-i18n.py`.
-  - `native-language-policy`: rejects project-owned `Cargo.toml`.
+  - `native-language-policy`: rejects project-owned Java sources.
   - `native`: builds the pinned Monero/JNI archives after verifying the submodule and
     patch series are present.
   - `instrumented`: API 35 emulator tests after `native`.
@@ -64,8 +64,8 @@ authoritative for security, language, build, and Git policy.
   only in `sign`, from the protected environment.
 - Do not add caches to the publishing workflow. Its comment explains the cache
   poisoning risk; keep `cache-disabled: true`.
-- Do not weaken or skip the `native-language-policy` job. Do not add a Rust build
-  path.
+- Do not weaken or skip the `native-language-policy` job. Kotlin/Compose and C++/JNI
+  are the permanent architecture; do not add another native runtime or FFI layer.
 - Do not add a debug signing fallback to release builds.
 - Do not remove artifact verification, checksum verification, or signature
   verification.
@@ -149,6 +149,6 @@ Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
 - [ ] Test gates still required before build/sign/publish.
 - [ ] Six APKs, expected IDs/versions/minSdk/ABIs, non-debuggable.
 - [ ] Checksums and signatures verified before publication.
-- [ ] Kotlin/C++ policy intact; no Rust.
+- [ ] Kotlin/C++ policy intact.
 - [ ] Artifacts do not contain secrets or unintended wallet data.
 - [ ] Documentation updated; success is not claimed without a manual run by the owner.

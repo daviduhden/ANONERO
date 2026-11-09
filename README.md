@@ -1,104 +1,163 @@
 # ANONERO
 
-Privacy and security focused Monero wallet with advanced features in a slick UX.
+Privacy- and security-focused Monero wallet for Android, with a full wallet flavor (ANON)
+and a view-only flavor (NERO).
 
-### QUICKSTART
+ANONERO is an Android/Kotlin application with a Jetpack Compose UI and a C++/JNI adapter
+over the official Monero `wallet2` engine. The native wallet archives are built separately
+from the pinned Monero sources and dependency inputs under `external-libs/`.
 
-- Source code: <https://github.com/daviduhden/ANONERO>
+## Documentation
 
-### REQUIREMENTS
+| Document | Contents |
+| --- | --- |
+| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Modules, state flow, wallet lifecycle, persistence, Tor/LWS, native boundary |
+| [`docs/architecture/jni-boundary.md`](docs/architecture/jni-boundary.md) | Kotlin/C++/wallet2 contracts, handles, callbacks, errors |
+| [`docs/security-model.md`](docs/security-model.md) | Assets, threat model, invariants, privacy limits, known issues |
+| [`docs/features.md`](docs/features.md) | Implemented features and their limitations |
+| [`docs/development.md`](docs/development.md) | Repository layout, conventions, static checks, extension recipes |
+| [`docs/build-and-release.md`](docs/build-and-release.md) | Gradle, native build, CI, signing, release |
+| [`docs/architecture/repository-state.md`](docs/architecture/repository-state.md) | Audited state, evidence, decisions, blockers |
+| [`docs/architecture/dependencies.md`](docs/architecture/dependencies.md) | Dependency inventory and update record |
+| [`PROGRESS.md`](PROGRESS.md), [`ROADMAP.md`](ROADMAP.md), [`TODO.md`](TODO.md) | Current progress, priorities, and actionable work |
 
-ANONERO requires **Android 10 (API 29) or later**. Releases built from this
-source cannot be installed or updated on Android 9 or earlier; upgrading a
-device to Android 10 or later is required before installing a new ANONERO build.
+Agent-specific instructions live in [`AGENTS.md`](AGENTS.md) and `.agents/skills/`.
 
-### DISCLAIMER
+## Requirements
 
-Be sure to back up your wallet recovery seed AND passphrase.
+- Android 10 (API 29) or later.
+- Builds from this source cannot be installed or updated on Android 9 or earlier.
+- Supported ABIs: `arm64-v8a` and `armeabi-v7a`. There is no `x86_64` native target.
 
-ANON enforces passphrase encryption on all seeds!
+## Download
 
-We are NOT responsible for lost or stolen funds.
+Signed APKs are published on the project’s GitHub Releases page. The release workflow
+builds ANONERO and NERO in three APK variants each (arm64-v8a, armeabi-v7a, universal),
+signs them with the protected release key, and publishes `SHA256SUMS`.
 
-### MAIN FEATURES
+Do not use APKs from an untrusted mirror. Verify the checksum and signature when distributing
+or installing outside the official release page.
 
-- Monero only
-- Mandatory proxy
-- No mandatory 3rd-party services (optional self-hosted LWS is opt-in)
-- Polyseed mnemonic
-- Passphrase encryption
-- No subaddress reuse
-- Encrypted backups
-- UTXO management (freeze/thaw, coin control)
-- Secure view-key syncing
-- Airgapped transactions
-- Multiple Monero accounts
-- Pay to many
-- Sign / verify messages
-- Optional light-wallet server (LWS) over Tor
-- Stealth mode (redacted notifications, hidden amounts, auto-lock)
-- Separate decoy wallet with an optional duress PIN
-- English, Spanish (Spain), Russian and Simplified Chinese UI with an in-app language selector
+## Main features
 
-### HOW TO BUILD
+- Monero only, with Polyseed and legacy seed restore.
+- Mandatory proxy; embedded Tor by default, with an explicit manual-proxy alternative.
+- Optional self-hosted/opt-in Monero Light Wallet Server (LWS) over Tor.
+- Passphrase encryption on seeds.
+- No intentional subaddress reuse.
+- Encrypted backups with v3 AEAD and v1/v2 restore compatibility.
+- UTXO management: freeze/thaw and coin control.
+- Airgapped unsigned/signed transaction and key-image/output exchange over QR/UR.
+- Multiple Monero accounts and subaddresses.
+- Pay to many.
+- Message signing and verification.
+- Stealth mode: redacted notifications, hidden amounts, optional auto-lock, no persisted logs.
+- Separate decoy wallet with an optional duress PIN.
+- Secure wipe of the active profile.
+- English, Spanish (Spain), Russian, and Simplified Chinese UI with an in-app language selector.
 
-ANONERO builds from GitHub against the **official Monero source tree**. Monero is
-a pinned git submodule, not a fork:
+## Architecture at a glance
 
-- Repository: <https://github.com/monero-project/monero>
-- Release: `v0.18.5.4`
-- Commit: `85f036ba7019cd36f08e8a38a27c37ea7b522618`
+```mermaid
+flowchart LR
+    UI["Compose UI"] --> VM["ViewModels"]
+    VM --> State["WalletState"]
+    State --> Handler["AnonWalletHandler"]
+    Handler --> Wallet["Wallet / WalletManager"]
+    Wallet --> JNI["C++ JNI adapter"]
+    JNI --> W2["Monero wallet2 static archives"]
+    Handler --> Tor["TorService"]
+    Tor -. SOCKS .-> W2
+```
 
-Upstream Monero does not expose every wallet-API method ANONERO uses (Polyseed
-with a passphrase, coin control / `CoinsInfo`, and the view-only key-image
-helpers). A pinned compatibility patch series is applied automatically on top of
-the official release.
+`WalletState` is the UI-facing source of truth. `AnonWalletHandler` opens/closes the wallet,
+resolves the profile, applies the proxy, configures the daemon/LWS, and wipes. One managed
+wallet exists per process; the decoy and backup re-keying use explicitly unmanaged wallets.
+See the architecture document for the complete flow.
 
-#### 1. Clone the repository
+## Build from source
 
-Clone with submodules so the exact official Monero commit is checked out:
+The build has two parts:
+
+1. **Native archives.** `external-libs/` builds official Monero `v0.18.5.4` plus the pinned
+   ANONERO wallet-API patch series, and the required dependencies, in a reproducible
+   container. The Monero source is a pinned submodule; changes are applied as patches, not
+   as edits to the submodule.
+2. **Android APK.** Gradle compiles the Kotlin app and the C++ JNI adapter, then packages
+   the prebuilt archives into the `anon` or `nero` flavor.
 
 ```sh
 git clone --recurse-submodules https://github.com/daviduhden/ANONERO.git
 cd ANONERO
-```
 
-If you already cloned without submodules:
-
-```sh
-git submodule update --init --recursive
-```
-
-#### 2. Build the native libraries
-
-`sudo` is only needed because the build drives docker (or podman):
-
-```sh
 cd external-libs
-sudo make android     # arm64-v8a + armeabi-v7a, for the APK
-sudo make linux       # linux-x86_64, for the desktop build
-sudo make             # all three
+sudo make android     # arm64-v8a + armeabi-v7a
+sudo make linux       # optional desktop libanonero.so
+sudo make             # all targets
 ```
 
-The first run applies the pinned patch series to `external-libs/monero`,
-initialises the nested submodules it adds, and downloads the pinned dependency
-sources. To run just the patch step:
+If the repository was cloned without submodules, run
+`git submodule update --init --recursive` before building.
 
-```sh
-cd external-libs
-make patches
-```
+`sudo` is only needed because the build drives Docker or Podman. Use `CONTAINER=podman` for a
+rootless Podman setup. The first build downloads several hundred megabytes; parallelism
+defaults to `nproc` and can be overridden with `make NPROC=4`.
 
-Builds run in a container, so the only host requirements are git, docker (or
-`CONTAINER=podman`) and free disk. The first build downloads several hundred
-megabytes. Parallelism defaults to `nproc`; override with `make NPROC=4`.
+Open the repository in Android Studio and build the `anon` or `nero` flavor. The Android
+build consumes `external-libs/arm64-v8a` and `external-libs/armeabi-v7a`.
 
-The native build is reproducible: from the pinned base image, SHA-pinned
-sources, official Monero commit, and pinned patch series, a build of a given
-commit produces byte-identical `.a`/`.so` files.
+**Current checkout caveat:** the pinned ANONERO patch series is not present under
+`external-libs/patches/`, and the Monero submodule is uninitialized. The native build cannot
+be reproduced from this checkout until those inputs are restored. See
+[`docs/architecture/repository-state.md`](docs/architecture/repository-state.md).
 
-#### 3. Build the APK
+For the full build/release pipeline, including CI jobs, signing, and artifact checks, see
+[`docs/build-and-release.md`](docs/build-and-release.md).
 
-Open the repository in Android Studio and build the `anon` or `nero` flavor.
-The Android build consumes the native libraries produced in
-`external-libs/arm64-v8a` and `external-libs/armeabi-v7a`.
+## Security and limitations
+
+- The recovery seed and passphrase are the ultimate recovery path. Back them up offline.
+- The wallet password is a random secret wrapped by Android Keystore; the PIN gates access
+  to it. A Keystore reset or device change can make the device-local wallet unreadable.
+- Tor hides the network path, not transaction amounts, timing, or sync patterns.
+- LWS sees the public address and view key and is treated as untrusted. It is optional.
+- The decoy wallet is separation of wallet files and secrets, **not** plausible deniability.
+- Stealth mode reduces casual exposure; it is not anonymity and does not defeat root,
+  accessibility services, or screen capture.
+- Existing backups include v1/v2 compatibility paths. Do not write new data with the legacy
+  unauthenticated format.
+
+Read [`docs/security-model.md`](docs/security-model.md) before changing key handling,
+transactions, backups, Tor/LWS, or profile isolation.
+
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `app/` | Android application and JNI adapter |
+| `external-libs/` | Pinned Monero and native dependency build |
+| `scripts/` | Static JNI and localization checks |
+| `.github/workflows/` | CI, signing, and release |
+| `docs/` | Technical documentation |
+| `.agents/` | Agent instructions and skills |
+| `AGENTS.md` | Repository-wide contributor/agent contract |
+
+## Development
+
+Use [`docs/development.md`](docs/development.md) for conventions, state/threading rules,
+persistence rules, static checks, and recipes for adding screens, preferences, native
+methods, dependencies, or migrations.
+
+Agent work must not compile, run tests, or execute workflows locally; CI is authoritative.
+No commit or push is performed without explicit supervisor authorization.
+
+## Disclaimer
+
+Be sure to back up your wallet recovery seed AND passphrase. ANON enforces passphrase
+encryption on all seeds. The maintainers are not responsible for lost or stolen funds.
+
+## License and attribution
+
+ANONERO is distributed under the Apache License 2.0. See [`LICENSE`](LICENSE) and
+[`NOTICE`](NOTICE). The project includes code derived from Monerujo; the original copyright
+and license notices apply to those portions.
