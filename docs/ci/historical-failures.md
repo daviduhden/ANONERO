@@ -4,13 +4,20 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42699227920` | `0006659` | `workflow_dispatch` | failure | native | JVM tests, Android Lint (0 errors, 0 warnings), JNI, i18n, and policy pass; native fails on missing patches; assemble/instrumented skipped |
+| `42698560608` | `2788e92` | `workflow_dispatch` | failure | native | Lint had 2 warnings left; fixed afterwards |
+| `42697719108` | `dda6cde` | `workflow_dispatch` | failure | native | Lint clean except icon/vector warnings; fixed afterwards |
+| `42695062606` | `746ecf4` | `workflow_dispatch` | failure | native | Lint errors cleared; structural warnings reduced |
+| `42694063725` | `dd692a8` | `workflow_dispatch` | failure | native | JVM tests and lint pass; compiler fixes validated |
+| `42693644972` | `47f4a5e` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; native | Regression introduced by the first lint fix; corrected in `dd692a8` |
+| `42692380022` | `672a1cc` | `workflow_dispatch` | failure | Android Lint; native | First lint run: 35 errors, 92 warnings |
 | `42686398569` | `52d67d4` | `workflow_dispatch` | failure | JVM unit tests; native | Manual owner run; architecture policy, JNI contract, localization passed; instrumented skipped |
 | `42552892586` | `ed8b097` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 | `42547686992` | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
-No other accessible runs, no artifacts, no release run, no instrumented run, and no
-successful build. The two historical `push` triggers are no longer present; workflows are
-manual-only as of the current tree.
+No release, instrumented, sanitizer, or fuzz run exists. The native job remains blocked by
+the missing patch series, so `assemble` and `instrumented` are skipped. The two historical
+`push` triggers are no longer present; workflows are manual-only.
 
 ## Failure records
 
@@ -249,10 +256,9 @@ manual-only as of the current tree.
 
 ## Missing evidence
 
-- No successful JVM run, so Kotlin warnings and test results are unknown.
-- Android Lint and the assemble/link job exist but have never run.
+- JVM tests pass on `dd692a8` and later.
+- Android Lint passes with zero errors and zero warnings on `0006659`.
+- The assemble/link job has never run because `native` fails first.
 - No C++ warning report.
 - No native link, instrumented, release, signing, sanitizer, or fuzz run.
-- No unit-test artifacts were retained because no test reports were produced.
-- No run has ever executed a unit test: two runs failed before Gradle started and one
-  failed in Kotlin compilation.
+- The native job is still blocked by the absent Monero patch series.
