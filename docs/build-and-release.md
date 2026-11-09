@@ -70,10 +70,10 @@ dependency versions and hashes, CMake/NDK archives, `SOURCE_DATE_EPOCH`, `ZERO_A
 `TZ=UTC`, and static archives. Do not add an unpinned download or a host toolchain
 dependency.
 
-**Current blocker:** `external-libs/patches/` contains only `apply.sh`, and the Monero
-submodule is uninitialized. The native build cannot be reproduced from this checkout until
-the pinned patch series and submodule are restored. The `native` CI job will fail for that
-reason independently of the Android changes.
+**Current state:** the five wallet-API patches are checked in under
+`external-libs/patches/` and apply cleanly to the pinned commit, but the local Monero
+submodule is uninitialized and the native archives have not been compiled. The manual
+`native` CI job is the authority for the native build.
 
 ## 4. GitHub Actions: test pipeline
 
@@ -193,7 +193,7 @@ Agent work must not execute these commands; use CI.
 
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
-| `native` job fails before compiling | Monero submodule or patch series missing | `git ls-tree HEAD external-libs/monero`, `ls external-libs/patches` |
+| `native` job fails before compiling | Monero submodule uninitialized or a patch does not apply | `git ls-tree HEAD external-libs/monero`, `ls external-libs/patches`, `make -C external-libs patches` |
 | JNI symbol mismatch | Kotlin `external` name and export diverged | `python3 scripts/check-jni-contract.py` |
 | Link failure in app CMake | NDK/CMake or archive set mismatch | `app/CMakeLists.txt`, `external-libs/<abi>/monero/` |
 | Release APK count wrong | ABI split or flavor output missing | Build log and `app/build/outputs/apk/` |

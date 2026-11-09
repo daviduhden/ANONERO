@@ -83,9 +83,9 @@ enumerated; `kotlinx.coroutines` was promoted to a direct declaration.
 | Unbound | 1.26.2 | 1.26.2 | 1.26.2 | Already latest stable; security release |
 | libzmq | 4.3.5 / `622fc6d…` | 4.3.5 / `622fc6d…` | 4.3.5 | Already latest stable |
 | libiconv | 1.19.1 | 1.19.1 | 1.19.1 | Already latest stable |
-| Polyseed | `bd79f50…` | `bd79f50…` | v3.0.2 | Blocked; must move with the Monero patch series |
-| utf8proc | `3de4596…` | `3de4596…` | v2.12.0 | Blocked; must move with the Monero patch series |
-| bc-ur | from Monero patch series | unchanged | Monero patch series | Blocked; patch files absent |
+| Polyseed | `bd79f50…` | `bd79f50…` | v3.0.2 | Pinned by the restored Monero patch series; native compile pending |
+| utf8proc | `3de4596…` | `3de4596…` | v2.12.0 | Pinned by the restored Monero patch series; native compile pending |
+| bc-ur | `d82e7c7…` | `d82e7c7…` | `MrCyjaneK/bc-ur` | Pinned by the restored Monero patch series; native compile pending |
 | Debian base | bookworm digest `6ebd97f…` | unchanged | latest bookworm digest not verified | Blocked; digest/snapshot update needs a verified build |
 | Debian snapshot | `20260824T000000Z` | unchanged | newer snapshots exist | Blocked for reproducibility review |
 
@@ -153,9 +153,9 @@ Gradle 9.7.
 | Dependency | Latest stable | Why not updated |
 | --- | --- | --- |
 | OpenSSL 4.1.0 | 4.1.0 | New major line; needs Monero, libzmq, Unbound, and native ABI/crypto validation. Current 3.5.9 is the latest 3.5 LTS patch and is a security release. |
-| Polyseed v3.0.2 | v3.0.2 | `build.sh` pins the commit expected by the Monero API patch series. The patch files are absent, so the matching Monero wrapper/submodule cannot be updated safely. |
-| utf8proc v2.12.0 | v2.12.0 | Same patch-series dependency as Polyseed; the Monero wrapper must be rebuilt against the matching commit. |
-| bc-ur | Monero patch series | The patch series is missing from this checkout. |
+| Polyseed v3.0.2 | v3.0.2 | `build.sh` and the restored Monero patch series pin `bd79f50…`. Native compile still needs CI. |
+| utf8proc v2.12.0 | v2.12.0 | `build.sh` and the restored Monero patch series pin `3de4596…`. Native compile still needs CI. |
+| bc-ur | `MrCyjaneK/bc-ur` `d82e7c7…` | Added by the restored patch series; native compile still needs CI. |
 | Debian base/snapshot | unverified | A base digest or snapshot change must be accompanied by a reproducible native build and verified package availability. |
 | Gradle dependency lockfile | n/a | Generating a lockfile requires Gradle resolution, which is prohibited locally. CI must generate/validate it in a dedicated change. |
 | JDK 21/25 | 21/25 LTS | AGP 9.5 documents JDK 17 as its minimum/default. No project requirement or CI evidence justifies changing the Gradle JDK; source/target remain 17 for Android compatibility. |

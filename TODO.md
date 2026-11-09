@@ -5,13 +5,18 @@ the rationale to `ROADMAP.md`.
 
 ## Critical
 
+- [ ] Review the LGPL-3.0 licensing implications of the restored `monero_c` patch series
+      before redistribution; see `external-libs/patches/README.md` and
+      `LICENSE-LGPL-3.0`.
+
 - [ ] Bind an imported signed NERO transaction to the reviewed unsigned object. wallet2
       currently exposes no parser for the signed file, so a compromised external signer can
       return a different destination/amount. Requires a patched native signed-file getter
       (txids/outputs) and a regression fixture before claiming fund safety.
 - [ ] Decide and enforce a backup-passphrase policy independent of the seed passphrase;
       short/empty seed passphrases currently produce weakly keyed backups.
-- [ ] Restore `external-libs/monero` and the pinned `external-libs/patches/*.patch` series.
+- [ ] Validate the restored wallet-API patch series in the manual `native` CI job; the
+      series applies to `85f036ba` but the native archives have not been compiled.
 - [ ] Create the protected `release` environment with required reviewers and the four
       signing secrets; confirm no other collaborator can run workflows from a modified ref.
 - [ ] Protect `.github/workflows/` and `main` with branch protection/CODEOWNERS.

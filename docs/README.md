@@ -45,8 +45,9 @@ a Keystore-wrapped wallet password and a PBKDF2 PIN gate.
 
 ## Known repository caveats
 
-The current checkout is not a complete native build environment: the Monero submodule is
-uninitialized and the ANONERO wallet-API patch series is absent from
-`external-libs/patches/`. The Android build and release pipeline are documented as designed,
-but native reproducibility cannot be verified until those inputs are restored. See
-[`architecture/repository-state.md`](architecture/repository-state.md).
+The current checkout is not a complete native build environment by itself: the Monero
+submodule is uninitialized locally. The wallet-API patch series is checked in under
+`external-libs/patches/` and applies cleanly to the pinned commit, but the native compile
+still requires the manual CI `native` job or local submodule initialization. See
+[`architecture/repository-state.md`](architecture/repository-state.md) and
+[`../external-libs/patches/README.md`](../external-libs/patches/README.md).

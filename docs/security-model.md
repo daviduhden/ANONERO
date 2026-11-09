@@ -200,9 +200,11 @@ correlate the two profiles.
 These are current limitations. Items fixed in the latest development cycle are listed
 separately below.
 
-1. **Monero patch series absent.** `external-libs/patches/` contains only `apply.sh`; the
-   submodule is uninitialized. The documented native build and `native` CI job cannot succeed
-   until the pinned patch series is restored. See `repository-state.md`.
+1. **Monero patch series licensing and native validation.** The five wallet-API patches
+   are checked in and apply to the pinned commit, but they are adapted from `monero_c`
+   under LGPL-3.0 (see `external-libs/patches/README.md`) and the native archives have not
+   been compiled. Treat the native build as unvalidated until the manual `native` CI job
+   passes.
 2. **No dependency lockfile/verification metadata.** Gradle resolution is not locked, and
    the wrapper JAR is the only checked-in binary build artifact. Supply-chain verification
    relies on pinned versions, the wrapper checksum, and CI. See `dependencies.md`.

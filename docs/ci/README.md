@@ -29,5 +29,6 @@ validation.
 
 GitHub Actions logs show the state of a specific commit and workflow definition. They do
 not prove the current working tree. Fixes described as “implemented, CI pending” have been
-reviewed statically only. Native and instrumented behavior remains unverified while the
-Monero submodule and patch series are absent.
+reviewed statically only. Native and instrumented behavior remains unverified: the patch
+series is checked in and applies to the pinned commit, but the local Monero submodule is
+uninitialized and the archives have not been compiled.

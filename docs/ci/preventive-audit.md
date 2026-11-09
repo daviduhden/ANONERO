@@ -4,8 +4,9 @@
 
 This is a static audit followed by manual CI validation. Run `42700250719` passes JVM
 unit tests, Android Lint (zero errors and zero warnings for both flavors), JNI symbol
-parity, localization, and the architecture policy. The native job still fails on the
-missing Monero patch series, so `assemble` and `instrumented` are skipped.
+parity, localization, and the architecture policy. The wallet-API patch series is now
+checked in and applies to the pinned Monero commit; the native job must still compile it,
+so `assemble` and `instrumented` remain unverified.
 
 ## Warning policy
 
@@ -59,7 +60,8 @@ missing Monero patch series, so `assemble` and `instrumented` are skipped.
   resulting warnings and `-Werror` readiness are unverified.
 - The JNI contract script checks symbol names only; it cannot validate JNI signatures,
   constructor descriptors, or link-time symbol availability.
-- Native compilation is blocked before C++ compilation by the missing patch series.
+- The native compile and link have not run. The patch series is present and applies to
+  the pinned commit, but the archives must be built in CI.
 - No AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or LeakSanitizer run
   exists.
 

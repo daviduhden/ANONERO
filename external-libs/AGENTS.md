@@ -33,17 +33,20 @@ The build is intended to be reproducible. Treat every pin as a security input.
 - The ANONERO patch series under `patches/` is part of the Monero input. Patches must
   be applied to the official submodule; do not commit a locally modified Monero tree.
 
-**Current checkout gap:** `external-libs/patches/` contains only `apply.sh`; the
-`.patch` files are missing. `external-libs/monero` is uninitialized. The native build
-described by the README cannot be reproduced from this checkout. Do not claim it can.
-Restoring the patch series and submodule is a prerequisite for any native validation.
+**Current checkout state:** the five wallet-API patches, `apply.sh`, `README.md`, and
+`LICENSE-LGPL-3.0` are checked in under `patches/`. They apply cleanly to the pinned
+`85f036ba` commit. `external-libs/monero` is uninitialized locally and the native archives
+have not been compiled, so the manual `native` CI job remains the authority.
+
+The patch series is adapted from `monero_c` and is LGPL-3.0; keep the licence file with
+the patches and do not relicense them as Apache-2.0.
 
 ## 3. Hard rules
 
 - Do not run `make`, `docker`/`podman`, `cmake`, or `build.sh` locally. CI is the
   build authority.
 - Do not edit the Monero submodule working tree. Add a patch file and extend
-  `patches/apply.sh` if the patch series is restored.
+  `patches/apply.sh` when changing the series.
 - Do not modify a pinned dependency version or hash to “make it build”.
 - Do not add a new native dependency unless it is required by Monero or the JNI
   adapter, is pinned, is license-compatible, and has a reproducible source URL.

@@ -19,8 +19,8 @@ then maintainability.
 
 ## 2. Native build and JNI
 
-- Restore the pinned Monero submodule and wallet-API patch series.
-- Obtain a green `native` CI run with CMake 4.4.5, NDK r30, Boost 1.92, zlib 1.4.
+- Validate the restored wallet-API patch series and obtain a green `native` CI run with
+  CMake 4.4.5, NDK r30, Boost 1.92, zlib 1.4.
 - Add a native/JNI test target for handle lifetime, null input, array-length mismatch, and
   listener replacement.
 - Continue RAII modernization in the project-owned adapter; keep the vendored Monero tree

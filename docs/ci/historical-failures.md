@@ -4,7 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `42700250719` | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native blocked on missing patches |
+| `42700250719` | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native failed before the series was restored |
 | `42699227920` | `0006659` | `workflow_dispatch` | failure | native | Lint 0 errors / 0 warnings; native blocked |
 | `42698560608` | `2788e92` | `workflow_dispatch` | failure | native | Lint had 2 warnings left; fixed afterwards |
 | `42697719108` | `dda6cde` | `workflow_dispatch` | failure | native | Lint clean except icon/vector warnings; fixed afterwards |
@@ -16,9 +16,9 @@
 | `42552892586` | `ed8b097` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 | `42547686992` | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
-No release, instrumented, sanitizer, or fuzz run exists. The native job remains blocked by
-the missing patch series, so `assemble` and `instrumented` are skipped. The two historical
-`push` triggers are no longer present; workflows are manual-only.
+No release, instrumented, sanitizer, or fuzz run exists. The native job passed its patch
+preflight only after the series was restored; the compile/link result is still pending.
+The two historical `push` triggers are no longer present; workflows are manual-only.
 
 ## Failure records
 
@@ -42,16 +42,17 @@ the missing patch series, so `assemble` and `instrumented` are skipped. The two 
 - **Job:** Build native Monero/JNI archives
 - **Diagnostic:** `Pinned ANONERO Monero patch series is missing from external-libs/patches/`;
   historical `error: can't open patch '.../external-libs/patches/*.patch'`.
-- **Root cause:** the repository does not contain the `.patch` series. In CI the submodule
-  checkout step succeeds; in the local audit checkout the submodule is uninitialized. The
-  patch series is missing in both cases.
+- **Root cause:** the repository did not contain the `.patch` series. In CI the submodule
+  checkout step succeeds; in the local audit checkout the submodule is uninitialized.
 - **Pattern search:** the native build, assemble/link, instrumented tests, release build,
   signing, and publication all depend on these inputs.
-- **Correction:** fail-fast preflight with an explicit error; the native input itself must
-  still be restored.
+- **Correction:** the five wallet-API patches were reconstructed from the `monero_c`
+  lineage, rebased onto the pinned `85f036ba` commit, and checked in with `apply.sh`,
+  provenance, and licence. They apply with `git apply --index --3way`; the nested
+  `bc-ur`, `polyseed`, and `utf8proc` gitlinks resolve.
 - **Regression check:** native preflight requires an initialized submodule and at least one
   patch file; `assemble` now links the JNI library even when instrumented tests are skipped.
-- **Status:** blocked at repository level; native and instrumented evidence unavailable.
+- **Status:** patch series restored; native compile and link still pending CI.
 
 ### CI-003 — Invalid resource string / apostrophe escaping
 
@@ -311,7 +312,9 @@ the missing patch series, so `assemble` and `instrumented` are skipped. The two 
 - JVM tests pass on `dd692a8` and later.
 - Android Lint passes with zero errors and zero warnings on `0006659` and later.
 - Kotlin compilation emits zero `w:` diagnostics on `e0afc7f`.
-- The assemble/link job has never run because `native` fails first.
+- The assemble/link job has never run because `native` stopped at the patch preflight
+  before the series was restored.
 - No C++ warning report.
 - No native link, instrumented, release, signing, sanitizer, or fuzz run.
-- The native job is still blocked by the absent Monero patch series.
+- The native job must compile the restored patch series before any of the above can be
+  validated.

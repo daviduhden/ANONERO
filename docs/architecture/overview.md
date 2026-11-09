@@ -259,9 +259,10 @@ and error mapping.
 ## 11. What is not present
 
 - An alternate native runtime, FFI layer, or project-owned Java.
-- A checked-in Monero patch series (the native build is blocked until it is restored).
 - A checked-in Gradle dependency lockfile or verification metadata.
 - Runtime, device, or cryptographic validation performed by this documentation pass.
+- A compiled native build from this checkout; the patch series is present, but the
+  archives require the manual CI `native` job.
 
 ## 12. Related documents
 

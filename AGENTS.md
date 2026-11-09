@@ -45,10 +45,11 @@ relying on it after a significant change.
   alternate project-owned native runtime or FFI layer.
 - `external-libs/monero` is a git submodule pinned to
   `85f036ba7019cd36f08e8a38a27c37ea7b522618` (README: Monero `v0.18.5.4`).
-- In this checkout the submodule is not populated and
-  `external-libs/patches/` contains only `apply.sh`. The patch series described by
-  `README.md` is not present. The native build is therefore **not reproducible from
-  this checkout** until the submodule and patches are restored.
+- `external-libs/patches/` contains the five wallet-API patches plus `apply.sh` and
+  `README.md`. The series is adapted from the `monero_c` Monero patches and applies to
+  the pinned commit; see `external-libs/patches/README.md` for provenance and licence.
+  The local submodule is still unpopulated, so the native build requires CI or a manual
+  `git submodule update --init --recursive` followed by `make -C external-libs patches`.
 - `docs/` had no documentation before this audit. It now contains a documentation index
   and the architecture, security, features, development, build, state, and dependency
   documents.
@@ -77,7 +78,6 @@ relying on it after a significant change.
 ### Not present or not proven
 
 - No alternate native runtime, FFI layer, or project-owned Java.
-- A checked-in Monero patch series.
 - Runtime, device, or cryptographic proof from this audit. Static inspection can find
   defects; it cannot prove correctness or security.
 - Any claim that “it works” without CI, logs, or an explicitly cited artifact.
@@ -377,9 +377,10 @@ Rules for documentation:
 
 ## 12. Known limitations (current checkout)
 
-- The Monero patch series is absent, so the documented native build cannot be
-  reproduced here. Do not claim native build success from this checkout.
-- The Monero submodule is uninitialized.
+- The Monero wallet-API patch series is checked in and applies cleanly to the pinned
+  commit, but the native build has not been compiled in this checkout. Do not claim
+  native build success until the manual CI `native` job passes.
+- The Monero submodule is uninitialized locally; CI checks it out.
 - The native toolchain update (CMake 4.4.5, NDK r30, Boost 1.92.0, zlib 1.4) and the
   Android toolchain update (AGP 9.5.1, Gradle 9.9.0, CMake 4.1.2, NDK 30) have not
   been compiled or linked. CI must validate them.
@@ -392,8 +393,8 @@ Rules for documentation:
   screen-capture-privileged apps, accessibility services, root, or forensic imaging.
 - Tor hides the network path, not timing, amounts, or the fact that a wallet is
   syncing. LWS sees the view key and incoming transaction metadata.
-- `README.md` describes a build workflow that depends on missing patch files; treat the
-  README as intent, not as proof of the current checkout.
+- The patch series is adapted from the `monero_c` lineage and is licensed under
+  LGPL-3.0; see `external-libs/patches/README.md` and `LICENSE-LGPL-3.0`.
 - NERO signed-transaction import cannot yet be bound to the reviewed unsigned object:
   wallet2 exposes no signed-file parser in this checkout. A compromised external signer
   can return a different payment; the UI warning/comment is not a substitute for native

@@ -171,7 +171,8 @@ CI jobs (manual dispatch only; every job other than `authorize` needs the owner 
 - `jni-contract`: symbol parity.
 - `i18n`: resource parity and hardcoded text scan.
 - `native-language-policy`: rejects project-owned Java sources.
-- `native`: builds Monero/JNI archives (blocked by missing patches in this checkout).
+- `native`: builds Monero/JNI archives; the patch series is present, the local submodule
+  is uninitialized, and CI is the compile authority.
 - `instrumented`: API 35 emulator tests.
 - `release`: test, build, sign, verify, publish; `publish` is a separate boolean input.
 
@@ -199,7 +200,9 @@ CI jobs (manual dispatch only; every job other than `authorize` needs the owner 
 
 - `ui/NavGraph.kt` has no executable code; navigation is implemented in `HomeGraph.kt` and
   `OnboardingGraph.kt`.
-- The Monero submodule and patch series are not present in the checkout.
+- The Monero submodule is not initialized in the local checkout. The wallet-API patch
+  series is checked in and applies to the pinned commit; the native archives still need
+  the manual CI `native` job.
 - The Gradle wrapper JAR is checked in at `gradle/wrapper/gradle-wrapper.jar`; the
   distribution checksum is pinned in `gradle/wrapper/gradle-wrapper.properties`.
 - No Gradle dependency lockfile or verification metadata is checked in.

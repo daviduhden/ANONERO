@@ -146,13 +146,18 @@ records progress; it is not a release note and does not claim CI validation.
   `refs/tags/` resolution.
 - Manual CI run `42700250719` confirms: JVM unit tests pass, Android Lint reports zero
   errors and zero warnings for both flavors, Kotlin compilation emits zero warnings, and
-  JNI/i18n/policy gates pass. `native`, `assemble`, and `instrumented` remain blocked by
-  the missing Monero patch series.
+  JNI/i18n/policy gates pass.
+- Restored the Monero wallet-API patch series: five patches adapted from the `monero_c`
+  lineage, rebased onto the pinned `85f036ba` commit, checked in with provenance and the
+  LGPL-3.0 licence. They apply with `git apply --index --3way`, and the `bc-ur`,
+  `polyseed`, and `utf8proc` submodules resolve at pinned commits. Native compile remains
+  pending.
 
 ## Pending validation
 
-- **Native build:** the Monero submodule and wallet-API patch series are absent. The
-  `native` job cannot succeed until they are restored. CMake/NDK/Boost/zlib changes are
+- **Native build:** the wallet-API patch series is checked in and applies to the pinned
+  commit, but the local Monero submodule is uninitialized and the archives have not been
+  compiled. The manual `native` job is the authority. CMake/NDK/Boost/zlib changes are
   statically reviewed only.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 have not
   been built or instrumented locally.
@@ -162,7 +167,7 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## Blocked
 
-- Monero patch series and submodule (repository blocker).
+- Native compile of the restored patch series (local submodule uninitialized; CI required).
 - OpenSSL 4.x, Polyseed/utf8proc updates, Debian base/snapshot, and Gradle lockfile
   generation have technical or validation blockers; see
   [`docs/architecture/dependencies.md`](docs/architecture/dependencies.md).

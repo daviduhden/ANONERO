@@ -30,8 +30,10 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 | JNI symbol parity is statically checked | `scripts/check-jni-contract.py`, `test.yml` |
 | Localization parity is statically checked | `scripts/check-i18n.py`, `test.yml` |
 | Monero submodule pinned | `git ls-tree HEAD external-libs/monero` -> `85f036ba...` |
-| Submodule not populated | `external-libs/monero` empty |
-| Patch files missing | `external-libs/patches/` contains only `apply.sh` |
+| Submodule not populated locally | `external-libs/monero` empty |
+| Wallet-API patch series present | `external-libs/patches/0001..0005`, `apply.sh`, `README.md` |
+| Patch series applies to the pin | `git apply --index --3way` on a clean `85f036ba` checkout |
+| Native archives not compiled | requires the manual CI `native` job |
 | Embedded Tor with mandatory proxy | `TorService.kt`, `AnonWalletHandler.applyProxy`, `WALLET_USE_TOR` default true |
 | Optional LWS over Tor | `PrivacySettings.kt` `LwsConfig`, `AnonWalletHandler.startService` |
 | Keystore-bound wallet secret | `KeyStoreHelper.kt`, `WalletKey.kt` |
@@ -62,9 +64,9 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 
 ### In progress or incomplete
 
-- Native reproducibility: README documents a patch series that is absent from the
-  checkout. The submodule is uninitialized. The native build cannot be reproduced
-  here.
+- Native reproducibility: the wallet-API patch series is checked in and applies to the
+  pinned commit. The local submodule is uninitialized and the native archives have not
+  been compiled; the manual CI `native` job must validate them.
 - Documentation: `docs/` was empty; this audit adds the documentation index, architecture
   and JNI docs, security model, features, development, build/release, state, dependency
   record, progress/roadmap/todo files, and the instruction system.
@@ -133,12 +135,13 @@ was committed in `52d67d4`. The CI compile-failure fixes were committed afterwar
 
 ## Known gaps and follow-ups
 
-1. **Restore the Monero patch series.** Without `external-libs/patches/*.patch`, the
-   documented native build and the `native` CI job cannot succeed. This is a
-   repository blocker, not an instruction defect.
-2. **Initialize the Monero submodule.** `git submodule update --init --recursive` is
-   required before patch application or native build. Do not run it as part of an
-   unrelated change.
+1. **Validate the restored Monero patch series.** The five patches and their nested
+   submodule pins are checked in, but the native archives have not been compiled. The
+   manual `native` CI job is the authority; the series is adapted from `monero_c` under
+   LGPL-3.0 (see `external-libs/patches/README.md`).
+2. **Initialize the Monero submodule for local native work.**
+   `git submodule update --init --recursive` is required before patch application or a
+   native build. Do not run it as part of an unrelated change.
 3. **Validate instructions in CI.** Markdown/YAML/frontmatter were checked statically.
    Skill discovery and agent behavior still need a real agent run.
 4. **Runtime privacy validation.** Tor restart, LWS reconnect, background-sync lock,
