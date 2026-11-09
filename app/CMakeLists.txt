@@ -26,6 +26,11 @@ add_library( anonero
              SHARED
              src/main/cpp/anonero.cpp )
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    # Project-owned code only. Third-party include trees below are marked SYSTEM.
+    target_compile_options(anonero PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 set(EXTERNAL_LIBS_DIR ${CMAKE_SOURCE_DIR}/../external-libs)
 
 ############
@@ -231,7 +236,7 @@ else()
     # JDK doesn't ship.
     find_package(JNI REQUIRED COMPONENTS JVM)
     find_package(Threads REQUIRED)
-    include_directories(${JNI_INCLUDE_DIRS})
+    include_directories(SYSTEM ${JNI_INCLUDE_DIRS})
 
     add_library(z STATIC IMPORTED)
     set_target_properties(z PROPERTIES IMPORTED_LOCATION
@@ -246,7 +251,7 @@ else()
     set(PLATFORM_LINK_OPTS "-Wl,-z,noexecstack")
 endif()
 
-include_directories( ${EXTERNAL_LIBS_DIR}/include )
+include_directories(SYSTEM ${EXTERNAL_LIBS_DIR}/include)
 
 message(STATUS EXTERNAL_LIBS_DIR :  ${EXTERNAL_LIBS_DIR})
 
