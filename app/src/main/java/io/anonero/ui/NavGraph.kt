@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,4 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
+ */
+
+/*
+ * Legacy navigation stub. The active graphs are built by
+ * `ui/home/graph/HomeGraph.kt` and `ui/onboard/graph/OnboardingGraph.kt`; this file contains
+ * no executable code and is not referenced by the app.
  */

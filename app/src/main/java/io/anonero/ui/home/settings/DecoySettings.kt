@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +95,13 @@ enum class DecoyError(@StringRes val messageRes: Int) {
     PASSPHRASE_DIFFERS(R.string.decoy_passphrase_differs),
 }
 
+/**
+ * Main-profile-only configuration for the decoy wallet and duress PIN.
+ *
+ * The screen requires a fresh PIN verification before destructive actions, hides itself in
+ * the decoy session and the view-only build, and rolls back a failed decoy creation. It is
+ * not a plausible-deniability feature; see `WalletProfiles.kt` and the security model.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DecoySettingsScreen(

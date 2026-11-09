@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,6 +101,13 @@ import io.anonero.util.isIgnoringBatteryOptimizations
 import org.koin.compose.koinInject
 import io.anonero.services.WalletState
 
+/**
+ * Hosts the bottom-navigation graph and translates lock-screen shortcuts into navigation.
+ *
+ * The battery-optimization prompt is shown because a foreground wallet sync can be killed
+ * by aggressive OEM power management. The dialog is advisory; the app does not require the
+ * exemption to function.
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @SuppressLint("BatteryLife")
 @Composable
@@ -115,7 +122,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
     val walletState = koinInject<WalletState>()
 
     val startDestination: Any = TransactionsRoute
-    
+
     LaunchedEffect(Unit) {
         walletState.unlockShortcut.collect { shortcut ->
             when (shortcut) {
@@ -134,7 +141,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
             }
         }
     }
-    
+
     LaunchedEffect(currentRoute) {
         if (getRoutes().find { it.getRouteAsString == currentRoute } != null) {
             showBottomNavigation = true

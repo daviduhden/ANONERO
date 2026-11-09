@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,13 @@ import io.anonero.ui.home.graph.routes.HomeScreenRoute
 import io.anonero.ui.home.graph.routes.LockScreenRoute
 
 
+/**
+ * Top-level destination chooser for an unlocked process.
+ *
+ * A wallet whose status is already OK starts at the home content; otherwise it starts at
+ * the lock screen. The lock route is part of the graph so a process that was launched
+ * without a wallet can still reach onboarding from the landing graph.
+ */
 fun NavGraphBuilder.homeGraph(navController: NavHostController) {
     val walletStatus = WalletManager.instance?.wallet?.status?.isOk
     navigation<Home>(

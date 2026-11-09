@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -119,6 +119,15 @@ enum class LockScreenShortCut {
 
 private const val TAG = "LockScreen"
 
+/**
+ * PIN entry surface for opening a wallet, unlocking background sync, or verifying a PIN
+ * before a sensitive settings action.
+ *
+ * The keypad is shuffled and attempts are throttled by [PinThrottle]. In `OPEN_WALLET` the
+ * ViewModel resolves the PIN to MAIN or DECOY and starts the wallet; in `LOCK_SCREEN` it
+ * only releases the overlay after `stopBackgroundSync` succeeds. [onUnLocked] must not be
+ * treated as proof of a successful wallet unlock by itself.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LockScreen(

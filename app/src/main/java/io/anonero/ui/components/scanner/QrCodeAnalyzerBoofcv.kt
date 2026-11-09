@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,14 @@ import java.nio.ByteBuffer
 
 private const val TAG = "QrCodeAnalyzerBoofcv"
 
+/**
+ * CameraX analyzer that converts YUV/JPEG frames to a BoofCV gray image and decodes QR
+ * codes with the BoofCV detector.
+ *
+ * Analysis runs on CameraX's executor, not the main thread. The callback may fire more than
+ * once per frame or for the same code; callers must de-duplicate and close over their own
+ * cancellation/lifecycle state.
+ */
 class QrCodeAnalyzerBoofcv(
     private val onQrCodesDetected: (qrCode: Result) -> Unit
 ) : ImageAnalysis.Analyzer {
