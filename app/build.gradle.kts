@@ -107,6 +107,14 @@ android {
         }
     }
 
+    // The app changes locale at runtime. Play language splits would remove the
+    // resources the user switches to, so keep every locale in the bundle.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     packaging {
         jniLibs.useLegacyPackaging = true
         resources {
