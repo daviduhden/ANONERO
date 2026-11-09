@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2026, David Uhden Collado
-# Copyright (c) 2023-2026 r4v3r23
+# Copyright (c) 2022-2026, r4v3r23
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if find . -name Cargo.toml -not -path './.git/*' -not -path './external-libs/*' -print -quit | grep -q .; then
+          if find . \( -name Cargo.toml -o -name Cargo.lock -o -name build.rs -o -name '*.rs' \) -not -path './.git/*' -not -path './external-libs/*' -print -quit | grep -q .; then
             echo "::error::Project-owned Rust crates conflict with the Kotlin/C++ architecture policy."
             exit 1
           fi
