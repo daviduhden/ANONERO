@@ -3,7 +3,7 @@ package io.anonero.util
 import java.math.BigInteger
 import java.util.Locale
 
-/**
+/*
  * Legacy CrAzYpass encoding. This is a compatibility format, not a general-purpose
  * password hash: [KeyStoreHelper] feeds it a native CryptoNight-derived 32-byte value.
  *
@@ -37,7 +37,7 @@ object CrazyPassEncoder {
         return result.toString()
     }
 
-    /**
+    /*
      * Accepts a 52-character CrAzYpass with any case/spacing and returns the canonical
      * blank-separated form, or null if the input is not a valid CrAzYpass.
      */

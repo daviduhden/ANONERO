@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.ui.onboard
 
 import android.content.Context
@@ -40,7 +58,7 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
 
     fun setMode(mode: Mode) = run { this.mode = mode }
 
-    /** A new main PIN must never collide with a configured duress PIN. */
+    /* A new main PIN must never collide with a configured duress PIN. */
     private fun requirePinNotDuress(pin: String) {
         val duress = prefs.getString(io.anonero.util.PREFS_DURESS_PIN_HASH, "")
         if (!duress.isNullOrEmpty() && PinHash.matches(pin, duress)) {
@@ -48,7 +66,7 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
         }
     }
 
-    /** The legitimate and decoy wallets must not share a seed passphrase. */
+    /* The legitimate and decoy wallets must not share a seed passphrase. */
     private fun requirePassphraseNotDecoy(passphrase: String) {
         val decoy = prefs.getString(io.anonero.util.PREFS_DECOY_PASSPHRASE_HASH, "")
         if (decoy.isNullOrEmpty()) return

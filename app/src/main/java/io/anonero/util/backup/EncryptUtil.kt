@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.util.backup
 
 import org.bouncycastle.crypto.digests.SHA256Digest
@@ -105,7 +123,7 @@ object EncryptUtil {
 
     }
 
-    /** Writes a v2 backup: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext+tag. */
+    /* Writes a v2 backup: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext+tag. */
     fun encryptFile(key: String, inputFile: File, outputFile: File) {
         val salt = ByteArray(V2_SALT_BYTES).also { SecureRandom().nextBytes(it) }
         val iv = ByteArray(V2_IV_BYTES).also { SecureRandom().nextBytes(it) }
@@ -123,7 +141,7 @@ object EncryptUtil {
         }
     }
 
-    /**
+    /*
      * Restores either format. v2 is authenticated: a tampered or truncated file, or a
      * wrong passphrase, fails the GCM tag check and throws instead of yielding garbage
      * -- or worse, plausible garbage. v1 files restore exactly as they always did.

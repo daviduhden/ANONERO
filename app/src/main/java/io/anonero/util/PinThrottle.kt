@@ -1,10 +1,28 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.util
 
 import android.content.SharedPreferences
 import android.os.SystemClock
 import androidx.core.content.edit
 
-/**
+/*
  * A rate limit for the lock-screen PIN.
  *
  * The PIN is all that stands between a stolen phone and the Keystore-wrapped wallet secret
@@ -22,7 +40,7 @@ object PinThrottle {
 
     private fun waitFor(attempts: Int) = (attempts - 4).coerceIn(0, 10) * 30_000L
 
-    /** Ms until the next attempt is allowed, 0 if it is allowed now. */
+    /* Ms until the next attempt is allowed, 0 if it is allowed now. */
     @Synchronized
     fun waitLeft(prefs: SharedPreferences, now: Long = SystemClock.elapsedRealtime()): Long {
         var last = prefs.getLong(LAST, 0)
@@ -34,7 +52,7 @@ object PinThrottle {
         return (last + waitFor(prefs.getInt(ATTEMPTS, 0)) - now).coerceAtLeast(0)
     }
 
-    /** Call before checking the PIN: counts the attempt and returns 0, or returns the wait left. */
+    /* Call before checking the PIN: counts the attempt and returns 0, or returns the wait left. */
     @Synchronized
     fun tryAttempt(prefs: SharedPreferences, now: Long = SystemClock.elapsedRealtime()): Long {
         val left = waitLeft(prefs, now)
@@ -46,7 +64,7 @@ object PinThrottle {
         return 0
     }
 
-    /** Clears the count after a correct PIN. */
+    /* Clears the count after a correct PIN. */
     @Synchronized
     fun reset(prefs: SharedPreferences) =
         prefs.edit(commit = true) { remove(ATTEMPTS); remove(LAST) }

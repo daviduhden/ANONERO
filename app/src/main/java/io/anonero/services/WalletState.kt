@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.services
 
 import androidx.compose.ui.util.fastDistinctBy
@@ -178,7 +196,7 @@ class WalletState {
         }
     }
 
-    /** Called after a PIN has selected a wallet profile, before the service starts. */
+    /* Called after a PIN has selected a wallet profile, before the service starts. */
     fun setProfile(profile: WalletProfile) {
         if (_profile.value != profile) {
             _profile.value = profile
@@ -198,7 +216,7 @@ class WalletState {
         }
     }
 
-    /**
+    /*
      * Selects a subaddress account. This is not a wallet switch: all accounts share the
      * same keys and wallet file. History and coins are re-read for the new major index
      * so balances from one account never appear under another.
@@ -243,7 +261,7 @@ class WalletState {
         }
     }
 
-    /** Freeze/thaw a wallet output. The native coin-control layer also enforces this. */
+    /* Freeze/thaw a wallet output. The native coin-control layer also enforces this. */
     @Synchronized
     fun setOutputFrozen(publicKey: String, frozen: Boolean): Boolean {
         val wallet = getWallet ?: return false
@@ -270,7 +288,7 @@ class WalletState {
     fun emitUnlockShortcut(shortcut: LockScreenShortCut) {
         _unlockShortcut.trySend(shortcut)
     }
-    
+
     suspend fun enterBackgroundSync(): Boolean = bgSyncMutex.withLock {
         val wallet = getWallet ?: return false
         if (!wallet.isInitialized || backgroundSync) return false
@@ -295,7 +313,7 @@ class WalletState {
         }
     }
 
-    /**
+    /*
      * Leaves background sync and restores the spend key. [pin] must already have been
      * verified against the PIN hash by the lock screen. wallet2 wants the wallet password,
      * which for a keystore-bound wallet is the device secret, not the PIN; only a legacy

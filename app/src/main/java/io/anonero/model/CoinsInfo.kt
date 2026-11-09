@@ -1,6 +1,6 @@
 package io.anonero.model
 
-/**
+/*
  * One wallet output as reported by wallet2 through the patched Coins API.
  *
  * [key] is the key image (used by coin control), [pub_key] is the output public key
@@ -8,7 +8,7 @@ package io.anonero.model
  * spent, locked by unlock time, or unavailable because of confirmations.
  */
 data class CoinsInfo(
-    /** wallet2 global output index (historical field name kept for compatibility). */
+    /* wallet2 global output index (historical field name kept for compatibility). */
     val unlockTime: Long,
     val spent: Boolean,
     val key: String,
@@ -16,7 +16,7 @@ data class CoinsInfo(
     val hash: String,
     val pub_key: String,
     val frozen: Boolean,
-    /** internal output index in the transaction (historical field name). */
+    /* internal output index in the transaction (historical field name). */
     val creationTime: Long,
     val unlocked: Boolean = false,
     val subaddrAccount: Int = 0,

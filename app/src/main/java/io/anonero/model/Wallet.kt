@@ -11,7 +11,7 @@ private const val TAG = "Wallet"
 class Wallet {
     var isSynchronized = false
     var isInitialized = false
-    /** True while wallet2 is talking to a MyMonero/LWS server instead of a monerod. */
+    /* True while wallet2 is talking to a MyMonero/LWS server instead of a monerod. */
     var isLightWallet = false
         private set
     private var accountIndex = 0
@@ -138,7 +138,7 @@ class Wallet {
         return subaddress
     }
 
-    /** Public account label; the wallet's own "Untitled account" fallback is abbreviated. */
+    /* Public account label; the wallet's own "Untitled account" fallback is abbreviated. */
     fun getAccountLabelFor(accountIndex: Int): String = getAccountLabel(accountIndex)
 
     fun setAccountLabelFor(accountIndex: Int, label: String?) =
@@ -230,7 +230,7 @@ class Wallet {
         lightWallet: Boolean
     ): Boolean
 
-    /** Registers/logs in this wallet with the LWS server. Only valid in light-wallet mode. */
+    /* Registers/logs in this wallet with the LWS server. Only valid in light-wallet mode. */
     external fun lightWalletLogin(): Boolean
 
     external fun getRestoreHeight(): Long
@@ -352,7 +352,7 @@ class Wallet {
     	return pendingTransaction!!
     }
 
-    /**
+    /*
      * Native multi-destination transaction. wallet2 builds one transaction set with all
      * outputs at once; this is not several independent sends. Amounts are in atomic
      * units and must have been parsed without floating point.
@@ -397,7 +397,7 @@ class Wallet {
         keyImages: ArrayList<String>
     ): Long
 
-    /** Exact fee estimate from wallet2 for the destination set. 0 means unavailable. */
+    /* Exact fee estimate from wallet2 for the destination set. 0 means unavailable. */
     fun estimateTransactionFee(
         destinations: List<Pair<String, Long>>,
         priority: PendingTransaction.Priority = PendingTransaction.Priority.Priority_Default
@@ -416,7 +416,7 @@ class Wallet {
         priority: Int
     ): Long
 
-    /**
+    /*
      * Signs [message] with the wallet's spend key. The private key never leaves wallet2.
      * The message is converted to UTF-8 bytes in Kotlin, not by JNI's modified UTF-8, so
      * non-BMP text is signed exactly as displayed.
@@ -426,7 +426,7 @@ class Wallet {
 
     private external fun signMessageJ(message: ByteArray): String
 
-    /** Verifies a Monero message signature. True means cryptographically valid, not identity. */
+    /* Verifies a Monero message signature. True means cryptographically valid, not identity. */
     fun verifySignedMessage(message: String, address: String, signature: String): Boolean =
         verifySignedMessageJ(
             message.toByteArray(Charsets.UTF_8),

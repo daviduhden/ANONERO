@@ -1,5 +1,7 @@
-/**
- * Copyright (c) 2017-2024 m2049r
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2022-2026, r4v3r23
+ * Copyright (c) 2017-2022, m2049r
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -175,7 +177,7 @@ struct MyWalletListener : Monero::WalletListener {
         jlistener = nullptr;
     }
 
-    /**
+/*
  * @brief updated  - generic callback, called when any event (sent/received/block reveived/etc) happened with the wallet;
  */
     void updated() {
@@ -192,7 +194,7 @@ struct MyWalletListener : Monero::WalletListener {
     }
 
 
-    /**
+    /*
      * @brief moneySpent - called when money spent
      * @param txId       - transaction id
      * @param amount     - amount
@@ -204,7 +206,7 @@ struct MyWalletListener : Monero::WalletListener {
                      PRIu64, amount);
     }
 
-    /**
+    /*
      * @brief moneyReceived - called when money received
      * @param txId          - transaction id
      * @param amount        - amount
@@ -216,7 +218,7 @@ struct MyWalletListener : Monero::WalletListener {
                      PRIu64, amount);
     }
 
-    /**
+    /*
      * @brief unconfirmedMoneyReceived - called when payment arrived in tx pool
      * @param txId          - transaction id
      * @param amount        - amount
@@ -242,7 +244,7 @@ struct MyWalletListener : Monero::WalletListener {
         jenv->CallVoidMethod(jlistener, listenerClass_newBlock, jstring1, amountLong);
     }
 
-    /**
+    /*
      * @brief newBlock      - called when new block received
      * @param height        - block height
      */
@@ -261,7 +263,7 @@ struct MyWalletListener : Monero::WalletListener {
         jenv->CallVoidMethod(jlistener, listenerClass_newBlock, h);
     }
 
-/**
+/*
  * @brief refreshed - called when wallet refreshed by background thread or explicitly refreshed by calling "refresh" synchronously
  */
     void refreshed() {
@@ -390,9 +392,7 @@ extern "C"
 #endif
 
 
-/**********************************/
-/********** WalletManager *********/
-/**********************************/
+/* WalletManager */
 JNIEXPORT jlong JNICALL
 Java_io_anonero_model_WalletManager_createWalletJ(JNIEnv *env, jobject instance,
                                                   jstring path,
@@ -779,9 +779,7 @@ Java_io_anonero_model_WalletManager_closeJ(JNIEnv *env, jobject instance,
 
 
 
-/**********************************/
-/************ Wallet **************/
-/**********************************/
+/* Wallet */
 
 // For backwards compatibility reasons, getSeed will continue silently fallback to legacy mnemonic
 // seed.

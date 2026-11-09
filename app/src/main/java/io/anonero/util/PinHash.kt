@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.util
 
 import java.security.SecureRandom
@@ -5,7 +23,7 @@ import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
-/**
+/*
  * A real hash for the lock-screen PIN check.
  *
  * PREFS_PIN_HASH historically held CrazyPassEncoder.encode(pin) -- reversible base-32,
@@ -51,11 +69,11 @@ object PinHash {
         return constantTimeEquals(legacyEncode(pin).toByteArray(), stored.toByteArray())
     }
 
-    /** True for values in the old reversible format, which verify but must be replaced. */
+    /* True for values in the old reversible format, which verify but must be replaced. */
     fun isLegacy(stored: String?): Boolean =
         !stored.isNullOrEmpty() && !stored.startsWith("$PREFIX:")
 
-    /**
+    /*
      * Verifies a PIN, or -- when no credential is configured -- performs the same PBKDF2
      * work anyway and returns false. This keeps the unlock path from revealing, through
      * timing, whether the optional decoy credential exists.

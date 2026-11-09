@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.util
 
 import android.content.ClipData
@@ -14,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
+/*
  * Reduces casual visual and notification exposure. It is not an anonymity guarantee:
  * the Android system, screen-capture-privileged apps, a rooted device, or a forensic
  * image can still observe much of what the app does. FLAG_SECURE (set unconditionally in
@@ -42,11 +60,11 @@ object StealthMode {
     fun setAutoLock(prefs: SharedPreferences, enabled: Boolean) =
         prefs.edit { putBoolean(PREFS_STEALTH_AUTO_LOCK, enabled) }
 
-    /** The app name is distinctive; a stealth notification should not announce the product. */
+    /* The app name is distinctive; a stealth notification should not announce the product. */
     fun notificationTitle(prefs: SharedPreferences, normal: String): String =
         if (isEnabled(prefs)) "Wallet" else normal
 
-    /** Never include balances, heights, addresses, or transaction counts in stealth mode. */
+    /* Never include balances, heights, addresses, or transaction counts in stealth mode. */
     fun notificationBody(prefs: SharedPreferences, normal: String): String =
         if (isEnabled(prefs)) "Background sync active" else normal
 
@@ -57,7 +75,7 @@ object StealthMode {
         if (isEnabled(prefs)) "New activity" else normal
 }
 
-/**
+/*
  * Copies to the system clipboard and removes the entry again after a short delay, unless
  * the user has copied something else in the meantime. A clipboard manager (including the
  * OS on newer versions) may still retain history; this reduces, not eliminates, exposure.
@@ -84,7 +102,7 @@ object SecureClipboard {
     }
 }
 
-/**
+/*
  * A Monero light-wallet server compatible with the MyMonero/LWS REST API that wallet2
  * speaks in light-wallet mode. Only the wallet's view key and public address are sent;
  * the spend key never leaves the device. The server can still see every incoming
@@ -123,7 +141,7 @@ data class LwsConfig(
             }
         }
 
-        /**
+        /*
          * Host is a DNS name, .onion address, or IPv4 literal. No scheme, credentials,
          * path, whitespace or embedded port: the port is a separate, validated field.
          *

@@ -20,7 +20,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import timber.log.Timber
 
-/**
+/*
  * Android Keystore integration for the legacy CrAzYpass gate and the modern
  * Keystore-wrapped wallet secret.
  *
@@ -47,7 +47,7 @@ object KeyStoreHelper {
         System.loadLibrary("anonero")
     }
 
-    /**
+    /*
      * CryptoNight slow hash. The native side returns null for invalid broken-variant
      * inputs or unsupported cases; callers must not assume a result.
      *
@@ -66,7 +66,7 @@ object KeyStoreHelper {
     fun getCrazyPass(context: Context, password: String): String =
         getCrazyPass(context, password, 0)
 
-    /**
+    /*
      * Historical ARM32 builds used a broken prehash/variant. Keep accepting those values
      * when the ABI matches, but never produce them on other architectures.
      */
@@ -305,7 +305,7 @@ object KeyStoreHelper {
         ).edit().remove(WALLET_SECRET_PREFIX + wallet).apply()
     }
 
-    /** What actually protects W: `strongbox` | `tee` | `software` | `unknown`. */
+    /* What actually protects W: `strongbox` | `tee` | `software` | `unknown`. */
     @Suppress("DEPRECATION")
     fun walletSecretSecurityLevel(wallet: String): String {
         return try {

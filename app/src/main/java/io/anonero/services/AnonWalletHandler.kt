@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.services
 
 import android.content.SharedPreferences
@@ -128,7 +146,7 @@ class AnonWalletHandler(
         return true
     }
 
-    /**
+    /*
      * One-time migration of a legacy PIN-encrypted wallet to a Keystore-wrapped random
      * key. Snapshot the keys file, re-encrypt with the new secret, wrap it, then drop the
      * snapshot. Any failure rolls back to the snapshot and leaves the wallet
@@ -277,7 +295,7 @@ class AnonWalletHandler(
 
     }
 
-    /**
+    /*
      * Routes the wallet through Tor (waiting for its socks port) or the manual proxy. Call it
      * before the wallet first talks to a node, or that traffic goes out unproxied.
      */

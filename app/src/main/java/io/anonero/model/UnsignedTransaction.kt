@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.model
 
 class UnsignedTransaction internal constructor(override var handle: Long) : StagingTransaction {
@@ -60,7 +78,7 @@ class UnsignedTransaction internal constructor(override var handle: Long) : Stag
     val firstTxIdJ: String?
         external get
 
-    /**
+    /*
      * wallet2's summary of what sign() will produce, built at load time from the real
      * outputs (splitted_dsts) rather than the advisory dests the scalar getters read.
      * It is the text monero-wallet-cli shows before signing.
@@ -70,7 +88,7 @@ class UnsignedTransaction internal constructor(override var handle: Long) : Stag
 
     private external fun confirmationMessageJ(): String?
 
-    /**
+    /*
      * Signs THIS loaded object to [outputPath]. Wallet.signAndExportJ re-loads the
      * unsigned file from disk and signs whatever is there; this signs what was reviewed.
      */

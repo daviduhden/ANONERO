@@ -1,5 +1,7 @@
-/**
- * Copyright (c) 2017-2024 m2049r
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2022-2026, r4v3r23
+ * Copyright (c) 2017-2022, m2049r
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

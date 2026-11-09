@@ -7,7 +7,7 @@ import io.anonero.model.WalletManager
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
-/**
+/*
  * Handy class for starting a new thread that has a looper. The looper can then be
  * used to create handler classes. Note that start() must still be called.
  * The started Thread has a stck size of STACK_SIZE (=5MB)

@@ -65,7 +65,7 @@ class WalletManager {
         return wallet
     }
 
-    /**
+    /*
      * Creates a wallet without making it the managed live one. Used to provision the
      * decoy wallet while the legitimate wallet stays open and untouched.
      */
@@ -94,7 +94,7 @@ class WalletManager {
         return wallet
     }
 
-    /**
+    /*
      * Opens a second wallet without making it the managed live one -- for working on a
      * copy while the real wallet stays open. Close it with [closeUnmanaged].
      */

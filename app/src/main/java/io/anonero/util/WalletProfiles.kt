@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, David Uhden Collado
+ * Copyright (c) 2023-2026 r4v3r23
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package io.anonero.util
 
 import android.content.Context
@@ -7,7 +25,7 @@ import io.anonero.AnonConfig
 import timber.log.Timber
 import java.io.File
 
-/**
+/*
  * Which wallet file the current process has open.
  *
  * The profile is deliberately not persisted: every process start begins on MAIN and the
@@ -43,7 +61,7 @@ object WalletSession {
     }
 }
 
-/**
+/*
  * File, Keystore-alias, and preference-key layout for both profiles.
  *
  * The two wallets live in the same app-private directory but have different file names,
@@ -76,7 +94,7 @@ object WalletProfileStore {
     fun restoreHeightKey(profile: WalletProfile): String =
         if (profile.isDecoy) DECOY_RESTORE_HEIGHT else RESTORE_HEIGHT
 
-    /**
+    /*
      * A decoy is usable only when all three pieces are present: the configured flag,
      * the encrypted wallet file, and the Keystore-wrapped wallet secret. If the file is
      * missing the duress PIN must not fall through to the legitimate wallet.
@@ -88,7 +106,7 @@ object WalletProfileStore {
         return file.exists() && WalletKey.exists(context, file.name)
     }
 
-    /** Files belonging to one wallet file: base cache, .keys, .address.txt, snapshots. */
+    /* Files belonging to one wallet file: base cache, .keys, .address.txt, snapshots. */
     fun walletFiles(context: Context, profile: WalletProfile): List<File> {
         val dir = AnonConfig.getDefaultWalletDir(context)
         val name = profile.walletName
@@ -97,12 +115,12 @@ object WalletProfileStore {
             ?: emptyList()
     }
 
-    /** True if the legitimate wallet, a usable decoy, or both exist. */
+    /* True if the legitimate wallet, a usable decoy, or both exist. */
     fun anyWalletExists(context: Context, prefs: SharedPreferences): Boolean =
         walletFile(context, WalletProfile.MAIN).exists() ||
             isDecoyConfigured(context, prefs)
 
-    /**
+    /*
      * Removes exactly one profile. It never deletes the other wallet's files, which is
      * what makes a wipe performed from the decoy profile non-destructive to the real
      * wallet.
@@ -128,7 +146,7 @@ object WalletProfileStore {
         }
     }
 
-    /**
+    /*
      * Resolves the profile for a PIN, checking both gates with the same work profile.
      * Returns null when neither matches. Callers must not reveal which check failed.
      *

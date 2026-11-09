@@ -12,13 +12,13 @@ class Coins(private val handle: Long){
     private external fun refreshJ(): List<CoinsInfo>
     external fun getCount(): Int
 
-    /** Freeze by output public key (not key image), then re-read wallet2's state. */
+    /* Freeze by output public key (not key image), then re-read wallet2's state. */
     fun freeze(publicKey: String) {
         setFrozenJ(publicKey)
         refresh()
     }
 
-    /** Thaw by output public key, then re-read wallet2's state. */
+    /* Thaw by output public key, then re-read wallet2's state. */
     fun thaw(publicKey: String) {
         thawJ(publicKey)
         refresh()
