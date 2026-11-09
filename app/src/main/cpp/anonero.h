@@ -23,6 +23,8 @@
 #define XMRWALLET_WALLET_LIB_H
 
 #include <jni.h>
+#include <cstddef>
+#include <cstdint>
 
 /*
 #include <android/log.h>
@@ -33,7 +35,7 @@
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 */
 
-jfieldID getHandleField(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
+inline jfieldID getHandleField(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
     if (obj == nullptr) return nullptr;
     jclass c = env->GetObjectClass(obj);
     if (c == nullptr) {
@@ -57,7 +59,7 @@ T *getHandle(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
     return reinterpret_cast<T *>(handle);
 }
 
-void setHandleFromLong(JNIEnv *env, jobject obj, jlong handle) {
+inline void setHandleFromLong(JNIEnv *env, jobject obj, jlong handle) {
     jfieldID field = getHandleField(env, obj);
     if (field == nullptr) return;
     env->SetLongField(obj, field, handle);
