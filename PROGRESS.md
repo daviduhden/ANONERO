@@ -151,7 +151,8 @@ records progress; it is not a release note and does not claim CI validation.
   lineage, rebased onto the pinned `85f036ba` commit, checked in with provenance and the
   LGPL-3.0 licence. They apply with `git apply --index --3way`, and the `bc-ur`,
   `polyseed`, and `utf8proc` submodules resolve at pinned commits. Native compile remains
-  pending.
+  pending; runs `42707311457` and `42708047372` applied every patch but stopped at a
+  Debian snapshot 503 in the container base image.
 
 ## Pending validation
 

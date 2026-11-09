@@ -15,8 +15,9 @@ the rationale to `ROADMAP.md`.
       (txids/outputs) and a regression fixture before claiming fund safety.
 - [ ] Decide and enforce a backup-passphrase policy independent of the seed passphrase;
       short/empty seed passphrases currently produce weakly keyed backups.
-- [ ] Validate the restored wallet-API patch series in the manual `native` CI job; the
-      series applies to `85f036ba` but the native archives have not been compiled.
+- [ ] Validate the restored wallet-API patch series in the manual `native` CI job once the
+      Debian snapshot backend recovers; the series applies to `85f036ba` but the native
+      archives have not been compiled.
 - [ ] Create the protected `release` environment with required reviewers and the four
       signing secrets; confirm no other collaborator can run workflows from a modified ref.
 - [ ] Protect `.github/workflows/` and `main` with branch protection/CODEOWNERS.

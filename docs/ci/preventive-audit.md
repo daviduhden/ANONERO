@@ -61,7 +61,8 @@ so `assemble` and `instrumented` remain unverified.
 - The JNI contract script checks symbol names only; it cannot validate JNI signatures,
   constructor descriptors, or link-time symbol availability.
 - The native compile and link have not run. The patch series is present and applies to
-  the pinned commit, but the archives must be built in CI.
+  the pinned commit; the last two runs stopped at the Debian snapshot 503 before compiling
+  Monero.
 - No AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or LeakSanitizer run
   exists.
 
