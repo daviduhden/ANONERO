@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,15 @@ const val FOREGROUND_CHANNEL = "anon_foreground"
 const val TX_CHANNEL = "anon_transactions"
 private const val TAG = "AnonApplication"
 
+/**
+ * Process entry point. Initializes the application context, locale, wallet state, Koin,
+ * logging, notification channels, Tor, and crash-time cleanup before any UI is created.
+ *
+ * Ordering matters: [AnonConfig.context] and [AnonConfig.initWalletState] must run before
+ * Koin or wallet code; [LocaleController.applySaved] must run before resource-bearing UI.
+ * The startup cleanup removes transient backup/export files and recovers an interrupted
+ * Keystore migration.
+ */
 class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
 
     private lateinit var anonLogTree: AnonLogTree
@@ -79,6 +88,12 @@ class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
             val removed = runCatching { File(cacheDir, name).deleteRecursively() }.getOrDefault(false)
             if (!removed) Timber.tag(TAG).w("Could not clear temporary backup data")
         }
+        // Older builds wrote the unencrypted ZIP directly in cache. Remove any leftovers.
+        cacheDir.listFiles()
+            ?.filter { it.isFile && it.name.contains("_backup_") && it.name.endsWith(".zip") }
+            ?.forEach { stale ->
+                if (!stale.delete()) Timber.tag(TAG).w("Could not clear stale backup archive")
+            }
         // recover a keystore migration interrupted by a crash, before any wallet open
         runCatching {
             val walletFile = AnonConfig.getDefaultWalletFile(this)
