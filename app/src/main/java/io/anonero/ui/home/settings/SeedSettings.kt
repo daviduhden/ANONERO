@@ -223,7 +223,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             return
         }
         val payload = Json.encodeToString(NeroKeyPayload.fromWallet(wallet))
-        neroPayload = payload.toString();
+        neroPayload = payload
     }
 
 

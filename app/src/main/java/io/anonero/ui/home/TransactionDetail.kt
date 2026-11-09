@@ -82,6 +82,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.KoinApplication
+import org.koin.dsl.koinConfiguration
 import org.koin.compose.koinInject
 
 
@@ -396,7 +397,7 @@ fun DetailItem(
 
 @Preview(device = "id:pixel_7_pro")
 @Composable
-private fun TransactionDetailsScreenPreview() = KoinApplication(application = {}) {
+private fun TransactionDetailsScreenPreview() = KoinApplication(configuration = koinConfiguration { }) {
     AnonNeroTheme {
 
     }

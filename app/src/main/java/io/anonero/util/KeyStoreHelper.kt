@@ -18,6 +18,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import androidx.core.content.edit
 import timber.log.Timber
 
 /**
@@ -180,7 +181,7 @@ object KeyStoreHelper {
         context.getSharedPreferences(
             SecurityConstants.WALLET_PASS_PREFS_NAME,
             Context.MODE_PRIVATE
-        ).edit().remove(wallet).apply()
+        ).edit { remove(wallet) }
     }
 
     @Synchronized
@@ -293,6 +294,9 @@ object KeyStoreHelper {
             Context.MODE_PRIVATE
         ).getString(WALLET_SECRET_PREFIX + wallet, "").isNullOrEmpty()
 
+    // commit() is required to fail closed on a failed removal; the KTX edit helper
+    // returns Unit and would discard that result.
+    @Suppress("UseKtx")
     @Synchronized
     fun removeWalletSecret(context: Context, wallet: String) {
         val prefs = context.getSharedPreferences(

@@ -309,7 +309,7 @@ object BackupHelper {
         return try {
             val w = WalletKey.newSecret()
             if (!wallet.setPassword(w)) {
-                throw Exception("setPassword failed: ${wallet.status?.errorString}")
+                throw Exception("setPassword failed: ${wallet.status.errorString}")
             }
             if (!wallet.store()) {
                 throw Exception("store failed after re-key")

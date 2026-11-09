@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -163,6 +164,7 @@ fun LogViewer(
     val listState = rememberLazyListState()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
+    val resources = LocalResources.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -205,7 +207,7 @@ fun LogViewer(
                                         context.startActivity(
                                             Intent.createChooser(
                                                 shareIntent,
-                                                context.getString(R.string.share_logs)
+                                                resources.getString(R.string.share_logs)
                                             )
                                         )
                                     }

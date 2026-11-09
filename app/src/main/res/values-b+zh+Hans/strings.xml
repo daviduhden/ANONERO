@@ -30,7 +30,7 @@
     <string name="create_wallet">创建钱包</string>
     <string name="restore_wallet">恢复钱包</string>
     <string name="proxy">代理</string>
-    <string name="initializing_tor">正在初始化 TOR ...</string>
+    <string name="initializing_tor">正在初始化 TOR …</string>
     <string name="copied_to_clipboard">已复制到剪贴板</string>
     <string name="transactions">交易</string>
     <string name="receive">接收</string>
@@ -43,7 +43,7 @@
     <string name="username">用户名</string>
     <string name="optional">（可选）</string>
     <string name="password">密码</string>
-    <string name="wallet_loading">钱包正在加载\n请稍候...</string>
+    <string name="wallet_loading">钱包正在加载\n请稍候…</string>
     <string name="manual_proxy">手动代理</string>
     <string name="on">开</string>
     <string name="off">关</string>
@@ -67,7 +67,7 @@
     <string name="pin_try_again_in">请在 %1$d:%2$02d 后重试</string>
     <string name="wallet_not_connected_to_node_please_check_network">钱包未连接到节点。请检查网络</string>
     <string name="address">地址</string>
-    <string name="constructing_transaction">正在构建交易...</string>
+    <string name="constructing_transaction">正在构建交易…</string>
     <string name="invalid_address">地址无效</string>
     <string name="amount">金额</string>
     <string name="sweeping_balance">正在清空余额：</string>
@@ -97,8 +97,8 @@
     <string name="resync_initiated_this_may_take_a_while">已开始重新同步……这可能需要一段时间。</string>
     <string name="show_outputs">显示输出</string>
     <string name="lock">锁定</string>
-    <string name="creating_wallet">正在创建钱包...</string>
-    <string name="restoring_wallet">正在恢复钱包...</string>
+    <string name="creating_wallet">正在创建钱包…</string>
+    <string name="restoring_wallet">正在恢复钱包…</string>
     <string name="close">关闭</string>
     <string name="logs">日志</string>
     <string name="unable_to">无法</string>
@@ -110,7 +110,7 @@
     <string name="primary_address">主地址</string>
     <string name="import_view_keys">导入查看密钥</string>
     <string name="invalid_qr_code">二维码无效</string>
-    <string name="loading">正在加载....</string>
+    <string name="loading">正在加载…</string>
     <string name="unable_to_create_wallet">无法创建钱包</string>
     <string name="enter_new_pin">输入新 PIN</string>
     <string name="enter_pin">输入 PIN</string>
@@ -154,7 +154,7 @@
     <string name="finish">完成</string>
     <string name="broadcast_tx">广播交易</string>
     <string name="unable_to_broadcast_transaction">无法广播交易\n %1$s</string>
-    <string name="broadcast_in_progress">正在发送交易...</string>
+    <string name="broadcast_in_progress">正在发送交易…</string>
     <string name="fee">手续费</string>
     <string name="export_as_file">导出为文件</string>
     <string name="importing_outputs">正在导入输出</string>
@@ -164,7 +164,7 @@
     <string name="import_outputs_failed">无法导入输出</string>
     <string name="import_key_images_failed">无法导入密钥映像</string>
     <string name="import_unsigned_failed">无法导入未签名交易</string>
-    <string name="unsigned_tx_count_invalid">未签名交易集包含 %1$d 笔交易；必须恰好为 1 笔</string>
+    <string name="unsigned_tx_count_invalid">无效的未签名交易集：找到 %1$d 笔；必须恰好为 1 笔</string>
 
     <string name="language">语言</string>
     <string name="language_system">系统语言</string>
@@ -200,7 +200,7 @@
     <string name="new_account">新账户</string>
     <string name="rename_account">重命名账户</string>
     <string name="add_account">添加账户</string>
-    <string name="selected">已选择</string>
+    <string name="a11y_selected">已选择</string>
     <string name="account_label">标签</string>
     <string name="no_accounts">暂无账户。请连接到节点或 LWS 并同步。</string>
 
@@ -288,12 +288,12 @@
     <string name="wallet_locked_offline">钱包已锁定：离线</string>
     <string name="offline">离线</string>
     <string name="wallet_locked_synced">钱包已锁定：已同步：%1$d</string>
-    <string name="loading_wallet">正在加载钱包...</string>
+    <string name="loading_wallet">正在加载钱包…</string>
     <string name="disconnected">已断开</string>
     <string name="daemon_disconnected">守护进程已断开</string>
     <string name="wrong_version">版本错误</string>
     <string name="synced_height">已同步：%1$d</string>
-    <string name="syncing">正在同步...</string>
+    <string name="syncing">正在同步…</string>
     <string name="syncing_blocks_left">正在同步：剩余 %1$s 个区块</string>
     <string name="syncing_completed">区块同步完成</string>
     <string name="transaction_received">已收到交易</string>
@@ -333,7 +333,7 @@
     <string name="primary_address_title">主地址</string>
     <string name="balance">余额</string>
     <string name="restore_height_title">恢复高度</string>
-    <string name="extracting_backup">正在提取备份...</string>
+    <string name="extracting_backup">正在提取备份…</string>
     <string name="invalid_network">网络无效</string>
     <string name="unable_extract_backup">无法提取备份。</string>
     <string name="entering_backup_pin">输入创建此备份时使用的 PIN</string>

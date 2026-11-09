@@ -61,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -176,6 +177,7 @@ fun QRExchangeScreen(
     val ur by viewModel.ur.observeAsState(null)
     val exportFile by viewModel.exportFile.observeAsState(null)
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
 
     val titleStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -205,8 +207,8 @@ fun QRExchangeScreen(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
-                        if (saved) context.getString(R.string.file_saved)
-                        else context.getString(R.string.could_not_save_file),
+                        if (saved) resources.getString(R.string.file_saved)
+                        else resources.getString(R.string.could_not_save_file),
                         Toast.LENGTH_SHORT
                     ).show()
                 }

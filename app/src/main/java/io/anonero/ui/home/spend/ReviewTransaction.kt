@@ -59,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -369,6 +370,7 @@ fun ReviewTransactionScreen(
         )
 
     val context = LocalContext.current;
+    val resources = LocalResources.current;
     val ctaText = if (AnonConfig.viewOnly) {
         if (!viewModel.isUnsignedTransaction() && !readyToBroadcast) {
             stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
@@ -658,8 +660,8 @@ fun ReviewTransactionScreen(
                                                 )
                                             qrScannerParam = SpendQRExchangeParam(
                                                 exportType = ExportType.SIGNED_TX,
-                                                title = context.getString(R.string.signed_tx),
-                                                ctaText = context.getString(R.string.finish)    ,
+                                                title = resources.getString(R.string.signed_tx),
+                                                ctaText = resources.getString(R.string.finish)    ,
                                             )
                                         } else {
                                             readyToBroadcast = false
@@ -668,11 +670,11 @@ fun ReviewTransactionScreen(
                                             Timber.tag(TAG).e("Signing failed: %s", reason)
                                             //tell the user how to resync outputs
                                             val hint = if (reason.contains("omit more outputs"))
-                                                "\n" + context.getString(R.string.signing_hint_omit_outputs)
+                                                "\n" + resources.getString(R.string.signing_hint_omit_outputs)
                                             else ""
                                             android.widget.Toast.makeText(
                                                 context,
-                                                context.getString(R.string.signing_failed) + hint,
+                                                resources.getString(R.string.signing_failed) + hint,
                                                 android.widget.Toast.LENGTH_LONG,
                                             ).show()
                                         }
@@ -686,8 +688,8 @@ fun ReviewTransactionScreen(
                                     if (AnonConfig.viewOnly && !readyToBroadcast) {
                                         qrScannerParam = SpendQRExchangeParam(
                                             exportType = ExportType.UN_SIGNED_TX,
-                                            title = context.getString(R.string.unsigned_tx),
-                                            ctaText = context.getString(R.string.scan_signed_tx),
+                                            title = resources.getString(R.string.unsigned_tx),
+                                            ctaText = resources.getString(R.string.scan_signed_tx),
                                         )
                                     } else {
                                         viewModel.broadCast()?.invokeOnCompletion { error ->

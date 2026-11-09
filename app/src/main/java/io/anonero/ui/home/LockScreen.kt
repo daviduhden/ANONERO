@@ -58,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -112,6 +113,7 @@ enum class LockScreenMode {
     OPEN_WALLET, LOCK_SCREEN, VERYFY_PIN
 }
 
+@androidx.annotation.Keep
 @Serializable
 enum class LockScreenShortCut {
     HOME, RECEIVE, SEND
@@ -156,7 +158,7 @@ fun LockScreen(
 
     // ms left on a PIN wait: read once (a wait outlives a restart; off the main thread, since a
     // reboot makes it write), then counted down on the boot clock -- nothing runs without a wait
-    var lockedFor by remember { mutableStateOf(0L) }
+    var lockedFor by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         lockedFor = withContext(Dispatchers.IO) { PinThrottle.waitLeft(prefs) }
     }

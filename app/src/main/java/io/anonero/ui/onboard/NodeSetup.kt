@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.capitalize
@@ -85,6 +86,7 @@ fun SetupNodeComposable(
     var rpcPassPhrase by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     val localContext = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val nodesRepository = koinInject<NodesRepository>()
     val torService = koinInject<TorService>()
@@ -268,7 +270,7 @@ fun SetupNodeComposable(
                                 }
                                 val validatedUrl = urlForParsing.toUri()
                                 if (validatedUrl.host == null) {
-                                    error = localContext.getString(R.string.invalid_url)
+                                    error = resources.getString(R.string.invalid_url)
                                 }
                                 val nodeJson = JSONObject()
                                     .apply {

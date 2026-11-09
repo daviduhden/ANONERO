@@ -19,7 +19,6 @@
 package io.anonero.ui.home.settings
 
 import AnonNeroTheme
-import android.app.Activity
 import android.content.SharedPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -127,7 +126,7 @@ fun SettingsPage(
     var stealthAutoLock by remember { mutableStateOf(StealthMode.autoLock(prefs)) }
     val themeMode by ThemeStore.mode.collectAsState()
     val language = remember { LocaleController.load(prefs) }
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     val pinChangedMessage = stringResource(R.string.pin_changed_success)
     val pinChangeErrorMessage = stringResource(R.string.pin_change_error)
 

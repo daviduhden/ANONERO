@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -205,6 +206,7 @@ fun NavGraphBuilder.onboardingGraph(
         composable<OnboardRestorePreviewScreen> { navBackStackEntry ->
             val backUpPath = navBackStackEntry.toRoute<OnboardRestorePreviewScreen>()
             val context = LocalContext.current
+            val resources = LocalResources.current
             val walletState = koinInject<WalletState>()
             val walletHandler = koinInject<AnonWalletHandler>()
             RestorePreview(
@@ -273,6 +275,7 @@ fun NavGraphBuilder.onboardingGraph(
         composable<OnboardPinScreen> {
             var showErrorMessage by remember { mutableStateOf<String?>(null) }
             val context = LocalContext.current
+            val resources = LocalResources.current
             val walletState = koinInject<WalletState>()
             val walletHandler = koinInject<AnonWalletHandler>()
             OnboardErrorDialog(
@@ -290,9 +293,9 @@ fun NavGraphBuilder.onboardingGraph(
             )
             PinSetup(
                 onNext = { pin ->
-                    var loadingMessage = context.getString(R.string.creating_wallet)
+                    var loadingMessage = resources.getString(R.string.creating_wallet)
                     if (onboardViewModel.getMode() == Mode.RESTORE) {
-                        loadingMessage = context.getString(R.string.restoring_wallet)
+                        loadingMessage = resources.getString(R.string.restoring_wallet)
                     }
                     navController.navigate(OnboardLoading(loadingMessage))
                     onboardViewModel.viewModelScope.launch {
@@ -325,7 +328,7 @@ fun NavGraphBuilder.onboardingGraph(
                             throw cancelled
                         } catch (failure: Exception) {
                             navController.popBackStack()
-                            showErrorMessage = context.getString(
+                            showErrorMessage = resources.getString(
                                 if (failure is RestoreTargetNotEmptyException) R.string.wallet_target_not_empty
                                 else if (onboardViewModel.getMode() == Mode.RESTORE) R.string.restore_failed
                                 else R.string.unable_to_create_wallet

@@ -118,6 +118,8 @@ class MainActivity : ComponentActivity() {
                 return false
             }
 
+            // The compat delegate has no Activity Result API equivalent.
+            @Suppress("DEPRECATION")
             override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) = false
         })
         // Everything this window ever shows -- seed, balance, addresses, the signing
@@ -280,12 +282,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Global permission-result hook used only to clear the prompt flag.
+    @Suppress("DEPRECATION")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         permissionPrompt = false
     }
 
-    //a system screen opened by the app does not count as leaving it
+    // Intercepts every external activity start so a system screen is not treated as
+    // leaving the app. The Activity Result API cannot provide a global override.
+    @Suppress("DEPRECATION")
     override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
         super.startActivityForResult(intent, requestCode, options)

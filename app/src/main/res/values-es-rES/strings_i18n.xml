@@ -52,7 +52,7 @@
     <string name="new_account">Nueva cuenta</string>
     <string name="rename_account">Cambiar nombre de la cuenta</string>
     <string name="add_account">Añadir cuenta</string>
-    <string name="selected">Seleccionada</string>
+    <string name="a11y_selected">Seleccionada</string>
     <string name="account_label">Etiqueta</string>
     <string name="no_accounts">Aún no hay cuentas disponibles. Conéctese a un nodo o LWS y sincronice.</string>
 
@@ -140,12 +140,12 @@
     <string name="wallet_locked_offline">Monedero bloqueado: sin conexión</string>
     <string name="offline">Sin conexión</string>
     <string name="wallet_locked_synced">Monedero bloqueado: sincronizado: %1$d</string>
-    <string name="loading_wallet">Cargando monedero...</string>
+    <string name="loading_wallet">Cargando monedero…</string>
     <string name="disconnected">Desconectado</string>
     <string name="daemon_disconnected">Daemon desconectado</string>
     <string name="wrong_version">Versión incorrecta</string>
     <string name="synced_height">Sincronizado: %1$d</string>
-    <string name="syncing">Sincronizando...</string>
+    <string name="syncing">Sincronizando…</string>
     <string name="syncing_blocks_left">Sincronizando: quedan %1$s bloques</string>
     <string name="syncing_completed">Sincronización de bloques completada</string>
     <string name="transaction_received">Transacción recibida</string>
@@ -185,7 +185,7 @@
     <string name="primary_address_title">Dirección principal</string>
     <string name="balance">Saldo</string>
     <string name="restore_height_title">Altura de restauración</string>
-    <string name="extracting_backup">Extrayendo copia de seguridad...</string>
+    <string name="extracting_backup">Extrayendo copia de seguridad…</string>
     <string name="invalid_network">Red no válida</string>
     <string name="unable_extract_backup">No se pudo extraer la copia de seguridad.</string>
     <string name="entering_backup_pin">Introduzca el PIN con el que se creó esta copia de seguridad</string>
@@ -232,14 +232,17 @@
 
     <plurals name="coins_selected_count">
         <item quantity="one">%1$d moneda seleccionada</item>
+        <item quantity="many">%1$d de monedas seleccionadas</item>
         <item quantity="other">%1$d monedas seleccionadas</item>
     </plurals>
     <plurals name="recipients_count">
         <item quantity="one">%1$d destinatario</item>
+        <item quantity="many">%1$d de destinatarios</item>
         <item quantity="other">%1$d destinatarios</item>
     </plurals>
     <plurals name="blocks_left_count">
         <item quantity="one">queda %1$s bloque</item>
+        <item quantity="many">quedan %1$s bloques</item>
         <item quantity="other">quedan %1$s bloques</item>
     </plurals>
     <string name="invalid_restore_height">Introduce una altura de restauración entera no negativa.</string>

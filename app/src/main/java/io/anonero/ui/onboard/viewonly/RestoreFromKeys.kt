@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,6 +80,7 @@ fun RestoreFromKeys(
     var error by remember { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val resources = LocalResources.current
     QRScannerDialog(
         show = showScanner,
         onQRCodeScanned = {
@@ -90,7 +92,7 @@ fun RestoreFromKeys(
                 viewKey = payload.privateViewKey
                 restoreHeight = payload.restoreHeight.toString()
             } catch (e: Exception) {
-                error = context.getString(R.string.invalid_qr_code)
+                error = resources.getString(R.string.invalid_qr_code)
             }
             showScanner = false
         },
@@ -247,7 +249,7 @@ fun RestoreFromKeys(
                     if (enabled) {
                         val height = restoreHeight.toLongOrNull()
                         if (height == null || height < 0) {
-                            error = context.getString(R.string.invalid_restore_height)
+                            error = resources.getString(R.string.invalid_restore_height)
                         } else {
                             val payload = NeroKeyPayload(
                                 primaryAddress = primaryAddress,

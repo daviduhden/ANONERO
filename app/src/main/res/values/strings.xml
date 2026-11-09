@@ -31,7 +31,7 @@
     <string name="create_wallet">Create Wallet</string>
     <string name="restore_wallet">Restore Wallet</string>
     <string name="proxy">Proxy</string>
-    <string name="initializing_tor">INITIALIZING TOR ...</string>
+    <string name="initializing_tor">INITIALIZING TOR …</string>
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="transactions">Transactions</string>
     <string name="receive">Receive</string>
@@ -44,7 +44,7 @@
     <string name="username">Username</string>
     <string name="optional">(Optional)</string>
     <string name="password">PASSWORD</string>
-    <string name="wallet_loading">Wallet is loading\n please wait...</string>
+    <string name="wallet_loading">Wallet is loading\n please wait…</string>
     <string name="manual_proxy">Manual Proxy</string>
     <string name="on">ON</string>
     <string name="off">OFF</string>
@@ -68,7 +68,7 @@
     <string name="pin_try_again_in">TRY AGAIN IN %1$d:%2$02d</string>
     <string name="wallet_not_connected_to_node_please_check_network">Wallet not connected to node. please check network</string>
     <string name="address">Address</string>
-    <string name="constructing_transaction">CONSTRUCTING TX...</string>
+    <string name="constructing_transaction">CONSTRUCTING TX…</string>
     <string name="invalid_address">invalid address</string>
     <string name="amount">Amount</string>
     <string name="sweeping_balance">Sweeping balance:</string>
@@ -98,8 +98,8 @@
     <string name="resync_initiated_this_may_take_a_while">Resync initiated… this may take a while.</string>
     <string name="show_outputs">Show Outputs</string>
     <string name="lock">Lock</string>
-    <string name="creating_wallet">Creating wallet...</string>
-    <string name="restoring_wallet">Restoring wallet...</string>
+    <string name="creating_wallet">Creating wallet…</string>
+    <string name="restoring_wallet">Restoring wallet…</string>
     <string name="close">Close</string>
     <string name="logs">Logs</string>
     <string name="unable_to">Unable to</string>
@@ -111,7 +111,7 @@
     <string name="primary_address">PRIMARY ADDRESS</string>
     <string name="import_view_keys">IMPORT VIEW KEYS</string>
     <string name="invalid_qr_code">Invalid QR Code</string>
-    <string name="loading">Loading....</string>
+    <string name="loading">Loading…</string>
     <string name="unable_to_create_wallet">unable to create wallet</string>
     <string name="enter_new_pin">Enter New PIN</string>
     <string name="enter_pin">Enter PIN</string>
@@ -155,7 +155,7 @@
     <string name="finish">FINISH</string>
     <string name="broadcast_tx">BROADCAST TX</string>
     <string name="unable_to_broadcast_transaction">Unable to broadcast transaction\n %1$s</string>
-    <string name="broadcast_in_progress">SENDING TX...</string>
+    <string name="broadcast_in_progress">SENDING TX…</string>
     <string name="fee">Fee</string>
     <string name="export_as_file">Export as file</string>
     <string name="importing_outputs">Importing outputs</string>
@@ -165,5 +165,5 @@
     <string name="import_outputs_failed">Failed to import outputs</string>
     <string name="import_key_images_failed">Failed to import key images</string>
     <string name="import_unsigned_failed">Failed to import unsigned transaction</string>
-    <string name="unsigned_tx_count_invalid">Unsigned transaction set contains %1$d transactions; exactly 1 is required</string>
+    <string name="unsigned_tx_count_invalid">Invalid unsigned transaction set: found %1$d; exactly 1 is required</string>
 </resources>

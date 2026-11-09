@@ -70,6 +70,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -159,6 +160,7 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     val backupFile by exportViewModel.backupFileLive.observeAsState()
     val backupError by exportViewModel.backupErrorLive.observeAsState()
     val backupFailedMessage = stringResource(R.string.backup_failed_generic)
@@ -235,8 +237,8 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
-                        if (saved) context.getString(R.string.file_saved)
-                        else context.getString(R.string.could_not_save_file),
+                        if (saved) resources.getString(R.string.file_saved)
+                        else resources.getString(R.string.could_not_save_file),
                         Toast.LENGTH_SHORT
                     ).show()
                 }

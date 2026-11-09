@@ -31,7 +31,7 @@
     <string name="create_wallet">Crear monedero</string>
     <string name="restore_wallet">Restaurar monedero</string>
     <string name="proxy">Servidor proxy</string>
-    <string name="initializing_tor">INICIALIZANDO TOR ...</string>
+    <string name="initializing_tor">INICIALIZANDO TOR …</string>
     <string name="copied_to_clipboard">Copiado al portapapeles</string>
     <string name="transactions">Transacciones</string>
     <string name="receive">Recibir</string>
@@ -44,7 +44,7 @@
     <string name="username">Usuario</string>
     <string name="optional">(Opcional)</string>
     <string name="password">CONTRASEÑA</string>
-    <string name="wallet_loading">El monedero se está cargando\nespere, por favor...</string>
+    <string name="wallet_loading">El monedero se está cargando\nespere, por favor…</string>
     <string name="manual_proxy">Configuración manual del proxy</string>
     <string name="on">ACTIVADO</string>
     <string name="off">DESACTIVADO</string>
@@ -68,7 +68,7 @@
     <string name="pin_try_again_in">REINTENTAR EN %1$d:%2$02d</string>
     <string name="wallet_not_connected_to_node_please_check_network">El monedero no está conectado al nodo. Compruebe la red</string>
     <string name="address">Dirección</string>
-    <string name="constructing_transaction">CONSTRUYENDO TRANSACCIÓN...</string>
+    <string name="constructing_transaction">CONSTRUYENDO TRANSACCIÓN…</string>
     <string name="invalid_address">dirección no válida</string>
     <string name="amount">Cantidad</string>
     <string name="sweeping_balance">Saldo a barrer:</string>
@@ -95,11 +95,11 @@
     <string name="coin_control">Control de monedas</string>
     <string name="refresh">Actualizar</string>
     <string name="resync_blockchain">Resincronizar la cadena de bloques</string>
-    <string name="resync_initiated_this_may_take_a_while">Resincronización iniciada... esto puede llevar un rato.</string>
+    <string name="resync_initiated_this_may_take_a_while">Resincronización iniciada… esto puede llevar un rato.</string>
     <string name="show_outputs">Mostrar salidas</string>
     <string name="lock">Bloquear</string>
-    <string name="creating_wallet">Creando monedero...</string>
-    <string name="restoring_wallet">Restaurando monedero...</string>
+    <string name="creating_wallet">Creando monedero…</string>
+    <string name="restoring_wallet">Restaurando monedero…</string>
     <string name="close">Cerrar</string>
     <string name="logs">Registros</string>
     <string name="unable_to">No se puede</string>
@@ -111,7 +111,7 @@
     <string name="primary_address">DIRECCIÓN PRINCIPAL</string>
     <string name="import_view_keys">IMPORTAR CLAVES DE VISUALIZACIÓN</string>
     <string name="invalid_qr_code">Código QR no válido</string>
-    <string name="loading">Cargando...</string>
+    <string name="loading">Cargando…</string>
     <string name="unable_to_create_wallet">No se puede crear el monedero</string>
     <string name="enter_new_pin">Introduzca un PIN nuevo</string>
     <string name="enter_pin">Introduzca el PIN</string>
@@ -155,7 +155,7 @@
     <string name="finish">FINALIZAR</string>
     <string name="broadcast_tx">PUBLICAR TRANSACCIÓN</string>
     <string name="unable_to_broadcast_transaction">No se puede publicar la transacción\n %1$s</string>
-    <string name="broadcast_in_progress">PUBLICANDO TRANSACCIÓN...</string>
+    <string name="broadcast_in_progress">PUBLICANDO TRANSACCIÓN…</string>
     <string name="fee">Comisión</string>
     <string name="export_as_file">Exportar como archivo</string>
     <string name="importing_outputs">Importando salidas</string>
@@ -165,5 +165,5 @@
     <string name="import_outputs_failed">No se pudieron importar las salidas</string>
     <string name="import_key_images_failed">No se pudieron importar las imágenes de clave</string>
     <string name="import_unsigned_failed">No se pudo importar la transacción sin firmar</string>
-    <string name="unsigned_tx_count_invalid">El conjunto de transacciones sin firmar contiene %1$d transacciones; se requiere exactamente 1</string>
+    <string name="unsigned_tx_count_invalid">Conjunto de transacciones sin firmar no válido: se encontraron %1$d; se requiere exactamente 1</string>
 </resources>

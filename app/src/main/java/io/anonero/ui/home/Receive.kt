@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -79,6 +80,7 @@ fun ReceiveScreen(
     val nextAddress by walletState.nextAddress.collectAsState(null)
     var labelDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(nextAddress) {
         // A profile reset clears nextAddress while the dialog may still be composed.
@@ -165,7 +167,7 @@ fun ReceiveScreen(
                         modifier = Modifier.clickable {
                             SecureClipboard.copy(context, address.address)
                             Toast.makeText(context,
-                                context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
+                                resources.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
                                 .show()
                         }
                     ) {

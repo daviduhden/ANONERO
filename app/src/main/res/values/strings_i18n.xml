@@ -52,7 +52,7 @@
     <string name="new_account">New account</string>
     <string name="rename_account">Rename account</string>
     <string name="add_account">Add account</string>
-    <string name="selected">Selected</string>
+    <string name="a11y_selected">Selected</string>
     <string name="account_label">Label</string>
     <string name="no_accounts">No accounts available yet. Connect to a node/LWS and sync.</string>
 
@@ -140,12 +140,12 @@
     <string name="wallet_locked_offline">Wallet Locked: Offline</string>
     <string name="offline">Offline</string>
     <string name="wallet_locked_synced">Wallet Locked: Synced: %1$d</string>
-    <string name="loading_wallet">Loading wallet...</string>
+    <string name="loading_wallet">Loading wallet…</string>
     <string name="disconnected">Disconnected</string>
     <string name="daemon_disconnected">Daemon Disconnected</string>
     <string name="wrong_version">Wrong Version</string>
     <string name="synced_height">Synced: %1$d</string>
-    <string name="syncing">Syncing...</string>
+    <string name="syncing">Syncing…</string>
     <string name="syncing_blocks_left">Syncing: %1$s blocks left</string>
     <string name="syncing_completed">Syncing blocks completed</string>
     <string name="transaction_received">Transaction received</string>
@@ -185,7 +185,7 @@
     <string name="primary_address_title">Primary Address</string>
     <string name="balance">Balance</string>
     <string name="restore_height_title">Restore Height</string>
-    <string name="extracting_backup">Extracting backup...</string>
+    <string name="extracting_backup">Extracting backup…</string>
     <string name="invalid_network">Invalid network</string>
     <string name="unable_extract_backup">Unable to extract backup.</string>
     <string name="entering_backup_pin">Enter the PIN this backup was made with</string>

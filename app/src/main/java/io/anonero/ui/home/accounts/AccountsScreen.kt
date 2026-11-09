@@ -177,7 +177,7 @@ fun AccountsScreen(
                         if (account.index == active) {
                             Icon(
                                 Icons.Default.Check,
-                                contentDescription = stringResource(R.string.selected),
+                                contentDescription = stringResource(R.string.a11y_selected),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }

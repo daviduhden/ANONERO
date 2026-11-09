@@ -371,7 +371,7 @@ class Wallet {
         val priority: Int = priority.ordinal
     	val preferredInputs = selectedUtxos.map { it.key }.toCollection(ArrayList())
     	if (selectedUtxos.isNotEmpty() && !sweepAll) {
-            checkSelectedAmounts(preferredInputs, amount, false)
+		checkSelectedAmounts(preferredInputs, amount, false)
     	}
         val txHandle =
             if (sweepAll) createSweepTransaction(

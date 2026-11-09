@@ -19,6 +19,7 @@
 package io.anonero.ui.home
 
 import AnonNeroTheme
+import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -80,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -193,6 +195,7 @@ fun TransactionScreen(
     val toastState = rememberToasterState()
     val activity = LocalActivity.current
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     if (broadcastSignedTxPath != null) {
         AlertDialog(
@@ -285,7 +288,7 @@ fun TransactionScreen(
                                             broadcastSignedTxPath = null
                                             if (!success) {
                                                 toastState.show(
-                                                    context.getString(R.string.broadcast_failed_generic),
+                                                    resources.getString(R.string.broadcast_failed_generic),
                                                     type = ToastType.Warning,
                                                     duration = 6.seconds
                                                 )
@@ -410,8 +413,8 @@ fun TransactionScreen(
                         showScanner = false
                         qrScannerParam = SpendQRExchangeParam(
                             exportType = ExportType.IMAGE,
-                            title = context.getString(R.string.key_images),
-                            ctaText = context.getString(R.string.scan_unsigned_tx),
+                            title = resources.getString(R.string.key_images),
+                            ctaText = resources.getString(R.string.scan_unsigned_tx),
                         )
                     }
 
@@ -423,7 +426,7 @@ fun TransactionScreen(
 
                     ImportEvents.IMPORT_KEY_IMAGES -> {
                         toastState.show(
-                            context.getString(R.string.key_images_imported),
+                            resources.getString(R.string.key_images_imported),
                             type = ToastType.Success,
                             duration = 4.seconds
                         )
@@ -665,7 +668,7 @@ fun TransactionScreen(
                                                     .e(failure, "wallet refresh failed")
                                                 withContext(Dispatchers.Main) {
                                                     toastState.show(
-                                                        context.getString(R.string.connection_failed),
+                                                        resources.getString(R.string.connection_failed),
                                                         type = ToastType.Warning,
                                                         duration = 6.seconds
                                                     )
@@ -682,7 +685,7 @@ fun TransactionScreen(
                                     if (result.isFailure) {
                                         scope.launch {
                                             toastState.show(
-                                                context.getString(R.string.resync_failed),
+                                                resources.getString(R.string.resync_failed),
                                                 type = ToastType.Warning,
                                                 duration = 6.seconds
                                             )
@@ -690,7 +693,7 @@ fun TransactionScreen(
                                     } else {
                                         scope.launch {
                                             toastState.show(
-                                                context.getString(R.string.resync_initiated_this_may_take_a_while),
+                                                resources.getString(R.string.resync_initiated_this_may_take_a_while),
                                                 type = ToastType.Success,
                                             )
                                         }
@@ -704,8 +707,8 @@ fun TransactionScreen(
                                         qrScannerParam =
                                             SpendQRExchangeParam(
                                                 exportType = ExportType.OUTPUT,
-                                                title = context.getString(R.string.outputs),
-                                                ctaText = context.getString(R.string.scan_key_images),
+                                                title = resources.getString(R.string.outputs),
+                                                ctaText = resources.getString(R.string.scan_key_images),
                                             )
                                     }
                                 )
@@ -717,7 +720,7 @@ fun TransactionScreen(
                                         qrScannerParam =
                                             SpendQRExchangeParam(
                                                 exportType = ExportType.IMAGE,
-                                                title = context.getString(R.string.key_images),
+                                                title = resources.getString(R.string.key_images),
                                                 ctaText = "",
                                             )
                                     }
@@ -739,9 +742,11 @@ fun TransactionScreen(
                 ),
             onRefresh = {
                 scope.launch {
-                    view.performHapticFeedback(
-                        HapticFeedbackConstants.CONFIRM
-                    )
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    } else {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    }
                     walletState.refresh()
                     refreshState.animateToHidden()
                 }

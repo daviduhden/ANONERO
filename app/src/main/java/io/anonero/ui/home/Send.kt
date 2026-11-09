@@ -70,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -193,11 +194,11 @@ class SendViewModel : ViewModel() {
                         priority = PendingTransaction.Priority.Priority_Default,
                         keyImages = arrayListOf()
                     )
-                    if (!pendingTx?.getErrorString().isNullOrEmpty()) {
+                    if (!pendingTx.getErrorString().isNullOrEmpty()) {
                         throw Exception(pendingTx.getErrorString())
                     }
 
-                    pendingTx?.let { writeUnsignedTransaction(it) }
+                    writeUnsignedTransaction(pendingTx)
                     pendingTx
                 } else {
                     if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
@@ -211,12 +212,12 @@ class SendViewModel : ViewModel() {
                         selectedUtxos = _coinsSelected.value?.toList() ?: listOf()
                     )
 
-                    if (!pendingTx?.getErrorString().isNullOrEmpty()) {
+                    if (!pendingTx.getErrorString().isNullOrEmpty()) {
                         Timber.tag(TAG).e("transaction error: %s", pendingTx.getErrorString())
                         _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
                         return@withContext null
                     }
-                    pendingTx?.let { writeUnsignedTransaction(it) }
+                    writeUnsignedTransaction(pendingTx)
                     pendingTx
                 }
             } catch (cancelled: CancellationException) {
@@ -437,6 +438,7 @@ fun SendScreen(
 
 
     val context = LocalContext.current
+    val resources = LocalResources.current
 
 
     if (showCoinSelection)
@@ -723,8 +725,8 @@ fun SendScreen(
                             if (needsKeyImages) {
                                 qrScannerParam = SpendQRExchangeParam(
                                     exportType = ExportType.OUTPUT,
-                                    title = context.getString(R.string.outputs),
-                                    ctaText = context.getString(R.string.scan_key_images),
+                                    title = resources.getString(R.string.outputs),
+                                    ctaText = resources.getString(R.string.scan_key_images),
                                 )
                             } else {
                                 prepare()
@@ -758,8 +760,8 @@ fun SendScreen(
                         showScanner = false
                         qrScannerParam = SpendQRExchangeParam(
                             exportType = ExportType.IMAGE,
-                            title = context.getString(R.string.key_images),
-                            ctaText = context.getString(R.string.scan_unsigned_tx),
+                            title = resources.getString(R.string.key_images),
+                            ctaText = resources.getString(R.string.scan_unsigned_tx),
                         )
                     }
 

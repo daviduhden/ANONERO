@@ -71,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -233,7 +234,7 @@ class NodeSettingsViewModel(
             try {
                 checkNotNull(wallet) { "Wallet unavailable" }
                 walletHandler.applyProxy()
-                if (WalletManager.instance !== manager || manager?.wallet !== wallet) {
+                if (WalletManager.instance !== manager || manager.wallet !== wallet) {
                     return@withContext
                 }
                 // Waiting for Tor can suspend while the user changes LWS settings.
@@ -308,6 +309,7 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val toastState = rememberToasterState()
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     if (showNodeDetails)
         Dialog(
@@ -407,7 +409,7 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                                         if (result.isFailure) {
                                             scope.launch {
                                                 toastState.show(
-                                                    context.getString(R.string.resync_failed),
+                                                    resources.getString(R.string.resync_failed),
                                                     type = ToastType.Warning,
                                                     duration = 6.seconds
                                                 )
@@ -415,7 +417,7 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                                         } else {
                                             scope.launch {
                                                 toastState.show(
-                                                    context.getString(R.string.resync_initiated_this_may_take_a_while),
+                                                    resources.getString(R.string.resync_initiated_this_may_take_a_while),
                                                     type = ToastType.Success,
                                                 )
                                             }

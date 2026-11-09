@@ -30,7 +30,7 @@
     <string name="create_wallet">Создать кошелёк</string>
     <string name="restore_wallet">Восстановить кошелёк</string>
     <string name="proxy">Прокси</string>
-    <string name="initializing_tor">ИНИЦИАЛИЗАЦИЯ TOR ...</string>
+    <string name="initializing_tor">ИНИЦИАЛИЗАЦИЯ TOR …</string>
     <string name="copied_to_clipboard">Скопировано в буфер обмена</string>
     <string name="transactions">Транзакции</string>
     <string name="receive">Получить</string>
@@ -43,7 +43,7 @@
     <string name="username">Имя пользователя</string>
     <string name="optional">(Необязательно)</string>
     <string name="password">ПАРОЛЬ</string>
-    <string name="wallet_loading">Кошелёк загружается\nподождите...</string>
+    <string name="wallet_loading">Кошелёк загружается\nподождите…</string>
     <string name="manual_proxy">Ручной прокси</string>
     <string name="on">ВКЛ</string>
     <string name="off">ВЫКЛ</string>
@@ -67,7 +67,7 @@
     <string name="pin_try_again_in">ПОВТОРИТЬ ЧЕРЕЗ %1$d:%2$02d</string>
     <string name="wallet_not_connected_to_node_please_check_network">Кошелёк не подключён к узлу. Проверьте сеть</string>
     <string name="address">Адрес</string>
-    <string name="constructing_transaction">СОЗДАНИЕ ТРАНЗАКЦИИ...</string>
+    <string name="constructing_transaction">СОЗДАНИЕ ТРАНЗАКЦИИ…</string>
     <string name="invalid_address">неверный адрес</string>
     <string name="amount">Сумма</string>
     <string name="sweeping_balance">Перенос баланса:</string>
@@ -97,8 +97,8 @@
     <string name="resync_initiated_this_may_take_a_while">Повторная синхронизация запущена… это может занять время.</string>
     <string name="show_outputs">Показать выходы</string>
     <string name="lock">Заблокировать</string>
-    <string name="creating_wallet">Создание кошелька...</string>
-    <string name="restoring_wallet">Восстановление кошелька...</string>
+    <string name="creating_wallet">Создание кошелька…</string>
+    <string name="restoring_wallet">Восстановление кошелька…</string>
     <string name="close">Закрыть</string>
     <string name="logs">Журналы</string>
     <string name="unable_to">Не удалось</string>
@@ -110,7 +110,7 @@
     <string name="primary_address">ОСНОВНОЙ АДРЕС</string>
     <string name="import_view_keys">ИМПОРТ КЛЮЧЕЙ ПРОСМОТРА</string>
     <string name="invalid_qr_code">Неверный QR-код</string>
-    <string name="loading">Загрузка....</string>
+    <string name="loading">Загрузка…</string>
     <string name="unable_to_create_wallet">не удалось создать кошелёк</string>
     <string name="enter_new_pin">Введите новый PIN</string>
     <string name="enter_pin">Введите PIN</string>
@@ -154,7 +154,7 @@
     <string name="finish">ГОТОВО</string>
     <string name="broadcast_tx">ОТПРАВИТЬ ТРАНЗАКЦИЮ</string>
     <string name="unable_to_broadcast_transaction">Не удалось отправить транзакцию\n %1$s</string>
-    <string name="broadcast_in_progress">ОТПРАВКА ТРАНЗАКЦИИ...</string>
+    <string name="broadcast_in_progress">ОТПРАВКА ТРАНЗАКЦИИ…</string>
     <string name="fee">Комиссия</string>
     <string name="export_as_file">Экспортировать как файл</string>
     <string name="importing_outputs">Импорт выходов</string>
@@ -164,7 +164,7 @@
     <string name="import_outputs_failed">Не удалось импортировать выходы</string>
     <string name="import_key_images_failed">Не удалось импортировать образы ключей</string>
     <string name="import_unsigned_failed">Не удалось импортировать неподписанную транзакцию</string>
-    <string name="unsigned_tx_count_invalid">Набор неподписанных транзакций содержит %1$d транзакций; требуется ровно 1</string>
+    <string name="unsigned_tx_count_invalid">Недопустимый набор неподписанных транзакций: найдено %1$d; требуется ровно 1</string>
 
     <string name="language">Язык</string>
     <string name="language_system">Системный язык</string>
@@ -200,7 +200,7 @@
     <string name="new_account">Новый счёт</string>
     <string name="rename_account">Переименовать счёт</string>
     <string name="add_account">Добавить счёт</string>
-    <string name="selected">Выбран</string>
+    <string name="a11y_selected">Выбран</string>
     <string name="account_label">Метка</string>
     <string name="no_accounts">Счетов пока нет. Подключитесь к узлу или LWS и синхронизируйтесь.</string>
 
@@ -288,12 +288,12 @@
     <string name="wallet_locked_offline">Кошелёк заблокирован: нет сети</string>
     <string name="offline">Нет сети</string>
     <string name="wallet_locked_synced">Кошелёк заблокирован: синхронизировано: %1$d</string>
-    <string name="loading_wallet">Загрузка кошелька...</string>
+    <string name="loading_wallet">Загрузка кошелька…</string>
     <string name="disconnected">Отключено</string>
     <string name="daemon_disconnected">Демон отключён</string>
     <string name="wrong_version">Неверная версия</string>
     <string name="synced_height">Синхронизировано: %1$d</string>
-    <string name="syncing">Синхронизация...</string>
+    <string name="syncing">Синхронизация…</string>
     <string name="syncing_blocks_left">Синхронизация: осталось блоков: %1$s</string>
     <string name="syncing_completed">Синхронизация блоков завершена</string>
     <string name="transaction_received">Транзакция получена</string>
@@ -333,7 +333,7 @@
     <string name="primary_address_title">Основной адрес</string>
     <string name="balance">Баланс</string>
     <string name="restore_height_title">Высота восстановления</string>
-    <string name="extracting_backup">Извлечение резервной копии...</string>
+    <string name="extracting_backup">Извлечение резервной копии…</string>
     <string name="invalid_network">Неверная сеть</string>
     <string name="unable_extract_backup">Не удалось извлечь резервную копию.</string>
     <string name="entering_backup_pin">Введите PIN, с которым была создана эта резервная копия</string>
