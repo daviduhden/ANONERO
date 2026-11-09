@@ -18,6 +18,7 @@
 
 package io.anonero.ui.onboard
 
+import io.anonero.util.MAX_RESTORE_HEIGHT
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -42,10 +43,11 @@ class SeedRestoreInputTest {
 
     @Test
     fun rejectsMalformedNegativeAndOverflowHeights() {
-        for (value in listOf("-1", "+1", "1.5", "one", "9223372036854775808")) {
+        for (value in listOf("-1", "+1", "1.5", "one", "9223372036854775808",
+                Long.MAX_VALUE.toString())) {
             assertFalse(SeedRestoreInput.isValidHeightInput(value))
         }
-        for (value in listOf("", " ", "0", " 123 ", Long.MAX_VALUE.toString())) {
+        for (value in listOf("", " ", "0", " 123 ", MAX_RESTORE_HEIGHT.toString())) {
             assertTrue(SeedRestoreInput.isValidHeightInput(value))
         }
     }
@@ -59,6 +61,9 @@ class SeedRestoreInputTest {
             SeedRestoreInput.requireValid(List(16) { "dummy" }, -1)
         }
         assertThrows(IllegalArgumentException::class.java) {
+            SeedRestoreInput.requireValid(List(16) { "dummy" }, Long.MAX_VALUE)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
             SeedRestoreInput.requireValid(List(25) { "dummy" }, null)
         }
     }
@@ -67,7 +72,7 @@ class SeedRestoreInputTest {
     fun preservesOptionalPolyseedAndExplicitLegacyHeights() {
         val words = List(16) { "dummy" }
         assertEquals(words, SeedRestoreInput.requireValid(words, null))
-        assertEquals(words, SeedRestoreInput.requireValid(words, Long.MAX_VALUE))
+        assertEquals(words, SeedRestoreInput.requireValid(words, MAX_RESTORE_HEIGHT))
         val legacy = List(25) { "dummy" }
         assertEquals(legacy, SeedRestoreInput.requireValid(legacy, 0))
     }
