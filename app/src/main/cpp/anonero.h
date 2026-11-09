@@ -34,18 +34,33 @@
 */
 
 jfieldID getHandleField(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
+    if (obj == nullptr) return nullptr;
     jclass c = env->GetObjectClass(obj);
-    return env->GetFieldID(c, fieldName, "J"); // of type long
+    if (c == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return nullptr;
+    }
+    jfieldID field = env->GetFieldID(c, fieldName, "J"); // of type long
+    env->DeleteLocalRef(c);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    return field;
 }
 
+// Reinterprets the opaque `jlong` stored in a Kotlin wrapper. The caller must know that
+// the pointer is still owned by a live native object; this helper deliberately does not
+// validate lifetime.
 template<typename T>
 T *getHandle(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
-    jlong handle = env->GetLongField(obj, getHandleField(env, obj, fieldName));
+    jfieldID field = getHandleField(env, obj, fieldName);
+    if (field == nullptr) return nullptr;
+    jlong handle = env->GetLongField(obj, field);
     return reinterpret_cast<T *>(handle);
 }
 
 void setHandleFromLong(JNIEnv *env, jobject obj, jlong handle) {
-    env->SetLongField(obj, getHandleField(env, obj), handle);
+    jfieldID field = getHandleField(env, obj);
+    if (field == nullptr) return;
+    env->SetLongField(obj, field, handle);
 }
 
 template<typename T>
