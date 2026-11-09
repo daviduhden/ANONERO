@@ -115,6 +115,37 @@ def placeholders(text: str) -> set[str]:
     return set(PLACEHOLDER.findall(text))
 
 
+def android_escape_errors(path: Path) -> list[str]:
+    """AAPT rejects unescaped apostrophes and unknown backslash escapes in string text."""
+    errors: list[str] = []
+    text = path.read_text(encoding="utf-8")
+    element = re.compile(r"<(?:string|item)\b[^>]*>(.*?)</(?:string|item)>", re.S)
+    for match in element.finditer(text):
+        body = match.group(1)
+        line = text.count("\n", 0, match.start(1)) + 1
+        in_quotes = False
+        i = 0
+        while i < len(body):
+            char = body[i]
+            if char == "\\":
+                nxt = body[i + 1:i + 2]
+                if nxt in "nt'\"\\@?":
+                    i += 2
+                    continue
+                if nxt == "u" and re.fullmatch(r"[0-9A-Fa-f]{4}", body[i + 2:i + 6] or ""):
+                    i += 6
+                    continue
+                errors.append(f"{path.relative_to(ROOT)}:{line}: invalid string escape")
+                i += 1
+                continue
+            if char == '"':
+                in_quotes = not in_quotes
+            elif char == "'" and not in_quotes:
+                errors.append(f"{path.relative_to(ROOT)}:{line}: unescaped apostrophe")
+            i += 1
+    return errors
+
+
 def main() -> int:
     errors = 0
     base_strings, base_plurals = parse_catalog(BASE_FILES)
@@ -187,6 +218,11 @@ def main() -> int:
                     f"'{value}'"
                 )
                 errors += 1
+
+    for path in sorted(RES.glob("values*/*.xml")):
+        for message in android_escape_errors(path):
+            fail(message)
+            errors += 1
 
     if errors:
         print(f"i18n check failed with {errors} problem(s)")
