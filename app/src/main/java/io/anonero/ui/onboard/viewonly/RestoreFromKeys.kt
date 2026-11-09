@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,6 +85,7 @@ fun RestoreFromKeys(
             error = ""
             try {
                 val payload = Json.decodeFromString<NeroKeyPayload>(it)
+                require(payload.restoreHeight >= 0) { "negative restore height" }
                 primaryAddress = payload.primaryAddress
                 viewKey = payload.privateViewKey
                 restoreHeight = payload.restoreHeight.toString()
@@ -244,13 +245,18 @@ fun RestoreFromKeys(
             AnonOutlineButton (
                 onClick = {
                     if (enabled) {
-                        val payload = NeroKeyPayload(
-                            primaryAddress = primaryAddress,
-                            privateViewKey = viewKey,
-                            restoreHeight = restoreHeight.toLong(),
-                            version = AnonConfig.NERO_KEY_PAYLOAD_VERSION
-                        )
-                        oNextPressed(payload)
+                        val height = restoreHeight.toLongOrNull()
+                        if (height == null || height < 0) {
+                            error = context.getString(R.string.invalid_restore_height)
+                        } else {
+                            val payload = NeroKeyPayload(
+                                primaryAddress = primaryAddress,
+                                privateViewKey = viewKey,
+                                restoreHeight = height,
+                                version = AnonConfig.NERO_KEY_PAYLOAD_VERSION
+                            )
+                            oNextPressed(payload)
+                        }
                     }
                 },
                 enabled = enabled,
