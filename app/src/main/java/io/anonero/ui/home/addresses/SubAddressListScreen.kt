@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,8 @@ class SubAddressListViewModel : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
 
     val subAddresses = walletState.subAddresses.asLiveData()
+    val hideAmounts = walletState.hideAmountsFlow.asLiveData()
+    val offline = walletState.offlineFlow.asLiveData()
 
 
     fun getNextAddress() {
@@ -91,6 +93,8 @@ fun SubAddressesScreen(
     }
     val vm = viewModel<SubAddressListViewModel>()
     val addresses by vm.subAddresses.observeAsState(listOf())
+    val hideAmounts by vm.hideAmounts.observeAsState(false)
+    val offline by vm.offline.observeAsState(false)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -141,7 +145,8 @@ fun SubAddressesScreen(
                                     address.displayLabel, color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
-                                    Formats.getDisplayAmount(address.totalAmount),
+                                    if (hideAmounts || offline) Formats.maskAmount(address.totalAmount)
+                                    else Formats.getDisplayAmount(address.totalAmount),
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold
                                 )

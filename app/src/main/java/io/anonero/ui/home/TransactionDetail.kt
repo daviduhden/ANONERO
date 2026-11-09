@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,7 +78,9 @@ import io.anonero.model.TransactionInfo
 import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.util.Formats
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 
@@ -108,7 +110,7 @@ fun TransactionDetailScreen(
         if (transactionInfo == null) {
             return
         }
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             notesDialog = false
             view.performHapticFeedback(
                 HapticFeedbackConstants.CONTEXT_CLICK
@@ -117,34 +119,33 @@ fun TransactionDetailScreen(
         }
     }
 
-    LaunchedEffect(true) {
-        scope.launch {
-            transactionInfo = transactions.find { it.hash == transactionId }
-            val wallet = WalletManager.instance?.wallet ?: return@launch
-            if (transactionInfo != null) {
-                var destination = ""
-                transactionInfo?.transfers?.forEach {
-                    destination = "${it.address}\n${destination}"
+    LaunchedEffect(transactionId, transactions) {
+        val found = transactions.find { it.hash == transactionId }
+        val details = withContext(Dispatchers.IO) {
+            val wallet = WalletManager.instance?.wallet
+            var destination = ""
+            var key = "____"
+            if (found != null) {
+                found.transfers.forEach {
+                    destination = "${it.address}\n$destination"
                 }
-                destinations = destination.trim()
-
-                if (transactionInfo?.direction == TransactionInfo.Direction.Direction_In) {
-                    destinations = wallet.getSubaddress(
-                        0,
-                        transactionInfo!!.addressIndex
-                    )
-                }
-                transactionKey =
-                    wallet.getTxKey(transactionInfo!!.hash) ?: "____"
-
-                transactionInfo?.notes?.let {
-                    notes = notes.copy(
-                        text = it,
-                        selection = TextRange(it.length)
-                    )
+                if (wallet != null) {
+                    if (found.direction == TransactionInfo.Direction.Direction_In) {
+                        destination = wallet.getSubaddress(0, found.addressIndex)
+                    }
+                    key = wallet.getTxKey(found.hash) ?: "____"
                 }
             }
-
+            destination.trim() to key
+        }
+        transactionInfo = found
+        destinations = details.first
+        transactionKey = details.second
+        found?.notes?.let {
+            notes = notes.copy(
+                text = it,
+                selection = TextRange(it.length)
+            )
         }
     }
 
@@ -318,7 +319,7 @@ fun TransactionDetailScreen(
                     DetailItem(
                         title = stringResource(R.string.transaction_fee),
                         subtitle = if (transactionInfo?.fee != null) {
-                            Formats.getDisplayAmount(transactionInfo?.fee!!)
+                            Formats.getExactDisplayAmount(transactionInfo?.fee!!)
                         } else {
                             "____"
                         }

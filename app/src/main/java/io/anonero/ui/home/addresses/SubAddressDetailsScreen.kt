@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,6 +80,8 @@ class SubAddressDetail(subAddress: Subaddress) : ViewModel() {
                         && txInfo.direction == TransactionInfo.Direction.Direction_In
             }
         }.asLiveData()
+    val hideAmounts = walletState.hideAmountsFlow.asLiveData()
+    val offline = walletState.offlineFlow.asLiveData()
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -98,6 +100,8 @@ fun SubAddressDetailScreen(
         SubAddressDetail(subAddress)
     }
     val transactions by subAddressDetailVm.transactions.observeAsState(listOf())
+    val hideAmounts by subAddressDetailVm.hideAmounts.observeAsState(false)
+    val offline by subAddressDetailVm.offline.observeAsState(false)
     var addressLabel by remember { mutableStateOf(subAddress.displayLabel) }
     BackHandler {
         onBackPress()
@@ -189,7 +193,8 @@ fun SubAddressDetailScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
-                                    Formats.getDisplayAmount(subAddress.totalAmount),
+                                    if (hideAmounts || offline) Formats.maskAmount(subAddress.totalAmount)
+                                    else Formats.getDisplayAmount(subAddress.totalAmount),
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold
                                 )

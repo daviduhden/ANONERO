@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package io.anonero.util
 
 import java.math.BigInteger
 
-/*
+/**
  * Exact conversion between a decimal XMR string and atomic units (10^-12 XMR).
  * Deliberately independent of java.lang.Double and of the native wallet parser so the
  * pay-to-many screen can reject malformed or overflowing input before any transaction
@@ -46,5 +46,5 @@ object MoneroAmount {
         return atomic.toLong()
     }
 
-    fun format(atomic: Long): String = Formats.getDisplayAmount(atomic)
+    fun format(atomic: Long): String = Formats.getExactDisplayAmount(atomic)
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,10 +41,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +63,8 @@ import io.anonero.ui.components.SubAddressLabelDialog
 import io.anonero.ui.components.qr.QrCodeColors
 import io.anonero.ui.components.qr.QrCodeView
 import io.anonero.util.SecureClipboard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 
 
@@ -75,12 +79,20 @@ fun ReceiveScreen(
     val nextAddress by walletState.nextAddress.collectAsState(null)
     var labelDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    if (labelDialog)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(nextAddress) {
+        // A profile reset clears nextAddress while the dialog may still be composed.
+        if (nextAddress == null) labelDialog = false
+    }
+    val address = nextAddress
+    if (labelDialog && address != null)
         SubAddressLabelDialog(
-            label = nextAddress!!.displayLabel,
+            label = address.displayLabel,
             onSave = { label ->
-                walletState.updateAddressLabel(label, nextAddress!!.addressIndex)
                 labelDialog = false
+                scope.launch(Dispatchers.IO) {
+                    walletState.updateAddressLabel(label, address.addressIndex)
+                }
             }, onCancel = {
                 labelDialog = false
             })
@@ -108,7 +120,7 @@ fun ReceiveScreen(
                 }
             )
         }) {
-        if (nextAddress != null) {
+        if (address != null) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize(),
@@ -118,7 +130,7 @@ fun ReceiveScreen(
             ) {
                 item {
                     Text(
-                        text = nextAddress!!.displayLabel,
+                        text = address.displayLabel,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -138,7 +150,7 @@ fun ReceiveScreen(
                 }
                 item {
                     QrCodeView(
-                        data = nextAddress!!.address,
+                        data = address.address,
                         colors = QrCodeColors(
                             background = MaterialTheme.colorScheme.background,
                             foreground = MaterialTheme.colorScheme.onBackground,
@@ -151,16 +163,14 @@ fun ReceiveScreen(
                 item {
                     SelectionContainer(
                         modifier = Modifier.clickable {
-                            nextAddress?.let {
-                                SecureClipboard.copy(context, it.address)
-                                Toast.makeText(context,
-                                    context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
-                                    .show()
-                            }
+                            SecureClipboard.copy(context, address.address)
+                            Toast.makeText(context,
+                                context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
+                                .show()
                         }
                     ) {
                         Text(
-                            nextAddress!!.address,
+                            address.address,
                             modifier = Modifier.width(300.dp)
                         )
                     }

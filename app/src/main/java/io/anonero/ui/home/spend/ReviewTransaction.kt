@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,7 +115,21 @@ data class ReviewModel(
 
 private const val TAG = "ReviewTransaction"
 
+/**
+ * Review and broadcast state for a pending or imported transaction.
+ *
+ * For a pending transaction, amount/fee come from wallet2 and the destination list comes
+ * from the navigation route. For an imported unsigned transaction, rows come from
+ * [UnsignedTransaction.confirmationMessage] parsed by [SigningSummary]; the advisory
+ * scalar getters are not a review source. If the summary cannot be parsed, the raw sentence
+ * is shown instead.
+ *
+ * Broadcasting is deliberately separate from construction. A successful commit/submit must
+ * be reflected as [BroadcastState.SUCCESS] only after wallet2 returns success; callers must
+ * not navigate back to a prefilled send form after a broadcast.
+ */
 class ReviewTransactionViewModel : ViewModel() {
+    private val broadcastInProgress = java.util.concurrent.atomic.AtomicBoolean(false)
     private val reviewModel = MutableLiveData<ReviewModel?>(null)
     private val broadcastingTx = MutableLiveData(BroadcastState.STAGING)
     private var _broadcastError: Exception? = null
@@ -132,6 +146,7 @@ class ReviewTransactionViewModel : ViewModel() {
     }
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
         val wallet = WalletManager.instance?.wallet;
         val pendingTransaction = wallet?.getPendingTx()
         val unsignedTransaction = wallet?.getUnsginedTx()
@@ -174,10 +189,17 @@ class ReviewTransactionViewModel : ViewModel() {
                 Timber.tag(TAG).e("Pending transaction has no txId")
             }
         }
+        }
     }
 
     fun broadCast(): Job? {
-        if (broadcastingTx.value == BroadcastState.IN_PROGRESS) {
+        if (broadcastingTx.value == BroadcastState.SUCCESS ||
+            broadcastingTx.value == BroadcastState.IN_PROGRESS) {
+            return null
+        }
+        // LiveData.postValue is asynchronous; an AtomicBoolean is the authoritative guard
+        // against a double tap broadcasting the same pending transaction twice.
+        if (!broadcastInProgress.compareAndSet(false, true)) {
             return null
         }
         val signedTxFile = File(
@@ -191,41 +213,48 @@ class ReviewTransactionViewModel : ViewModel() {
             try {
                 val wallet = WalletManager.instance?.wallet
                 if (wallet == null) {
-                    throw Exception("Wallet is available")
+                    throw Exception("Wallet is unavailable")
                 }
                 if (!AnonConfig.viewOnly) {
-                    pendingTransaction?.let {
-                        val result = wallet.send(it)
-                        if (!result) {
-                            throw Exception("Failed to send transaction")
-                        } else {
-                            broadcastingTx.postValue(BroadcastState.SUCCESS)
-                        }
+                    val tx = pendingTransaction
+                        ?: throw IllegalStateException("No pending transaction to broadcast")
+                    if (!wallet.send(tx)) {
+                        throw Exception("Failed to send transaction")
                     }
-                } else
-                    if (signedTxFile.exists()) {
-                        val error =
-                            wallet.submitTransaction(signedTxFile.absolutePath)
-                        val success = error == "Transaction submitted!";
-                        if (success) {
-                            broadcastingTx.postValue(BroadcastState.SUCCESS)
-                            signedTxFile.delete()
-                            Timber.tag(TAG).d("Transaction broadcasted...")
-                        } else {
-                            broadcastingTx.postValue(BroadcastState.ERROR)
-                            Timber.tag(TAG).e("broadcasting failed  ${error}")
-                            throw Exception(error)
-                        }
-                    } else {
+                } else {
+                    if (!signedTxFile.exists()) {
                         throw Exception("Signed transaction file not found")
                     }
-                wallet.startRefresh()
-                wallet.refreshHistory()
-                wallet.store()
+                    // LIMITATION: wallet2 exposes no parser for the signed file here, so
+                    // this path cannot yet compare its txids/outputs with the unsigned
+                    // object the user reviewed. A compromised external signer can return a
+                    // different transaction. Do not treat this as verified fund safety
+                    // until the native signed-file binding API exists and is tested.
+                    val error = wallet.submitTransaction(signedTxFile.absolutePath)
+                    if (error != "Transaction submitted!") {
+                        throw Exception(error)
+                    }
+                    signedTxFile.delete()
+                    Timber.tag(TAG).d("Transaction broadcasted...")
+                }
+                // The transaction is already broadcast at this point. A later refresh/store
+                // failure must not turn the UI into an error state that invites a retry and a
+                // second payment.
                 broadcastingTx.postValue(BroadcastState.SUCCESS)
+                try {
+                    wallet.startRefresh()
+                    wallet.refreshHistory()
+                    wallet.store()
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w(e, "post-broadcast refresh failed")
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (ex: Exception) {
                 _broadcastError = ex
                 broadcastingTx.postValue(BroadcastState.ERROR)
+            } finally {
+                broadcastInProgress.set(false)
             }
         }
     }
@@ -487,7 +516,7 @@ fun ReviewTransactionScreen(
                                                     Column {
                                                         Text(address, style = subTitleStyle)
                                                         Text(
-                                                            Formats.getDisplayAmount(
+                                                            Formats.getExactDisplayAmount(
                                                                 reviewParams.amounts.getOrElse(index) { 0L }
                                                             ),
                                                             style = subTitleStyle
@@ -512,7 +541,7 @@ fun ReviewTransactionScreen(
                                                 supportingContent = {
                                                     Text(
                                                         if (destinations.size == 1) destination.address
-                                                        else "${destination.address}\n${Formats.getDisplayAmount(destination.amount)}",
+                                                        else "${destination.address}\n${Formats.getExactDisplayAmount(destination.amount)}",
                                                         style = subTitleStyle
                                                     )
                                                 }
@@ -537,7 +566,7 @@ fun ReviewTransactionScreen(
                                         headlineContent = { Text(stringResource(R.string.amount), style = titleStyle) },
                                         supportingContent = {
                                             Text(
-                                                Formats.getDisplayAmount(
+                                                Formats.getExactDisplayAmount(
                                                     reviewModel!!.amount
                                                 ),
                                                 style = subTitleStyle
@@ -551,7 +580,7 @@ fun ReviewTransactionScreen(
                                         headlineContent = { Text(stringResource(R.string.fee), style = titleStyle) },
                                         supportingContent = {
                                             Text(
-                                                Formats.getDisplayAmount(
+                                                Formats.getExactDisplayAmount(
                                                     reviewModel!!.fee
                                                 ),
                                                 style = subTitleStyle
@@ -564,7 +593,7 @@ fun ReviewTransactionScreen(
                                         headlineContent = { Text(stringResource(R.string.total), style = titleStyle) },
                                         supportingContent = {
                                             Text(
-                                                Formats.getDisplayAmount(
+                                                Formats.getExactDisplayAmount(
                                                     reviewModel!!.total
                                                 ),
                                                 textAlign = TextAlign.Center,

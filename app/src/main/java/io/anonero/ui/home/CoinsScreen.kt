@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,7 +162,7 @@ fun CoinsScreen(
                     shape = MaterialTheme.shapes.medium,
                     contentPadding = PaddingValues(12.dp)
                 ) {
-                    Text(if (selected.size != 0) stringResource(R.string.confirm) else stringResource(R.string.spend))
+                    Text(if (selectedCoins.isNotEmpty()) stringResource(R.string.confirm) else stringResource(R.string.spend))
                 }
             }
         },

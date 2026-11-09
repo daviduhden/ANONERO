@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,6 +159,15 @@ fun QRScannerDialog(
 }
 
 
+/**
+ * Full-screen CameraX QR scanner with runtime camera permission handling.
+ *
+ * Runs in a modal bottom sheet from [QRScannerDialog]. The scanner decodes plain QR strings
+ * and UR fragments; UR assembly is delegated to [URDecoder] and reported through
+ * [onUrRusult] (the historical spelling is kept for source compatibility). The camera
+ * executor is created per composition and must be shut down when the scanner is disposed;
+ * the preview is unbound on dispose as well.
+ */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun QRScanner(
@@ -193,6 +202,7 @@ fun QRScanner(
     DisposableEffect(true) {
         onDispose {
             cameraProvider?.unbindAll()
+            cameraExecutor.shutdown()
         }
     }
 

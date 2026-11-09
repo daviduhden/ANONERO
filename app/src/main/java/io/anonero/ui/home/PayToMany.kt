@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -179,9 +180,17 @@ fun PayToManyScreen(
     BackHandler { onBackPress() }
 
     val parsed = recipients.map { parseExactAmount(it.amount) }
-    val addressesValid = recipients.map {
-        it.address.isNotBlank() &&
-            WalletManager.instance?.wallet?.validateAddress(it.address) == true
+    val addressesValid by produceState(
+        initialValue = recipients.map { false },
+        recipients.toList(),
+    ) {
+        value = withContext(Dispatchers.IO) {
+            val wallet = WalletManager.instance?.wallet
+            recipients.map { recipient ->
+                recipient.address.isNotBlank() &&
+                    wallet?.validateAddress(recipient.address) == true
+            }
+        }
     }
     val amountsValid = parsed.all { it != null && it > 0L }
     val total: Long? = runCatching {
@@ -279,7 +288,7 @@ fun PayToManyScreen(
                 ) {
                     Text(stringResource(R.string.total), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        Formats.getDisplayAmount(total ?: 0L),
+                        Formats.getExactDisplayAmount(total ?: 0L),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary
                     )

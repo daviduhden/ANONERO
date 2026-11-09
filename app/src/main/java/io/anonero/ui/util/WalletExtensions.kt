@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,28 +22,28 @@ import io.anonero.model.Subaddress
 import io.anonero.model.Wallet
 
 fun Wallet.getLastUnusedIndex(): Int {
-    var lastUsedSubaddress = 0
-    val subaddress = arrayListOf<Subaddress>()
-    for (i in 0 until this.numSubAddresses) {
-        subaddress.add(this.getSubaddressObject(i))
-    }
+    // The number of created subaddresses, not only received payments, determines the
+    // next index. Otherwise creating several addresses without receiving funds reuses
+    // index 1 and links them.
+    var lastIndex = this.numSubAddresses - 1
     for (info in this.history?.all ?: listOf()) {
-        if (info.addressIndex > lastUsedSubaddress) lastUsedSubaddress = info.addressIndex
+        if (info.addressIndex > lastIndex) lastIndex = info.addressIndex
     }
-    return lastUsedSubaddress
+    return lastIndex
 }
+
+internal fun nextSubaddressIndex(lastUsed: Int, count: Int): Int =
+    maxOf(lastUsed, count - 1) + 1
 
 
 fun Wallet.getLatestSubAddress(): Subaddress {
-    val lastUsedSubAddress = getLastUnusedIndex()
-    //get the next address
-    val address = this.getSubaddressObject(lastUsedSubAddress + 1)
-    //create the next address if the wallet does not have it yet
-    if (address.addressIndex >= this.numSubAddresses) {
-        this.addSubaddress(getAccountIndex(), "Subaddress #${address.addressIndex}")
+    val nextIndex = nextSubaddressIndex(getLastUnusedIndex(), this.numSubAddresses)
+    // Create the next address if the wallet does not have it yet.
+    if (nextIndex >= this.numSubAddresses) {
+        this.addSubaddress(getAccountIndex(), "Subaddress #$nextIndex")
         this.store()
     }
-    return address
+    return this.getSubaddressObject(nextIndex)
 }
 
 
@@ -52,9 +52,7 @@ fun Wallet.getAllUsedSubAddresses(): List<Subaddress> {
     for (i in 0 until this.numSubAddresses) {
         subAddresses.add(this.getSubaddressObject(i))
     }
-    this.getLatestSubAddress().let {
-        if (subAddresses.indexOf(it) == -1) subAddresses.add(it)
-    }
+    // Do not call getLatestSubAddress() here: getters must not create or store addresses.
     return subAddresses
         .apply {
             this.removeIf { it.addressIndex == 0 && it.totalAmount != 0L }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,13 +30,17 @@ internal object SeedRestoreInput {
     fun isValidHeightInput(input: String): Boolean {
         val value = input.trim()
         return value.isEmpty() ||
-            (value.all { it in '0'..'9' } && value.toLongOrNull() != null)
+            (value.all { it in '0'..'9' } &&
+                value.toLongOrNull()?.let { it in 0..io.anonero.util.MAX_RESTORE_HEIGHT } == true)
     }
 
     fun requireValid(seed: List<String>, restoreHeight: Long?): List<String> {
         val normalized = words(seed.joinToString(" "))
         require(hasSupportedCount(normalized)) { "Unsupported mnemonic length" }
-        require(restoreHeight == null || restoreHeight >= 0) { "Invalid restore height" }
+        require(restoreHeight == null ||
+            restoreHeight in 0..io.anonero.util.MAX_RESTORE_HEIGHT) {
+            "Invalid restore height"
+        }
         require(normalized.size != 25 || restoreHeight != null) { "Restore height required" }
         return normalized
     }

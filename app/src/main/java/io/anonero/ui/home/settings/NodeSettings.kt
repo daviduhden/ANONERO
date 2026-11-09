@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,6 +80,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
@@ -315,6 +316,7 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                 dismissOnClickOutside = true,
                 dismissOnBackPress = true,
                 decorFitsSystemWindows = false,
+                securePolicy = SecureFlagPolicy.SecureOn,
             ),
             onDismissRequest = {
                 showNodeDetails = false

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,7 +122,9 @@ import io.anonero.ui.home.spend.qr.SpendQRExchangeParam
 import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.util.Formats
 import io.anonero.util.StealthMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -220,6 +222,7 @@ fun TransactionScreen(
             },
             onDismissRequest = {
                 scanFailure = null
+                broadcastSignedTxPath = null
             },
             dismissButton = {
                 Button(
@@ -256,19 +259,40 @@ fun TransactionScreen(
                         containerColor = MaterialTheme.colorScheme.onBackground,
                     ),
                     onClick = {
-                        broadcastProgree = true
-                        scope.launch(Dispatchers.IO) {
-                            try {
-                                WalletManager.instance?.wallet?.submitTransaction(
-                                    broadcastSignedTxPath ?: ""
-                                )
-                                WalletManager.instance?.wallet?.refreshHistory()
-                                WalletManager.instance?.wallet?.store()
-                            } catch (ex: Exception) {
-                                Timber.tag(TAG).e(ex)
-                            } finally {
-                                broadcastProgree = false
-                                broadcastSignedTxPath = null
+                        if (!broadcastProgree) {
+                            val path = broadcastSignedTxPath
+                            if (path != null) {
+                                broadcastProgree = true
+                                scope.launch(Dispatchers.IO) {
+                                    var success = false
+                                    try {
+                                        val wallet = WalletManager.instance?.wallet
+                                            ?: throw IllegalStateException("wallet unavailable")
+                                        val error = wallet.submitTransaction(path)
+                                        if (error != "Transaction submitted!") {
+                                            throw IllegalStateException(error ?: "broadcast failed")
+                                        }
+                                        wallet.refreshHistory()
+                                        wallet.store()
+                                        success = true
+                                    } catch (ex: CancellationException) {
+                                        throw ex
+                                    } catch (ex: Exception) {
+                                        Timber.tag(TAG).e(ex, "signed transaction broadcast failed")
+                                    } finally {
+                                        withContext(NonCancellable + Dispatchers.Main) {
+                                            broadcastProgree = false
+                                            broadcastSignedTxPath = null
+                                            if (!success) {
+                                                toastState.show(
+                                                    context.getString(R.string.broadcast_failed_generic),
+                                                    type = ToastType.Warning,
+                                                    duration = 6.seconds
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }) { Text(stringResource(R.string.yes)) }
@@ -483,7 +507,8 @@ fun TransactionScreen(
     val showIndefiniteLoading by walletState.isLoading.asLiveData().observeAsState(false)
     val refreshState = rememberPullToRefreshState();
     val view = LocalView.current;
-    val torConnected by torService.socksFlow.asLiveData().observeAsState(torService.socks != null)
+    val torSocket by torService.socksFlow.asLiveData().observeAsState(torService.socks)
+    val torConnected = torSocket != null
     val useTor = anonPrefs.getBoolean(WALLET_USE_TOR, true)
     val stealthEnabled by StealthMode.enabled.collectAsState()
     val hazeState = rememberHazeState()
@@ -632,7 +657,21 @@ fun TransactionScreen(
                             if (!offline) DropdownMenuItem(
                                 text = { Text(stringResource(R.string.refresh)) },
                                 onClick = {
-                                    navigateTo(CoinsScreenRoute)
+                                    showMenu = false
+                                    scope.launch(Dispatchers.IO) {
+                                        runCatching { walletState.refresh() }
+                                            .onFailure { failure ->
+                                                Timber.tag(TAG)
+                                                    .e(failure, "wallet refresh failed")
+                                                withContext(Dispatchers.Main) {
+                                                    toastState.show(
+                                                        context.getString(R.string.connection_failed),
+                                                        type = ToastType.Warning,
+                                                        duration = 6.seconds
+                                                    )
+                                                }
+                                            }
+                                    }
                                 }
                             )
                             if (!offline) DropdownMenuItem(

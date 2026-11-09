@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -139,8 +139,7 @@ fun SeedSetup(
 private fun SetupNodeComposablePreview() {
     AnonNeroTheme {
         SeedSetup(
-            seed = "only inquiry tumble vivid useful verify urban black immense essence negative wife deliver organ hungry mirror"
-                .split(" ").toList(),
+            seed = (1..16).map { "word$it" },
         )
     }
 }

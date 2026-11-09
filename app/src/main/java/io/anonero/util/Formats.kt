@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,18 @@ object Formats {
             .setScale(8, RoundingMode.HALF_UP)
         if (d.scale() < 2) d = d.setScale(2, RoundingMode.UNNECESSARY)
         return d.toPlainString()
+    }
+
+    /**
+     * Exact 12-decimal rendering for payment, fee, and review values. Unlike the compact
+     * balance formatter, this never rounds: format(parse(x)) must preserve every atomic unit.
+     */
+    fun getExactDisplayAmount(amount: Long): String {
+        if (amount == 0L) return "0"
+        return BigDecimal(amount)
+            .scaleByPowerOfTen(-AnonConfig.XMR_DECIMALS)
+            .stripTrailingZeros()
+            .toPlainString()
     }
 
     fun formatTransactionTime(timestamp: Long, pattern: String = "HH:mm\ndd/MM"): String {

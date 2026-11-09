@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -47,7 +48,11 @@ import androidx.activity.compose.BackHandler
 import io.anonero.AnonConfig
 import io.anonero.model.node.NodeFields
 import io.anonero.R
+import io.anonero.services.AnonWalletHandler
+import io.anonero.services.WalletState
+import io.anonero.services.startAnonService
 import io.anonero.util.RestoreTargetNotEmptyException
+import io.anonero.util.WalletSession
 import io.anonero.ui.home.graph.routes.Home
 import io.anonero.ui.home.settings.LogViewer
 import io.anonero.ui.home.settings.ProxySettings
@@ -68,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 
 @Serializable
@@ -89,7 +95,7 @@ data object OnboardLogsScreen
 data class OnboardLoading(val message: String)
 
 @Serializable
-data class OnboardSeedScreen(val seed: String)
+data object OnboardSeedScreen
 
 @Serializable
 data object OnboardPinScreen
@@ -110,6 +116,14 @@ data class OnboardRestorePreviewScreen(val backUpPath: String)
 data object OnboardImportKeysScreen
 
 //onboarding
+/**
+ * Navigation graph for first-run setup, seed restore, backup restore, and view-only key
+ * import.
+ *
+ * The graph is entered only when no usable wallet exists. It shares [OnboardViewModel] so
+ * the passphrase/seed/restore payload survives screen changes; the final destination is
+ * either the home graph or the node setup screen for an offline/airgapped flow.
+ */
 fun NavGraphBuilder.onboardingGraph(
     navController: NavHostController,
     onboardViewModel: OnboardViewModel
@@ -189,6 +203,9 @@ fun NavGraphBuilder.onboardingGraph(
         }
         composable<OnboardRestorePreviewScreen> { navBackStackEntry ->
             val backUpPath = navBackStackEntry.toRoute<OnboardRestorePreviewScreen>()
+            val context = LocalContext.current
+            val walletState = koinInject<WalletState>()
+            val walletHandler = koinInject<AnonWalletHandler>()
             RestorePreview(
                 backUpPath = backUpPath.backUpPath,
                 onBackPressed = {
@@ -198,6 +215,11 @@ fun NavGraphBuilder.onboardingGraph(
                     navController.navigate(it)
                 },
                 oNextPressed = {
+                    // The restore left the re-keyed wallet managed. Start the normal
+                    // wallet pipeline before leaving onboarding.
+                    walletState.setProfile(WalletSession.profile)
+                    walletHandler.scope.launch { walletHandler.startService() }
+                    runCatching { startAnonService(context) }
                     val prefs = AnonConfig.context?.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
                     //a backup of an offline signer has no node
                     if (prefs?.getString(NodeFields.RPC_HOST.value, "").isNullOrEmpty()) {
@@ -249,6 +271,8 @@ fun NavGraphBuilder.onboardingGraph(
         composable<OnboardPinScreen> {
             var showErrorMessage by remember { mutableStateOf<String?>(null) }
             val context = LocalContext.current
+            val walletState = koinInject<WalletState>()
+            val walletHandler = koinInject<AnonWalletHandler>()
             OnboardErrorDialog(
                 showErrorMessage = showErrorMessage,
                 isRestoreMode = onboardViewModel.getMode() == Mode.RESTORE,
@@ -280,13 +304,19 @@ fun NavGraphBuilder.onboardingGraph(
                             } else {
                                 onboardViewModel.create(pin)
                             }
+                            // The newly created/restored wallet is managed. Publish the
+                            // profile and start the normal proxy/init/refresh pipeline
+                            // before Home renders; otherwise the first session is inert.
+                            walletState.setProfile(WalletSession.profile)
+                            walletHandler.scope.launch { walletHandler.startService() }
+                            runCatching { startAnonService(context) }
                             delay(600)
                             if (AnonConfig.viewOnly || onboardViewModel.getMode() == Mode.RESTORE) {
                                 navController.navigate(Home) {
                                     popUpTo(LandingScreenRoute)
                                 }
                             } else {
-                                navController.navigate(OnboardSeedScreen(onboardViewModel.getSeed()))
+                                navController.navigate(OnboardSeedScreen)
                             }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
@@ -302,11 +332,17 @@ fun NavGraphBuilder.onboardingGraph(
                 }
             )
         }
-        composable<OnboardSeedScreen> { navBackStackEntry ->
-            val state = navBackStackEntry.toRoute<OnboardSeedScreen>()
+        composable<OnboardSeedScreen> {
+            val seed by produceState(initialValue = emptyList<String>()) {
+                value = withContext(Dispatchers.IO) {
+                    onboardViewModel.getSeed()
+                        .trim()
+                        .split(Regex("\\s+"))
+                        .filter { it.isNotEmpty() }
+                }
+            }
             SeedSetup(
-                seed = state.seed
-                    .split(" ").toList(),
+                seed = seed,
                 oNextPressed = {
                     navController.navigate(
                         Home
@@ -314,9 +350,9 @@ fun NavGraphBuilder.onboardingGraph(
                         popUpTo(LandingScreenRoute)
                     }
                 },
-                onBackPressed = {
-                    navController.navigate("")
-                }
+                // The wallet already exists. Do not navigate back to the PIN screen or
+                // reload the seed from a saved-state route; require the explicit Next.
+                onBackPressed = { }
             )
         }
         composable<OnboardImportKeysScreen> {

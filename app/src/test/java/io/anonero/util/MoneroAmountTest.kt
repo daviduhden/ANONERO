@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,16 +39,35 @@ class MoneroAmountTest {
     }
 
     @Test
+    fun `surrounding whitespace is trimmed before parsing`() {
+        assertEquals(1_000_000_000_000L, MoneroAmount.parseExact(" 1 "))
+        assertEquals(1_000_000_000_000L, MoneroAmount.parseExact("\t1\n"))
+    }
+
+    @Test
     fun `invalid, negative, zero and over-precise values are rejected`() {
         assertNull(MoneroAmount.parseExact(""))
         assertNull(MoneroAmount.parseExact("0"))
         assertNull(MoneroAmount.parseExact("-1"))
+        assertNull(MoneroAmount.parseExact("+1"))
         assertNull(MoneroAmount.parseExact("1."))
         assertNull(MoneroAmount.parseExact(".1"))
+        assertNull(MoneroAmount.parseExact("01"))
+        assertNull(MoneroAmount.parseExact("1 000"))
         assertNull(MoneroAmount.parseExact("1.0000000000001"))
         assertNull(MoneroAmount.parseExact("1,5"))
         assertNull(MoneroAmount.parseExact("1e3"))
-        assertNull(MoneroAmount.parseExact(" 1"))
+    }
+
+    @Test
+    fun `formatter is exact and round-trips every atomic unit`() {
+        assertEquals("1", MoneroAmount.format(1_000_000_000_000L))
+        assertEquals("0.000000000001", MoneroAmount.format(1L))
+        assertEquals("12.345678901234", MoneroAmount.format(12_345_678_901_234L))
+        for (value in listOf(1L, 999_999_999_999L, 1_000_000_000_000L,
+            12_345_678_901_234L, Long.MAX_VALUE / 2)) {
+            assertEquals(value, MoneroAmount.parseExact(MoneroAmount.format(value)))
+        }
     }
 
     @Test

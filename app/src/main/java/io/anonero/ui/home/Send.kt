@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,6 +105,7 @@ import io.anonero.ui.home.spend.qr.QRExchangeScreen
 import io.anonero.ui.home.spend.qr.SpendQRExchangeParam
 import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.util.Formats
+import io.anonero.util.MoneroAmount
 import io.anonero.util.backup.BackupHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -128,6 +129,18 @@ enum class SendError(@StringRes val messageRes: Int) {
     CONSTRUCTION_FAILED(R.string.transaction_construction_failed),
 }
 
+/**
+ * Screen state and transaction construction for a single send.
+ *
+ * The ViewModel validates connection state, parses the amount, builds a wallet2 pending
+ * transaction (including sweep and coin-control selections), and writes the unsigned
+ * transaction to the cache for review/airgapped export. It does not broadcast: the review
+ * screen owns the final commit/submit step.
+ *
+ * The amount path uses [io.anonero.util.MoneroAmount.parseExact], like pay-to-many, so
+ * malformed, zero, over-precise, or overflowing input is rejected before a transaction
+ * object exists. URI amounts are carried as atomic Long values, never Double.
+ */
 class SendViewModel : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
     private val _balance = walletState.unLockedBalance.asLiveData()
@@ -140,13 +153,36 @@ class SendViewModel : ViewModel() {
     val coins = _coinsSelected as LiveData<Set<CoinsInfo>>
     val txComposeError = _txComposeError as LiveData<SendError?>
 
+    private fun writeUnsignedTransaction(pendingTx: PendingTransaction) {
+        val cacheDir = AnonConfig.context?.cacheDir
+            ?: throw IllegalStateException("cache directory unavailable")
+        val unsignedTxFile = File(cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE)
+        // A fixed cache name means a failed write could leave the previous transaction
+        // in place and a later QR export would sign a different payment. Clear it first
+        // and fail closed if the write does not succeed.
+        if (unsignedTxFile.exists() && !unsignedTxFile.delete()) {
+            throw IllegalStateException("stale unsigned transaction could not be removed")
+        }
+        if (!pendingTx.commit(unsignedTxFile.path, true)) {
+            throw IllegalStateException("unsigned transaction could not be written")
+        }
+    }
+
     suspend fun prepareTransaction(addressField: String, amount: String): PendingTransaction? {
-        val amountFromString: Long = Wallet.getAmountFromString(amount)
         val wallet = WalletManager.instance?.wallet
+        val isSweep = spendType.value == SpendType.SWEEP
         return withContext(Dispatchers.IO) {
             try {
+                // Sweep ignores the amount; a normal send must never pass through Double or
+                // the native parser, which can accept values the review screen did not show.
+                val amountAtomic = if (isSweep) {
+                    0L
+                } else {
+                    MoneroAmount.parseExact(amount)
+                        ?: throw IllegalArgumentException("invalid amount")
+                }
                 _txComposeError.postValue(null)
-                if (spendType.value == SpendType.SWEEP && _coinsSelected.value.isNullOrEmpty()) {
+                if (isSweep && _coinsSelected.value.isNullOrEmpty()) {
                     if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
@@ -160,11 +196,7 @@ class SendViewModel : ViewModel() {
                         throw Exception(pendingTx.getErrorString())
                     }
 
-                    if (pendingTx != null) {
-                        val unsignedTxFile =
-                            File(AnonConfig.context?.cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE)
-                        pendingTx.commit(unsignedTxFile.path, true)
-                    }
+                    pendingTx?.let { writeUnsignedTransaction(it) }
                     pendingTx
                 } else {
                     if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
@@ -173,8 +205,8 @@ class SendViewModel : ViewModel() {
                     }
                     val pendingTx = wallet.createTransaction(
                         dst_addr = addressField,
-                        amount = amountFromString,
-                        sweepAll = spendType.value == SpendType.SWEEP,
+                        amount = amountAtomic,
+                        sweepAll = isSweep,
                         selectedUtxos = _coinsSelected.value?.toList() ?: listOf()
                     )
 
@@ -183,11 +215,7 @@ class SendViewModel : ViewModel() {
                         _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
                         return@withContext null
                     }
-                    if (pendingTx != null) {
-                        val unsignedTxFile =
-                            File(AnonConfig.context?.cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE)
-                        pendingTx.commit(unsignedTxFile.path, true)
-                    }
+                    pendingTx?.let { writeUnsignedTransaction(it) }
                     pendingTx
                 }
             } catch (e: Exception) {
@@ -339,9 +367,8 @@ fun SendScreen(
         paymentUriFromScanner?.let {
             if (it.address.isNotEmpty())
                 addressField = it.address
-            if (it.amount != 0.0)
-                amountField =
-                    Wallet.getDisplayAmount(Wallet.getAmountFromString(it.amount.toString()))
+            if (it.amount > 0L)
+                amountField = MoneroAmount.format(it.amount)
         }
     }
 
@@ -349,9 +376,8 @@ fun SendScreen(
         paymentUri?.let {
             if (it.address.isNotEmpty())
                 addressField = it.address
-            if (it.amount != 0.0)
-                amountField =
-                    Wallet.getDisplayAmount(Wallet.getAmountFromString(it.amount.toString()))
+            if (it.amount > 0L)
+                amountField = MoneroAmount.format(it.amount)
         }
     }
     val sweep = spendType == SpendType.SWEEP
@@ -359,13 +385,13 @@ fun SendScreen(
     LaunchedEffect(addressField, amountField) {
         scope.launch {
             unlockedBalance?.let { maxSpendableBalance ->
-                val amountFromString = Wallet.getAmountFromString(amountField)
+                val amountAtomic = MoneroAmount.parseExact(amountField)
 
                 validSpend = when {
                     inValidAddress == true -> false
                     spendType == SpendType.SWEEP -> true
-                    amountFromString == 0L || maxSpendableBalance == 0L -> false
-                    amountFromString >= maxSpendableBalance -> false
+                    amountAtomic == null || maxSpendableBalance == 0L -> false
+                    amountAtomic >= maxSpendableBalance -> false
                     else -> true
                 }
             }
@@ -591,7 +617,7 @@ fun SendScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(
                                     imeAction = ImeAction.Next,
-                                    keyboardType = KeyboardType.Number
+                                    keyboardType = KeyboardType.Decimal
                                 ),
                                 enabled = !showIndefiniteLoading,
                                 onValueChange = {
@@ -670,26 +696,23 @@ fun SendScreen(
                             horizontal = 16.dp,
                         ),
                     onClick = {
-                        val wallet = WalletManager.instance?.wallet;
-                        val spendAmount = Wallet.getAmountFromString(amountField)
-                        if (wallet == null) {
-                            return@AnonOutlineButton
+                        val wallet = WalletManager.instance?.wallet ?: return@AnonOutlineButton
+                        val isSweep = spendType == SpendType.SWEEP
+                        val spendAmount = if (isSweep) {
+                            0L
+                        } else {
+                            MoneroAmount.parseExact(amountField) ?: return@AnonOutlineButton
                         }
                         if (AnonConfig.viewOnly) {
-                            var needsKeyImages: Boolean
-                            if (spendType == SpendType.SWEEP) {
-                                needsKeyImages = wallet.hasUnknownKeyImages()
+                            val needsKeyImages = if (isSweep) {
+                                wallet.hasUnknownKeyImages()
                             } else {
-                                needsKeyImages =
-                                    (spendAmount + 1_000_000_000L) >
-                                        wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
-                                Timber.tag(TAG).d("SendScreen: needsKeyImages: %s", needsKeyImages)
-                                Timber.tag(TAG)
-                                    .i(
-                                        "SendScreen: viewOnlyBalance: %s",
-                                        wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
-                                    )
-                                Timber.tag(TAG).d("SendScreen: spendAmount: %s", spendAmount)
+                                // Reserve a fee for the key-image check without letting a
+                                // near-Long.MAX amount wrap negative.
+                                val withFee = runCatching {
+                                    Math.addExact(spendAmount, 1_000_000_000L)
+                                }.getOrDefault(Long.MAX_VALUE)
+                                withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
                             }
 
                             if (needsKeyImages) {
