@@ -9,12 +9,15 @@ authoritative for security, language, build, and Git policy.
   There is no `push` or `pull_request` trigger. Jobs:
   - `authorize`: owner gate; every other job needs it.
   - `unit`: JVM unit tests for `anon` and `nero`.
+  - `lint`: Android Lint for both flavors; uploads HTML/XML reports.
   - `jni-contract`: `scripts/check-jni-contract.py`.
   - `i18n`: `scripts/check-i18n.py`.
   - `native-language-policy`: rejects project-owned Java sources.
   - `native`: builds the pinned Monero/JNI archives after verifying the submodule and
     patch series are present.
-  - `instrumented`: API 35 emulator tests after `native`.
+  - `assemble`: links `libanonero.so` and verifies the API 29 floor even when instrumented
+    tests are skipped.
+  - `instrumented`: API 35 emulator tests after `native` and `assemble`.
 - `release.yml` — manual `workflow_dispatch` only. Inputs:
   - `tag`: existing `v*` tag to build; required.
   - `publish`: publish signed APKs to GitHub Releases; default `false`.

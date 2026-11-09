@@ -97,7 +97,7 @@ jobs:
       is_release: ${{ steps.meta.outputs.is_release }}
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       source_sha: ${{ steps.meta.outputs.source_sha }}
-      unsigned_artifact: anonero-unsigned-${{ github.run_id }}
+      unsigned_artifact: anonero-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Free runner disk before build
@@ -118,7 +118,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag }}
           submodules: false
           persist-credentials: false
 
@@ -160,7 +160,11 @@ jobs:
             echo "::error::Tag core version '$CORE' does not match app versionName '$VERSION'"
             exit 1
           fi
-          TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+          git show-ref --verify --quiet "refs/tags/${TAG}" || {
+            echo "::error::$TAG is not an existing tag"
+            exit 1
+          }
+          TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
           HEAD_COMMIT="$(git rev-parse HEAD)"
           if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
             echo "::error::Tag '$TAG' does not point at the checked-out commit"
@@ -238,7 +242,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
           sdkmanager --install \
             "platform-tools" \
             "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
@@ -260,9 +264,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --stacktrace clean \
+          ./gradlew --no-daemon --continue --stacktrace clean \
+            :app:lintAnonRelease \
+            :app:lintNeroRelease \
             :app:assembleAnonRelease \
             :app:assembleNeroRelease
+
+      - name: Upload release lint reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-lint-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.xml
+            app/build/reports/lint-results-*.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Verify APKs and collect architecture splits
         shell: bash
@@ -382,13 +400,16 @@ jobs:
             echo "::error::expected 6 APKs total, got $total"
             exit 1
           fi
+          ( cd dist-unsigned && sha256sum ./*.apk > SHA256SUMS )
           ls -lh dist-unsigned
 
       - name: Upload unsigned APK artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: anonero-unsigned-${{ github.run_id }}
-          path: dist-unsigned/*.apk
+          name: anonero-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist-unsigned/*.apk
+            dist-unsigned/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
 
@@ -401,7 +422,7 @@ jobs:
       contents: read
     environment: release
     outputs:
-      signed_artifact: anonero-signed-${{ github.run_id }}
+      signed_artifact: anonero-signed-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Set up Java 17
@@ -452,7 +473,10 @@ jobs:
           [[ -s "$KS" ]] || { echo "::error::decoded keystore is empty"; exit 1; }
 
           APKSIGNER="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          ZIPALIGN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
           test -x "$APKSIGNER"
+          test -x "$ZIPALIGN"
+          ( cd unsigned && sha256sum -c SHA256SUMS )
           rm -rf dist
           mkdir -p dist
           shopt -s nullglob
@@ -463,6 +487,10 @@ jobs:
           }
           for apk in "${apks[@]}"; do
             [[ -s "$apk" ]] || { echo "::error::empty APK $apk"; exit 1; }
+            "$ZIPALIGN" -c -P 16 -v 4 "$apk" >/dev/null || {
+              echo "::error::$apk is not 16 KB zipaligned"
+              exit 1
+            }
             out="dist/$(basename "$apk")"
             "$APKSIGNER" sign \
               --ks "$KS" \
@@ -474,6 +502,13 @@ jobs:
             [[ -s "$out" ]] || { echo "::error::signing produced an empty APK: $out"; exit 1; }
           done
           ( cd dist && sha256sum ./*.apk > SHA256SUMS )
+          mapfile -t listed < <(awk '{print $2}' dist/SHA256SUMS | sed 's|^\./||' | sort)
+          mapfile -t actual < <(printf '%s\n' dist/*.apk | xargs -n1 basename | sort)
+          if ! diff -u <(printf '%s\n' "${listed[@]}") <(printf '%s\n' "${actual[@]}") >/dev/null; then
+            echo "::error::SHA256SUMS does not list exactly the signed APKs"
+            diff -u <(printf '%s\n' "${listed[@]}") <(printf '%s\n' "${actual[@]}") || true
+            exit 1
+          fi
           ls -lh dist
 
       - name: Verify APK signatures and checksums
@@ -489,11 +524,17 @@ jobs:
             "$APKSIGNER" verify --verbose --print-certs "$apk" >/dev/null
           done
           ( cd dist && sha256sum -c SHA256SUMS )
+          mapfile -t listed < <(awk '{print $2}' dist/SHA256SUMS | sed 's|^\./||' | sort)
+          mapfile -t actual < <(printf '%s\n' dist/*.apk | xargs -n1 basename | sort)
+          if ! diff -u <(printf '%s\n' "${listed[@]}") <(printf '%s\n' "${actual[@]}") >/dev/null; then
+            echo "::error::SHA256SUMS does not list exactly the signed APKs"
+            exit 1
+          fi
 
       - name: Upload signed APKs and checksums
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: anonero-signed-${{ github.run_id }}
+          name: anonero-signed-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             dist/*.apk
             dist/SHA256SUMS
@@ -503,7 +544,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [authorize, build, sign]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish == true && needs.build.outputs.is_release == 'true'
+    if: github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.run_instrumented == true && needs.build.outputs.is_release == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Publishing needs write access to create/upload release assets. The job is behind
@@ -521,7 +562,7 @@ jobs:
       - name: Re-check the tag before publishing
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.build.outputs.tag }}
+          ref: refs/tags/${{ needs.build.outputs.tag }}
           fetch-depth: 0
           fetch-tags: true
           submodules: false
@@ -539,7 +580,11 @@ jobs:
           SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
         run: |
           set -euo pipefail
-          TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+          git show-ref --verify --quiet "refs/tags/${TAG}" || {
+            echo "::error::$TAG is not an existing tag"
+            exit 1
+          }
+          TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
           if [[ "$TAG_COMMIT" != "$SOURCE_SHA" ]]; then
             echo "::error::Release tag moved after the build; refusing to publish"
             exit 1
@@ -552,6 +597,13 @@ jobs:
           }
           [[ -s dist/SHA256SUMS ]] || { echo "::error::SHA256SUMS is missing"; exit 1; }
           ( cd dist && sha256sum -c SHA256SUMS )
+          mapfile -t listed < <(awk '{print $2}' dist/SHA256SUMS | sed 's|^\./||' | sort)
+          mapfile -t actual < <(printf '%s\n' dist/*.apk | xargs -n1 basename | sort)
+          if ! diff -u <(printf '%s\n' "${listed[@]}") <(printf '%s\n' "${actual[@]}") >/dev/null; then
+            echo "::error::SHA256SUMS does not list exactly the published APKs"
+            diff -u <(printf '%s\n' "${listed[@]}") <(printf '%s\n' "${actual[@]}") || true
+            exit 1
+          fi
           ls -lh dist
 
       - name: Create or extend the release without overwriting assets

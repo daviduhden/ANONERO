@@ -159,10 +159,15 @@ grep/rg, file inspection, XML/TOML parsing
 Forbidden for agent work: `./gradlew`, `make`, `cmake`, `docker`/`podman`, `adb`, emulators,
 or executing the app.
 
+`check-i18n.py` also rejects unescaped Android string apostrophes and invalid string escape
+sequences; a passing XML parse alone is not sufficient.
+
 CI jobs (manual dispatch only; every job other than `authorize` needs the owner gate):
 
 - `authorize`: owner gate.
 - `unit`: JVM unit tests for both flavors.
+- `lint`: Android Lint for both flavors with HTML/XML reports.
+- `assemble`: links `libanonero.so` and checks the API 29 floor.
 - `jni-contract`: symbol parity.
 - `i18n`: resource parity and hardcoded text scan.
 - `native-language-policy`: rejects project-owned Java sources.

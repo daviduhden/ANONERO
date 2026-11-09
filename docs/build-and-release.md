@@ -86,6 +86,8 @@ an `authorize` job that requires the repository owner as both `github.actor` and
 | --- | --- |
 | `authorize` | Owner gate; every other job needs it |
 | `unit` | `:app:testAnonDebugUnitTest` and `:app:testNeroDebugUnitTest` |
+| `lint` | Android Lint for both flavors; uploads HTML/XML reports |
+| `assemble` | Links `libanonero.so` and checks the API 29 floor without an emulator |
 | `jni-contract` | `python3 scripts/check-jni-contract.py` (names only, not signatures) |
 | `i18n` | `python3 scripts/check-i18n.py` (parity, placeholders, unresolved resources, hardcoded text) |
 | `native-language-policy` | Rejects project-owned Java sources |

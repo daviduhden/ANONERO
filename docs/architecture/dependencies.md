@@ -167,7 +167,7 @@ Gradle 9.7.
 
 These updates are **not** validated until GitHub Actions succeeds:
 
-- `unit`, `jni-contract`, `i18n`, and `native-language-policy` jobs.
+- `unit`, `lint`, `assemble`, `jni-contract`, `i18n`, and `native-language-policy` jobs.
 - `native`: CMake 4.4.5 + NDK r30 + Boost 1.92 + zlib 1.4 must produce the Monero
   archives; this is the highest-risk update.
 - `instrumented`: API 35 emulator with compileSdk 37.2/NDK 30.

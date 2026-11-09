@@ -129,7 +129,7 @@ security, language, build, and Git policy. Read it first.
 - Do not run Gradle, unit tests, instrumented tests, or the emulator locally.
 - Allowed: reading, `grep`/`rg`, `git diff`, XML/TOML parsing, `python3
   scripts/check-i18n.py`, `python3 scripts/check-jni-contract.py`, `bash -n`.
-- CI is authoritative. Relevant jobs: `unit`, `jni-contract`, `i18n`,
+- CI is authoritative. Relevant jobs: `unit`, `lint`, `jni-contract`, `i18n`,
   `native-language-policy`, `native`, `instrumented`.
 - For UI-only changes, state that runtime rendering and accessibility behavior remain
   unverified until CI/device testing.

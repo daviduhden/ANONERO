@@ -41,9 +41,9 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 - No Gradle cache in the publishing workflow. Cache poisoning before signing is a
   release risk.
 - `native-language-policy` must continue to enforce the Kotlin/C++ source layout.
-- Required gates stay required: `authorize`, `unit`, `jni-contract`, `i18n`,
-  `native-language-policy`, `native`, `instrumented` (via `test.yml`), then build,
-  sign, publish.
+- Required gates stay required: `authorize`, `unit`, `lint`, `jni-contract`, `i18n`,
+  `native-language-policy`, `native`, `assemble`, `instrumented` (via `test.yml`), then
+  build, sign, publish.
 - Release APKs must be unsigned before the `sign` job. No debug signing fallback.
 - Verify before publish: six APKs, package IDs, versionName/versionCode, minSdk 29,
   non-debuggable, only arm64-v8a/armeabi-v7a, `libanonero.so`, signatures,
