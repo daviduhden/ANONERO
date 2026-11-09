@@ -31,6 +31,8 @@ Do not use to claim runtime success, fund safety, or cryptographic proof.
 - `AGENTS.md`
 - `docs/architecture/repository-state.md`
 - `docs/architecture/dependencies.md`
+- `docs/ci/README.md`
+- `docs/ci/historical-failures.md`
 - `scripts/check-jni-contract.py`
 - `scripts/check-i18n.py`
 - `app/build.gradle.kts`
@@ -43,16 +45,22 @@ Do not use to claim runtime success, fund safety, or cryptographic proof.
 1. **Define scope.** List the directories, commits, and questions. Record the exact
    `HEAD` and dirty state.
 2. **Build an inventory.** Files, languages, entry points, persistence, network,
-   native, secrets, CI.
-3. **Establish the baseline.** Run only allowed static checks:
+   secrets, CI.
+3. **Inventory every diagnosis.** For each compile error, warning, test failure, crash,
+   JNI/sanitizer diagnostic, or historical CI failure, record the run/commit, root cause,
+   related files, equivalent patterns, fix, and regression check in `docs/ci/`.
+4. **Search for the pattern, not only the line.** Review declarations, definitions,
+   consumers, tests, and the same design in other components. A single fixed warning does
+   not close the audit.
+5. **Establish the baseline.** Run only allowed static checks:
    - `python3 scripts/check-jni-contract.py`
    - `python3 scripts/check-i18n.py`
    - `git diff --check`
    - manifest/resource/dependency parsing.
-4. **Trace invariants.** Use the root security invariants and the relevant skill as
+6. **Trace invariants.** Use the root security invariants and the relevant skill as
    the checklist. For each, find the enforcing code or state clearly that it is
    absent.
-5. **Search for high-risk patterns.**
+7. **Search for high-risk patterns.**
    - secrets in logs, prefs, intents, clipboard, notifications, tests;
    - cleartext/network clients outside wallet2;
    - `setTrustedDaemon(true)` in LWS paths;
@@ -61,15 +69,15 @@ Do not use to claim runtime success, fund safety, or cryptographic proof.
    - profile cross-reads;
    - `allowBackup`, exported components, new permissions;
    - disabled security checks in workflows.
-6. **Check compatibility.** Backup versions, legacy PIN, `.premigrate`, JNI
+8. **Check compatibility.** Backup versions, legacy PIN, `.premigrate`, JNI
    signatures, Monero pin/patches, minSdk, ABIs.
-7. **Verify references.** Every path, symbol, resource, and command cited in a report
+9. **Verify references.** Every path, symbol, resource, and command cited in a report
    must exist. Use `rg -n` and file existence checks.
-8. **Classify evidence and severity.** Separate verified static, inferred, and
+10. **Classify evidence and severity.** Separate verified static, inferred, and
    unverified. Do not inflate confidence.
-9. **Write actionable findings.** Each finding: file:line, what is wrong, impact,
+11. **Write actionable findings.** Each finding: file:line, what is wrong, impact,
    confidence, recommended fix, and the CI check that would confirm it.
-10. **State limitations.** No runtime, device, network, or side-channel proof.
+12. **State limitations.** No runtime, device, network, or side-channel proof.
 
 ## Findings template
 

@@ -38,11 +38,8 @@ This section records facts verified during the instruction audit. Re-verify befo
 relying on it after a significant change.
 
 - The audit baseline was `ed8b097` (`docs: add Apache-2.0 license headers and normalize
-  comment style`). The current hardening cycle adds commits through `92e36a4` plus this
-  documentation cleanup.
-- The working tree has uncommitted copyright-line and final-newline normalization
-  edits across many files. They are user work. Do not revert, reformat, or include
-  them in unrelated changes.
+  comment style`). The current hardening cycle adds commits through `52d67d4`; the CI
+  compile-failure fixes, workflow gates, and `docs/ci/` inventory were committed afterwards.
 - `app/src/main/java` contains Kotlin only. There are no `.java` files.
 - The native boundary is the C++ JNI adapter in `app/src/main/cpp/`; there is no
   alternate project-owned native runtime or FFI layer.
@@ -191,10 +188,19 @@ decision and documentation, not a local workaround.
   workflow without explicit authorization; the agent is not authorized to start Actions.
   The owner gate and repository protections are described in `.github/workflows/AGENTS.md`.
 - **CI is the build authority.**
-  - `.github/workflows/test.yml`: JVM unit tests, JNI symbol contract, localization,
-    Kotlin/C++ policy, native archives, instrumented tests.
+  - `.github/workflows/test.yml`: JVM unit tests, Android Lint, JNI symbol contract,
+    localization, Kotlin/C++ policy, native archives, instrumented tests.
   - `.github/workflows/release.yml`: required test suite, unsigned release APKs,
     protected-key signing, checksum/signature verification, GitHub Release publishing.
+- **Every diagnosis requires a root-cause pass.** A compile error, compiler warning, test
+  failure, crash, JNI diagnostic, or sanitizer report must trigger:
+  1. root-cause analysis;
+  2. a repository-wide search for the same pattern and related variants;
+  3. a fail-closed fix;
+  4. a regression test or static check;
+  5. an entry in `docs/ci/` for historical or recurring failures.
+  A disappearing original diagnostic is not completion. Do not hide warnings with
+  `continue-on-error`, `|| true`, blanket suppressions, or removed checks.
 - **Evidence levels.** Label conclusions as:
   - *verified static*: directly visible in a file or produced by a static check;
   - *inferred*: follows from code but was not executed;
@@ -355,6 +361,7 @@ Keep instructions close to the code they govern:
 | New persisted/legacy format | `compatibility-migrations` skill, compatibility section here |
 | Dependency/toolchain pin change | `docs/architecture/dependencies.md`, `external-libs/AGENTS.md`, `github-actions` skill |
 | Work status or next priorities | `PROGRESS.md`, `TODO.md`, `ROADMAP.md` |
+| CI failure, warning, or recurring diagnostics | `docs/ci/`, `.github/workflows/AGENTS.md` |
 | New security boundary or limitation | `AGENTS.md`, relevant skill, `docs/security-model.md`, `docs/architecture/repository-state.md` |
 
 Rules for documentation:
