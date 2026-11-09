@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <string name="language">Idioma</string>
+    <string name="language_system">Idioma del sistema</string>
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_chinese">简体中文</string>
+
+    <string name="settings_appearance_privacy">APARIENCIA Y PRIVACIDAD</string>
+    <string name="theme">Tema</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="stealth_mode">Modo discreto</string>
+    <string name="stealth_mode_supporting">Oculta importes, redacta notificaciones y bloquea al pasar a segundo plano</string>
+    <string name="auto_lock_stealth">Bloqueo automático en modo discreto</string>
+    <string name="auto_lock_stealth_supporting">Activa la sincronización en segundo plano en cuanto se detiene la app</string>
+    <string name="lws_settings_title">Servidor de monedero ligero (LWS)</string>
+    <string name="lws_settings_supporting">Descarga experimental del escaneo de la clave de visualización por Tor</string>
+    <string name="accounts_settings_title">Cuentas</string>
+    <string name="accounts_settings_supporting">Crea, selecciona y etiqueta cuentas del monedero</string>
+    <string name="sign_verify_settings_title">Firmar / Verificar mensajes</string>
+    <string name="sign_verify_settings_supporting">Demuestra el control de una dirección sin mover fondos</string>
+    <string name="decoy_settings_title">Monedero señuelo y PIN de coacción</string>
+    <string name="decoy_settings_supporting">Monedero independiente abierto con un PIN alternativo</string>
+    <string name="pin_changed_success">PIN cambiado correctamente</string>
+    <string name="pin_change_error">Error al cambiar el PIN. Consulte los registros para más detalles</string>
+    <string name="normal_pin_differs_duress">El PIN normal debe ser distinto del PIN de coacción</string>
+    <string name="duress_pin_differs_normal">El PIN de coacción debe ser distinto del PIN normal</string>
+    <string name="wallet_not_open">El monedero no está abierto</string>
+    <string name="set_password_failed">No se pudo establecer la contraseña del monedero: %1$s</string>
+
+    <string name="accounts">Cuentas</string>
+    <string name="new_account">Nueva cuenta</string>
+    <string name="rename_account">Cambiar nombre de la cuenta</string>
+    <string name="add_account">Añadir cuenta</string>
+    <string name="selected">Seleccionada</string>
+    <string name="account_label">Etiqueta</string>
+    <string name="no_accounts">Aún no hay cuentas disponibles. Conéctese a un nodo o LWS y sincronice.</string>
+
+    <string name="sign_verify_title">Firmar / Verificar</string>
+    <string name="sign_verify_explanation">Firme con la clave de gasto de la cuenta activa. Una firma válida demuestra la posesión de la clave de gasto de esa dirección; no demuestra quién es la persona.</string>
+    <string name="message_to_sign">Mensaje que firmar</string>
+    <string name="signature">Firma</string>
+    <string name="copy_signature">Copiar firma</string>
+    <string name="sign">FIRMAR</string>
+    <string name="verify">VERIFICAR</string>
+    <string name="message">Mensaje</string>
+    <string name="verify_signature">Verificar una firma</string>
+    <string name="signing_failed">No se pudo firmar. El monedero puede estar en sincronización en segundo plano o ser de solo visualización.</string>
+    <string name="signature_valid">La firma es válida para esta dirección y este mensaje</string>
+    <string name="signature_invalid">La firma NO es válida</string>
+
+    <string name="pay_to_many">Pago a varias direcciones</string>
+    <string name="pay_to_many_description">Una sola transacción con varias salidas. Cada fila necesita una dirección Monero válida y un importe exacto.</string>
+    <string name="pay_to_many_view_only">No disponible en esta compilación de solo visualización: el flujo airgapped con varios destinos aún no está implementado.</string>
+    <string name="pay_to_many_recipient">Destinatario %1$d</string>
+    <string name="add_recipient">Añadir destinatario</string>
+    <string name="remove_recipient">Eliminar destinatario</string>
+    <string name="positive_amount">Introduzca un importe positivo con un máximo de 12 decimales</string>
+    <string name="total_exceeds_balance">El total supera el saldo disponible</string>
+    <string name="could_not_export_unsigned">No se pudo exportar la transacción sin firmar</string>
+    <string name="transaction_construction_failed">No se pudo construir la transacción</string>
+
+    <string name="lws_title">Servidor de monedero ligero</string>
+    <string name="use_lws">Usar LWS</string>
+    <string name="lws_supporting">Descarga el escaneo de la clave de visualización a un servidor de monedero ligero Monero. Solo se envían la dirección pública y la clave privada de visualización; la clave de gasto nunca sale del dispositivo.</string>
+    <string name="lws_host">Servidor LWS</string>
+    <string name="lws_port">Puerto</string>
+    <string name="lws_privacy_warning">Privacidad: el operador del LWS puede ver su dirección, todos los importes entrantes y aproximadamente cuándo llegaron. No puede gastar. Tor oculta su IP al operador, pero no elimina la confianza que deposita en el servidor. Prefiera un servidor que usted mismo opere.</string>
+    <string name="lws_tor_enabled">Tor integrado está activado. El tráfico LWS lo utilizará.</string>
+    <string name="lws_tor_disabled">Tor integrado está desactivado. LWS no se puede activar hasta que Tor esté encendido.</string>
+    <string name="lws_restart_warning">Aplicar LWS requiere reiniciar la app. Los ajustes de nodo normal se ignoran mientras LWS está activado. El modo de monedero ligero puede no admitir todos los servidores (especialmente monederos con muchas subdirecciones) y es experimental en ANONERO.</string>
+    <string name="lws_saved_restart">Guardado. Reinicie ANONERO para usar esta configuración.</string>
+    <string name="lws_requires_tor">LWS requiere Tor. Active primero Tor integrado en los ajustes del proxy.</string>
+    <string name="lws_error_host_empty">El host no puede estar vacío</string>
+    <string name="lws_error_host_too_long">El host es demasiado largo</string>
+    <string name="lws_error_host_format">Introduzca solo el nombre del host, sin esquema, ruta ni puerto</string>
+    <string name="lws_error_host_invalid">Nombre de host no válido</string>
+    <string name="lws_error_port_range">El puerto debe estar entre 1 y 65535</string>
+
+    <string name="decoy_duress_title">Señuelo y coacción</string>
+    <string name="decoy_not_available">Este ajuste no está disponible para el monedero actual.</string>
+    <string name="decoy_remove_title">¿Eliminar el monedero señuelo?</string>
+    <string name="decoy_remove_warning">Esto elimina el archivo del monedero señuelo, su clave de Keystore y su PIN de coacción. Los fondos del señuelo se pierden a menos que tenga su semilla. El monedero legítimo no se modifica.</string>
+    <string name="remove">Eliminar</string>
+    <string name="decoy_intro">El señuelo es un archivo de monedero completamente separado, con su propio secreto envuelto por Keystore, PIN, frase de paso e historial. El PIN normal abre este monedero; el PIN de coacción abre el señuelo.</string>
+    <string name="decoy_limits">Límites: esto es separación, no negación plausible. Un acceso forense a un dispositivo desbloqueado puede revelar que existen dos monederos. No confíe en el señuelo frente a una incautación del dispositivo.</string>
+    <string name="creating_decoy_wallet">Creando monedero señuelo…</string>
+    <string name="setup_decoy_wallet">CONFIGURAR MONEDERO SEÑUELO</string>
+    <string name="decoy_passphrase_hint">Elija una frase de paso para la semilla del señuelo. No debe ser la misma que la frase de paso del monedero legítimo.</string>
+    <string name="decoy_passphrase_min">Frase de paso del señuelo (mín. 8 caracteres)</string>
+    <string name="confirm_decoy_passphrase">Confirmar frase de paso del señuelo</string>
+    <string name="continue_action">CONTINUAR</string>
+    <string name="change_duress_pin">CAMBIAR PIN DE COACCIÓN</string>
+    <string name="remove_decoy_wallet">ELIMINAR MONEDERO SEÑUELO</string>
+    <string name="enter_duress_pin">Introduzca el PIN de coacción</string>
+    <string name="new_duress_pin">Nuevo PIN de coacción</string>
+    <string name="duress_pin_differs">El PIN de coacción debe ser distinto del PIN normal</string>
+    <string name="decoy_passphrase_differs">La frase de paso del señuelo debe ser distinta de la frase de paso principal</string>
+    <string name="app_context_unavailable">El contexto de la aplicación no está disponible</string>
+    <string name="decoy_exists">Ya existe un monedero señuelo; elimínelo primero</string>
+    <string name="decoy_creation_failed">No se pudo crear el monedero señuelo</string>
+    <string name="decoy_write_failed">No se pudo escribir el monedero señuelo: %1$s</string>
+    <string name="decoy_seed_failed">No se pudo leer la semilla del señuelo</string>
+    <string name="decoy_credentials_failed">No se pudieron guardar las credenciales del señuelo</string>
+    <string name="decoy_configured_help">El PIN de coacción está configurado. El monedero señuelo se abre con él desde la pantalla de bloqueo inicial tras un inicio en frío; una sesión principal ya abierta no se cambia en caliente. Desbloquéelo así para acceder a sus pantallas de Recibir y Enviar.</string>
+
+    <string name="frozen">CONGELADA</string>
+    <string name="freeze_output">Congelar salida</string>
+    <string name="frozen_outputs_note">Las salidas congeladas permanecen en el monedero, pero se excluyen de la selección de entradas de transacción. No se gastan ni se bloquean por consenso.</string>
+    <string name="thaw_output">Descongelar salida</string>
+
+    <string name="broadcast_question">¿Desea difundir la transacción?</string>
+    <string name="yes">Sí</string>
+    <string name="exit_question">¿Desea salir de %1$s?</string>
+    <string name="exit">Salir</string>
+    <string name="scan">Escanear</string>
+    <string name="tor_status">Estado de Tor</string>
+    <string name="more">Más</string>
+
+    <string name="wallet_locked_offline">Monedero bloqueado: sin conexión</string>
+    <string name="offline">Sin conexión</string>
+    <string name="wallet_locked_synced">Monedero bloqueado: sincronizado: %1$d</string>
+    <string name="loading_wallet">Cargando monedero...</string>
+    <string name="disconnected">Desconectado</string>
+    <string name="daemon_disconnected">Daemon desconectado</string>
+    <string name="wrong_version">Versión incorrecta</string>
+    <string name="synced_height">Sincronizado: %1$d</string>
+    <string name="syncing">Sincronizando...</string>
+    <string name="syncing_blocks_left">Sincronizando: quedan %1$s bloques</string>
+    <string name="syncing_completed">Sincronización de bloques completada</string>
+    <string name="transaction_received">Transacción recibida</string>
+    <string name="notification_channel_wallet">Servicio del monedero</string>
+    <string name="notification_channel_wallet_activity">Actividad del monedero</string>
+    <string name="tor_daemon_suffix"> | Daemon de Tor: %1$s</string>
+    <string name="notification_channel_transactions">Transacciones</string>
+
+    <string name="allow">Permitir</string>
+    <string name="open_app_settings">Abrir ajustes de la app</string>
+    <string name="app_logo">Logotipo de ANONERO</string>
+    <string name="camera_permission_message">Permita el acceso a la cámara para escanear el código QR</string>
+    <string name="camera_permission_required">Se requiere permiso de cámara para escanear códigos QR. Actívelo en los ajustes de la app.</string>
+    <string name="label_cannot_be_empty">La etiqueta no puede estar vacía</string>
+    <string name="update">Actualizar</string>
+    <string name="could_not_unlock_wallet">No se pudo desbloquear el monedero. Inténtelo de nuevo o reinicie la app.</string>
+
+    <string name="backup_failed">Error en la copia de seguridad: %1$s</string>
+    <string name="backup_failed_generic">Error en la copia de seguridad</string>
+    <string name="file_saved">Archivo guardado</string>
+    <string name="could_not_save_file">No se pudo guardar el archivo</string>
+    <string name="unknown_error">Error desconocido</string>
+    <string name="success">Correcto</string>
+    <string name="what_will_be_signed">Qué se va a firmar</string>
+    <string name="signed_tx">TX FIRMADA</string>
+    <string name="broadcast_failed_generic">No se pudo difundir la transacción</string>
+    <string name="signing_hint_omit_outputs">En NERO, abra el menú, pulse Mostrar salidas, escanéelo aquí y vuelva a enviar.</string>
+    <string name="unsigned_tx">TX SIN FIRMAR</string>
+    <string name="scan_signed_tx">ESCANEAR TX FIRMADA</string>
+
+    <string name="import_polyseed">IMPORTAR FRASE MNEMÓNICA POLYSEED</string>
+    <string name="enter_seed">INTRODUCIR SEMILLA</string>
+    <string name="invalid_seed">Semilla no válida</string>
+    <string name="restore_height_required">Se requiere la altura de restauración para una semilla de 25 palabras</string>
+    <string name="view_logs">Ver registros</string>
+    <string name="seed">Semilla</string>
+    <string name="primary_address_title">Dirección principal</string>
+    <string name="balance">Saldo</string>
+    <string name="restore_height_title">Altura de restauración</string>
+    <string name="extracting_backup">Extrayendo copia de seguridad...</string>
+    <string name="invalid_network">Red no válida</string>
+    <string name="unable_extract_backup">No se pudo extraer la copia de seguridad.</string>
+    <string name="entering_backup_pin">Introduzca el PIN con el que se creó esta copia de seguridad</string>
+    <string name="backup_created_at">Creado el %1$s</string>
+    <string name="restore_failed">Error al restaurar</string>
+
+    <string name="url_cannot_be_empty">La URL no puede estar vacía</string>
+    <string name="connection_failed">Error al conectar con el servidor</string>
+
+    <string name="invalid_url">URL no válida</string>
+    <string name="add_node">Añadir nodo</string>
+    <string name="nodes">Nodos</string>
+    <string name="available_nodes">Nodos disponibles</string>
+    <string name="remove_node">Eliminar</string>
+    <string name="node_label">NODO</string>
+    <string name="daemon_height">Altura del daemon: %1$s</string>
+    <string name="error_connecting">Error al conectar con el servidor: %1$s</string>
+    <string name="disable_lws_restart">Desactive LWS y reinicie antes de conectar un nodo</string>
+    <string name="error_prefix">Error: %1$s</string>
+
+    <string name="key_images_imported">Imágenes de clave importadas</string>
+    <string name="ok">Aceptar</string>
+    <string name="wallet_title">Monedero</string>
+    <string name="resync_failed">No se pudo resincronizar la cadena de bloques</string>
+
+    <string name="wiping_wallet">Borrando monedero</string>
+    <string name="wallet_cleared">Monedero borrado</string>
+    <string name="clearing_preferences">Borrando preferencias</string>
+    <string name="clearing_nodes">Borrando nodos</string>
+    <string name="clearing_logs">Borrando registros</string>
+    <string name="logs_cleared">Registros borrados</string>
+    <string name="share_logs">Compartir registros</string>
+    <string name="clear_logs">Borrar registros</string>
+    <string name="wallet_wiped_successfully">Monedero borrado correctamente</string>
+    <string name="wipe_failed">No se pudo borrar el monedero</string>
+    <string name="multi">MULTI</string>
+    <string name="edit">Editar</string>
+    <string name="clear">Borrar</string>
+
+    <string name="sweeping_balance_amount">Saldo a barrer: %1$s (menos comisiones)</string>
+    <string name="available_balance_amount">Saldo disponible: %1$s</string>
+    <string name="address_index_of_count">Dirección %1$d de %2$d</string>
+    <string name="label_value">%1$s: %2$s</string>
+
+    <plurals name="coins_selected_count">
+        <item quantity="one">%1$d moneda seleccionada</item>
+        <item quantity="other">%1$d monedas seleccionadas</item>
+    </plurals>
+    <plurals name="recipients_count">
+        <item quantity="one">%1$d destinatario</item>
+        <item quantity="other">%1$d destinatarios</item>
+    </plurals>
+    <plurals name="blocks_left_count">
+        <item quantity="one">queda %1$s bloque</item>
+        <item quantity="other">quedan %1$s bloques</item>
+    </plurals>
+    <string name="invalid_restore_height">Introduce una altura de restauración entera no negativa.</string>
+    <string name="nero_backup_passphrase_prompt">Elige una frase de contraseña de al menos 8 caracteres para la copia de seguridad. La necesitarás para restaurar esta cartera de solo lectura.</string>
+    <string name="wallet_target_not_empty">Ya existen datos o credenciales de una cartera. Recupera esa cartera antes de continuar. Para sustituirla, conserva su semilla o una copia de seguridad y bórrala explícitamente primero.</string>
+</resources>

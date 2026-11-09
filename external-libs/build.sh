@@ -1,0 +1,334 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Reproducibility, if run outside the container (Containerfile sets these too).
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1704067200}"
+export ZERO_AR_DATE=1
+export TZ=UTC
+export LC_ALL="${LC_ALL:-C.UTF-8}"
+
+# fetch is the one step that runs before a target is chosen.
+if [ "${1:-}" = fetch ]; then TARGET=${TARGET:-android64}; fi
+: "${TARGET:?set TARGET to one of: android64 android32 linux}"
+
+## PINNED VERSIONS -- bump version and hash together
+
+CMAKE_VERSION=3.31.12   # https://github.com/Kitware/CMake/releases
+CMAKE_SHA256=0dc2e9a6860f06bf10bd8fadc03e35d9eeb4df46e33763a7e480e987758f385c
+# Held on 3.x: app/CMakeLists.txt still declares cmake_minimum_required(VERSION 3.4.1),
+# which CMake 4 rejects. Moving to 4.x needs a dedicated native build validation.
+
+NDK_REVISION=r27c      # https://developer.android.com/ndk/downloads  (r27c == 27.2.12479018)
+NDK_SHA1=090e8083a715fdb1a3e402d0763c388abb03fb4e
+
+BOOST_VERSION=1.86.0    # https://github.com/boostorg/boost/releases
+BOOST_SHA256=2128a4c96862b5c0970c1e34d76b1d57e4a1016b80df85ad39667f30b1deba26
+ICONV_VERSION=1.19.1    # https://ftp.gnu.org/pub/gnu/libiconv/
+ICONV_SHA256=9a06844846d664d7122161700c10a64480d7c7bcead3091925a785b38c91edab
+ZLIB_VERSION=1.3.2      # https://github.com/madler/zlib/releases (1.4 changes ABI/API; validate separately)
+ZLIB_SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
+OPENSSL_VERSION=3.5.9   # https://github.com/openssl/openssl/releases (LTS line; 4.x needs a dedicated validation)
+OPENSSL_SHA256=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
+ZMQ_VERSION=v4.3.5      # https://github.com/zeromq/libzmq/releases
+ZMQ_COMMIT=622fc6dde99ee172ebaa9c8628d85a7a1995a21d
+SODIUM_VERSION=1.0.22   # https://github.com/jedisct1/libsodium/releases
+SODIUM_SHA256=adbdd8f16149e81ac6078a03aca6fc03b592b89ef7b5ed83841c086191be3349
+EXPAT_VERSION=2.10.0    # https://github.com/libexpat/libexpat/releases
+EXPAT_TAG=R_2_10_0
+EXPAT_SHA256=5466a341f9c692ef7a958a6881311be597f8e1ce345984cf78414f54793dea4c
+UNBOUND_VERSION=1.26.2  # https://www.nlnetlabs.nl/downloads/unbound/
+UNBOUND_SHA256=d8ee7aa6bbb3ff1be7d9e57637d0d0ec2f18273a8efff1a0afe2c665858b96f7
+
+# Pinned to the external/polyseed and external/utf8proc commits added to the
+# official Monero tree by the ANONERO API patch series.  They must match the
+# submodules Monero builds against.
+POLYSEED_COMMIT=bd79f5014c331273357277ed8a3d756fb61b9fa1
+UTF8PROC_COMMIT=3de4596fbe28956855df2ecb3c11c0bbc3535838
+
+## TARGET TABLE
+
+case "$TARGET" in
+android64)
+    PLATFORM=android; ABI=arm64-v8a; API=29
+    CLANG=aarch64-linux-android29; HOST=aarch64-linux-android
+    OPENSSL_TARGET=android-arm64 ;;
+android32)
+    PLATFORM=android; ABI=armeabi-v7a; API=29
+    CLANG=armv7a-linux-androideabi29; HOST=arm-linux-androideabi
+    OPENSSL_TARGET=android-arm ;;
+linux)
+    PLATFORM=linux;  ABI=linux-x86_64; HOST=
+    OPENSSL_TARGET=linux-x86_64
+    MONERO_ARCH=x86-64 ;;
+*)
+    echo "unknown TARGET '$TARGET' (android64 android32 linux)" >&2; exit 1 ;;
+esac
+
+WORK=${WORK:-/opt/build}
+NDK=${NDK:-/opt/android-ndk-$NDK_REVISION}
+TC_DIR=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+
+# Android deps install INTO the NDK sysroot, not a private prefix: monero/Makefile fixes
+# the cmake command line, and CMAKE_FIND_ROOT_PATH_MODE_*=ONLY hides anything outside the
+# sysroot from find_package(). Collision-free -- the NDK keeps its own archives under
+# usr/lib/<triple>/.
+if [ "$PLATFORM" = android ]; then
+    PREFIX=$TC_DIR/sysroot/usr
+else
+    PREFIX=${PREFIX:-$WORK/prefix}
+fi
+OUT=${OUT:-/opt/out}
+SRC=${SRC:-$WORK/src}
+MONERO=${MONERO:-/src}
+NPROC=${NPROC:-$(nproc)}
+mkdir -p "$WORK" "$PREFIX" "$SRC"
+
+android() { [ "$PLATFORM" = android ]; }
+
+HOSTF=(); if [ -n "$HOST" ]; then HOSTF=(--host="$HOST"); fi
+
+grab() {  # grab <url> <file> <sha256> -- download + verify only
+    cd "$SRC"
+    [ -f "$2" ] || curl -fL --http1.1 --retry 8 --retry-all-errors --retry-delay 3 -C - -o "$2" "$1"
+    echo "$3  $2" | sha256sum -c
+}
+
+get() {  # get <url> <file> <sha256> -- grab, then unpack into $WORK
+    grab "$@"; cd "$WORK"; tar -xf "$SRC/$2"
+}
+
+pin() {  # pin <repo> <branch> <dir> <commit>
+    cd "$WORK"
+    if [ ! -d "$3" ]; then
+        # git has no --retry
+        i=1; until git clone "$1" -b "$2" "$3"; do
+            [ "$i" -ge 5 ] && { echo "clone of $1 failed after 5 tries" >&2; return 1; }
+            echo "clone retry $i for $1"; i=$((i+1)); sleep 3; rm -rf "$3"
+        done
+    fi
+    cd "$3"
+    # Some pinned commits (notably polyseed's bd79f50) are ancestors that the
+    # branch tip no longer reaches.  Fetch the exact object by SHA before reset.
+    git cat-file -e "$4^{commit}" 2>/dev/null || git fetch origin "$4"
+    git reset --hard "$4"; test "$(git rev-parse HEAD)" = "$4"
+}
+
+cc() {
+    if android; then
+        export ANDROID_NDK_ROOT=$NDK
+        export TC=$TC_DIR
+        export CC=$CLANG-clang CXX=$CLANG-clang++
+        export AR=$TC/bin/llvm-ar RANLIB=$TC/bin/llvm-ranlib STRIP=$TC/bin/llvm-strip
+        export PATH=$TC/bin:$PATH
+    fi
+}
+
+## STEPS
+
+# Target-independent, so all three images share this layer instead of re-fetching ~400MB.
+step_fetch() {
+    grab "https://github.com/boostorg/boost/releases/download/boost-$BOOST_VERSION/boost-$BOOST_VERSION-b2-nodocs.tar.gz" "boost-$BOOST_VERSION.tar.gz" "$BOOST_SHA256"
+    grab "http://ftp.gnu.org/pub/gnu/libiconv/libiconv-$ICONV_VERSION.tar.gz" "libiconv-$ICONV_VERSION.tar.gz" "$ICONV_SHA256"
+    grab "https://github.com/madler/zlib/releases/download/v$ZLIB_VERSION/zlib-$ZLIB_VERSION.tar.gz" "zlib-$ZLIB_VERSION.tar.gz" "$ZLIB_SHA256"
+    grab "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz" "openssl-$OPENSSL_VERSION.tar.gz" "$OPENSSL_SHA256"
+    grab "https://download.libsodium.org/libsodium/releases/libsodium-$SODIUM_VERSION.tar.gz" "libsodium-$SODIUM_VERSION.tar.gz" "$SODIUM_SHA256"
+    grab "https://github.com/libexpat/libexpat/releases/download/$EXPAT_TAG/expat-$EXPAT_VERSION.tar.gz" "expat-$EXPAT_VERSION.tar.gz" "$EXPAT_SHA256"
+    grab "https://www.nlnetlabs.nl/downloads/unbound/unbound-$UNBOUND_VERSION.tar.gz" "unbound-$UNBOUND_VERSION.tar.gz" "$UNBOUND_SHA256"
+    echo "fetched $(ls "$SRC" | wc -l) sources"
+}
+
+step_toolchain() {
+    cd /usr
+    curl -fL --http1.1 --retry 8 --retry-all-errors --retry-delay 3 -C - -O "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-linux-x86_64.tar.gz"
+    echo "$CMAKE_SHA256  cmake-$CMAKE_VERSION-linux-x86_64.tar.gz" | sha256sum -c
+    tar -xzf "cmake-$CMAKE_VERSION-linux-x86_64.tar.gz" && rm -f "cmake-$CMAKE_VERSION-linux-x86_64.tar.gz"
+    ln -sf "/usr/cmake-$CMAKE_VERSION-linux-x86_64/bin/"* /usr/local/bin/
+    android || return 0
+    cd /opt
+    # NDK is 633MB; --http1.1 avoids HTTP/2 resets, --retry-all-errors + -C - ride out drops.
+    curl -fL --http1.1 --retry 8 --retry-all-errors --retry-delay 3 -C - -O "https://dl.google.com/android/repository/android-ndk-$NDK_REVISION-linux.zip"
+    echo "$NDK_SHA1  android-ndk-$NDK_REVISION-linux.zip" | sha1sum -c
+    unzip -q "android-ndk-$NDK_REVISION-linux.zip" && rm -f "android-ndk-$NDK_REVISION-linux.zip"
+}
+
+dep_iconv() {
+    if ! android; then echo "iconv: glibc provides it"; return 0; fi
+    cc; get "http://ftp.gnu.org/pub/gnu/libiconv/libiconv-$ICONV_VERSION.tar.gz" "libiconv-$ICONV_VERSION.tar.gz" "$ICONV_SHA256"
+    cd "$WORK/libiconv-$ICONV_VERSION"
+    ./configure --build=x86_64-linux-gnu "${HOSTF[@]}" --prefix="$PREFIX" --disable-rpath --enable-static --disable-shared
+    make -j"$NPROC" && make install
+}
+
+dep_boost() {
+    cc; get "https://github.com/boostorg/boost/releases/download/boost-$BOOST_VERSION/boost-$BOOST_VERSION-b2-nodocs.tar.gz" "boost-$BOOST_VERSION.tar.gz" "$BOOST_SHA256"
+    cd "$WORK/boost-$BOOST_VERSION"
+    ./bootstrap.sh --prefix="$PREFIX" --without-icu
+    B2=(--build-type=minimal link=static cflags=-fPIC cxxflags=-fPIC
+        --with-chrono --with-date_time --with-filesystem --with-program_options --with-regex
+        --with-serialization --with-system --with-thread --with-locale
+        threading=multi)
+    if android; then
+        echo "using clang : android : ${CXX} : <compileflags>--sysroot=${TC}/sysroot <compileflags>-I${PREFIX}/include <linkflags>--sysroot=${TC}/sysroot <linkflags>-L${PREFIX}/lib <linkflags>-liconv <archiver>${AR} <ranlib>${RANLIB} ;" > user-config.jam
+        ./b2 "${B2[@]}" --user-config=user-config.jam runtime-link=static \
+            --build-dir=android --stagedir=android \
+            toolset=clang-android threadapi=pthread target-os=android \
+            "-sICONV_PATH=$PREFIX" install -j"$NPROC"
+    else
+        ./b2 "${B2[@]}" install -j"$NPROC"
+    fi
+    ar rcsD "$PREFIX/lib/libboost_system.a"  # header-only now; monero still asks for it
+}
+
+dep_zlib() {
+    cc; get "https://github.com/madler/zlib/releases/download/v$ZLIB_VERSION/zlib-$ZLIB_VERSION.tar.gz" "zlib-$ZLIB_VERSION.tar.gz" "$ZLIB_SHA256"
+    rm -rf "$WORK/zlib"; mv "$WORK/zlib-$ZLIB_VERSION" "$WORK/zlib"; cd "$WORK/zlib"
+    if android; then
+        ./configure --static && make -j"$NPROC"
+    else
+        CFLAGS=-fPIC ./configure --static --prefix="$PREFIX" && make -j"$NPROC" && make install
+    fi
+}
+
+dep_openssl() {
+    cc; get "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz" "openssl-$OPENSSL_VERSION.tar.gz" "$OPENSSL_SHA256"
+    cd "$WORK/openssl-$OPENSSL_VERSION"
+    if android; then
+        ANDROID_NDK_ROOT=$NDK ./Configure "$OPENSSL_TARGET" "-D__ANDROID_API__=$API" -fPIC -static \
+            no-shared no-tests --with-zlib-include="$WORK/zlib/include" --with-zlib-lib="$WORK/zlib/lib" \
+            --prefix="$PREFIX" --openssldir="$PREFIX"
+    else
+        # --libdir=lib: openssl 3.x defaults to lib64 on x86_64, which step_collect misses.
+        ./Configure "$OPENSSL_TARGET" -fPIC no-shared no-tests \
+            --with-zlib-include="$PREFIX/include" --with-zlib-lib="$PREFIX/lib" \
+            --prefix="$PREFIX" --openssldir="$PREFIX" --libdir=lib
+    fi
+    make -j"$NPROC" && make install_sw
+}
+
+dep_zmq() {
+    cc; pin https://github.com/zeromq/libzmq.git "$ZMQ_VERSION" libzmq "$ZMQ_COMMIT"
+    ./autogen.sh
+    # libzmq builds its own test helpers with -Werror by default, and gcc's -Waddress
+    # rejects one of them in the 4.3.x line. Clang doesn't emit it, so android is unaffected.
+    ZMQF=(); android || ZMQF=(--disable-Werror)
+    ./configure --prefix="$PREFIX" "${HOSTF[@]}" --enable-static --disable-shared --with-pic \
+        --without-libsodium --disable-curve --without-documentation "${ZMQF[@]}"
+    make -j"$NPROC" && make install
+}
+
+dep_sodium() {
+    cc; get "https://download.libsodium.org/libsodium/releases/libsodium-$SODIUM_VERSION.tar.gz" "libsodium-$SODIUM_VERSION.tar.gz" "$SODIUM_SHA256"
+    cd "$WORK/libsodium-$SODIUM_VERSION" && ./autogen.sh
+    ./configure --prefix="$PREFIX" "${HOSTF[@]}" --enable-static --disable-shared --with-pic
+    make -j"$NPROC" && make install
+}
+
+dep_expat() {
+    cc; get "https://github.com/libexpat/libexpat/releases/download/$EXPAT_TAG/expat-$EXPAT_VERSION.tar.gz" "expat-$EXPAT_VERSION.tar.gz" "$EXPAT_SHA256"
+    cd "$WORK/expat-$EXPAT_VERSION"
+    ./configure --prefix="$PREFIX" "${HOSTF[@]}" --enable-static --disable-shared --with-pic
+    make -j"$NPROC" && make install
+}
+
+dep_unbound() {
+    cc; get "https://www.nlnetlabs.nl/downloads/unbound/unbound-$UNBOUND_VERSION.tar.gz" "unbound-$UNBOUND_VERSION.tar.gz" "$UNBOUND_SHA256"
+    cd "$WORK/unbound-$UNBOUND_VERSION"
+    ./configure --prefix="$PREFIX" "${HOSTF[@]}" --enable-static --disable-shared --with-pic \
+        --disable-flto --with-ssl="$PREFIX" --with-libexpat="$PREFIX"
+    make -j"$NPROC" && make install
+}
+
+cmakeflags() {
+    if android; then
+        echo "-DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-$API"
+    else
+        echo "-DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_BUILD_TYPE=Release"
+    fi
+}
+
+# polyseed and utf8proc: no distro packages them, so from source on every target.
+dep_polyseed() {
+    cc; pin https://github.com/tevador/polyseed.git master polyseed "$POLYSEED_COMMIT"
+    # Polyseed defaults to a shared library; ANONERO links the static archive.
+    cmake -DCMAKE_INSTALL_PREFIX="$PREFIX" -D STATIC=ON $(cmakeflags) . \
+        && make -j"$NPROC" && make install
+}
+
+dep_utf8proc() {
+    cc; pin https://github.com/JuliaStrings/utf8proc master utf8proc "$UTF8PROC_COMMIT"
+    mkdir -p build && cd build && rm -rf ../CMakeCache.txt ../CMakeFiles/
+    cmake -DCMAKE_INSTALL_PREFIX="$PREFIX" $(cmakeflags) .. && make -j"$NPROC" && make install
+}
+
+step_monero() {
+    cc; cd "$MONERO"
+    if android; then
+        # Official Monero has no release-static-android-*-wallet_api Make targets,
+        # so configure CMake directly with the NDK toolchain.  The source tree has
+        # already been patched by external-libs/patches/apply.sh.
+        rm -rf "$MONERO/build/release"
+        mkdir -p "$MONERO/build/release"
+        cmake -S "$MONERO" -B "$MONERO/build/release" \
+            -D CMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -D ANDROID_ABI="$ABI" -D ANDROID_PLATFORM="android-$API" \
+            -D CMAKE_BUILD_TYPE=Release -D CMAKE_PREFIX_PATH="$PREFIX" \
+            -D CMAKE_INCLUDE_PATH="$PREFIX/include" -D CMAKE_LIBRARY_PATH="$PREFIX/lib" \
+            -D BOOST_ROOT="$PREFIX" -D BOOST_IGNORE_SYSTEM_PATHS=ON \
+            -D Boost_USE_STATIC_RUNTIME=ON \
+            -D OPENSSL_ROOT_DIR="$PREFIX" -D STATIC=ON \
+            -D BUILD_TESTS=OFF -D BUILD_GUI_DEPS=ON -D USE_DEVICE_TREZOR=OFF \
+            -D STACK_TRACE=OFF -D CMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -D BUILD_64="$([ "$ABI" = arm64-v8a ] && echo ON || echo OFF)" \
+            -D BUILD_TAG="android-$ABI"
+        cmake --build "$MONERO/build/release" --parallel "$NPROC"
+    else
+        # Point CMake at our prefix rather than the system. STATIC stays OFF:
+        # STATIC=ON would set Boost_USE_STATIC_RUNTIME, and FindBoost then wants
+        # ABI-tagged names that a layout=system install doesn't produce. Our prefix
+        # holds only PIC .a files, so they get linked either way.
+        mkdir -p build/release && cd build/release
+        cmake -D CMAKE_BUILD_TYPE=Release -D STATIC=OFF -D ARCH="$MONERO_ARCH" -D BUILD_64=ON \
+              -D BUILD_TESTS=OFF -D BUILD_GUI_DEPS=1 -D USE_DEVICE_TREZOR=OFF -D STACK_TRACE=OFF \
+              -D CMAKE_POSITION_INDEPENDENT_CODE=ON -D BUILD_TAG="linux-x64" \
+              -D CMAKE_PREFIX_PATH="$PREFIX" -D BOOST_ROOT="$PREFIX" \
+              -D BOOST_IGNORE_SYSTEM_PATHS=ON -D OPENSSL_ROOT_DIR="$PREFIX" ../..
+        make wallet_api polyseed_wrapper -j"$NPROC"
+    fi
+    # wallet_api is EXCLUDE_FROM_ALL.  Build it (and the Polyseed wrapper the JNI
+    # library links) explicitly with their real CMake target names.
+    if android; then
+        cmake --build "$MONERO/build/release" --parallel "$NPROC" \
+            --target wallet_api polyseed_wrapper
+    fi
+    cd "$MONERO/build/release" && mkdir -p lib
+    find . -path ./lib -prune -o -name '*.a' -exec cp '{}' lib \;
+}
+
+# `find -exec cp` exits 0 even when it copied nothing, so check the archives explicitly.
+step_collect() {
+    mkdir -p "$OUT/monero"
+    find "$PREFIX/lib" -maxdepth 1 -name '*.a' -exec cp -a {} "$OUT"/ \; 2>/dev/null || true
+    cp -a "$MONERO"/build/release/lib/. "$OUT"/monero/
+    local missing=0 l
+    for l in libwallet_api.a libwallet.a libcryptonote_core.a libcryptonote_basic.a libringct.a \
+             libcncrypto.a libcommon.a libepee.a libdevice.a libmnemonics.a libpolyseed_wrapper.a \
+             libeasylogging.a liblmdb.a libblocks.a libcheckpoints.a libmultisig.a libversion.a \
+             libnet.a librandomx.a libhardforks.a librpc_base.a libblockchain_db.a \
+             libringct_basic.a libcryptonote_format_utils_basic.a libbc-ur.a; do
+        [ -s "$OUT/monero/$l" ] || { echo "MISSING monero/$l" >&2; missing=1; }
+    done
+    [ -s "$OUT/libpolyseed.a" ] || { echo "MISSING libpolyseed.a" >&2; missing=1; }
+    [ "$missing" -eq 0 ] || { echo "incomplete build for $TARGET" >&2; exit 1; }
+    echo "OK $TARGET ($ABI): $(find "$OUT" -name '*.a' | wc -l) archives"
+}
+
+case "${1:-}" in
+    fetch)     step_fetch ;;
+    toolchain) step_toolchain ;;
+    monero)    step_monero ;;
+    collect)   step_collect ;;
+    "")        echo "usage: TARGET=<t> $0 {fetch|toolchain|<dep>|monero|collect}" >&2; exit 1 ;;
+    *)  declare -F "dep_$1" >/dev/null || { echo "unknown step '$1'" >&2; exit 1; }
+        "dep_$1" ;;
+esac

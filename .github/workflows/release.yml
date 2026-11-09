@@ -1,0 +1,520 @@
+name: Build and publish APKs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+# Default to read-only. Only the publish job gets contents: write.
+permissions:
+  contents: read
+
+# Never let two runs publish the same ref concurrently. A release must not be
+# cancelled halfway through asset upload.
+concurrency:
+  group: anonero-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+  # The APK verification below rejects any output whose manifest reports another
+  # minSdk. compileSdk/targetSdk remain independent (37).
+  ANDROID_MIN_SDK: '29'
+  ANDROID_COMPILE_SDK: '37'
+  ANDROID_BUILD_TOOLS: '37.0.0'
+  ANDROID_NDK: '29.0.14206865'
+  ANDROID_CMAKE: '3.31.6'
+
+jobs:
+  test:
+    name: Required test suite
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+    with:
+      run_instrumented: true
+
+  build:
+    name: Build and verify unsigned APKs
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      version_code: ${{ steps.meta.outputs.version_code }}
+      tag: ${{ steps.meta.outputs.tag }}
+      artifact_version: ${{ steps.meta.outputs.artifact_version }}
+      is_release: ${{ steps.meta.outputs.is_release }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      source_sha: ${{ steps.meta.outputs.source_sha }}
+      unsigned_artifact: anonero-unsigned-${{ github.run_id }}
+
+    steps:
+      - name: Free runner disk before build
+        run: |
+          set -euo pipefail
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            /usr/share/swift \
+            /usr/local/.ghcup || true
+          df -h /
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+
+      - name: Determine version and verify tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          VERSION_CODE="$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)"
+          if [[ -z "$VERSION" || -z "$VERSION_CODE" ]]; then
+            echo "::error::Could not read versionName/versionCode from app/build.gradle.kts"
+            exit 1
+          fi
+
+          TAG=""
+          IS_RELEASE="false"
+          IS_PRERELEASE="false"
+
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::Tag '$TAG' is not a valid release tag"
+              exit 1
+            fi
+            CORE="${TAG#v}"
+            CORE="${CORE%%[+-]*}"
+            if [[ "$CORE" != "$VERSION" ]]; then
+              echo "::error::Tag core version '$CORE' does not match app versionName '$VERSION'"
+              exit 1
+            fi
+            TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+            HEAD_COMMIT="$(git rev-parse HEAD)"
+            if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+              echo "::error::Tag '$TAG' does not point at the checked-out commit"
+              exit 1
+            fi
+            IS_RELEASE="true"
+            if [[ "${TAG#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+              IS_PRERELEASE="true"
+            fi
+          fi
+
+          ARTIFACT_VERSION="${TAG:-$VERSION}"
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          {
+            echo "source_sha=$SOURCE_SHA"
+            echo "version=$VERSION"
+            echo "version_code=$VERSION_CODE"
+            echo "tag=$TAG"
+            echo "artifact_version=$ARTIFACT_VERSION"
+            echo "is_release=$IS_RELEASE"
+            echo "is_prerelease=$IS_PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Version: $VERSION"
+          echo "Tag: ${TAG:-<manual build>}"
+          echo "Release: $IS_RELEASE (prerelease=$IS_PRERELEASE)"
+
+      # Kotlin/C++ is the permanent architecture; do not add a Rust build path.
+      - name: Enforce the Kotlin and C++ architecture policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find . -name Cargo.toml -not -path './external-libs/*' -not -path './.git/*' -print -quit | grep -q .; then
+            echo "::error::Project-owned Rust crates conflict with the Kotlin/C++ architecture policy."
+            exit 1
+          fi
+
+      - name: Download native archives from the test job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.test.outputs.native_artifact }}
+          path: native-artifact
+
+      - name: Install native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d native-artifact/native-out ]; then
+            cp -a native-artifact/native-out/. external-libs/
+          else
+            cp -a native-artifact/. external-libs/
+          fi
+          required=(
+            external-libs/arm64-v8a/monero/libwallet_api.a
+            external-libs/armeabi-v7a/monero/libwallet_api.a
+            external-libs/include/wallet2_api.h
+          )
+          for f in "${required[@]}"; do
+            [[ -s "$f" ]] || { echo "::error::missing native artifact: $f"; exit 1; }
+          done
+          echo "Native artifacts:"
+          du -sh external-libs/arm64-v8a external-libs/armeabi-v7a
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.0" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK}" \
+            "cmake;${ANDROID_CMAKE}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -d "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Caches are deliberately disabled in the publishing workflow. A cache
+          # restored into a job that uploads release assets is a poisoning vector.
+          cache-disabled: true
+          validate-wrappers: true
+
+      - name: Build release APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --stacktrace clean \
+            :app:assembleAnonRelease \
+            :app:assembleNeroRelease
+
+      - name: Verify APKs and collect architecture splits
+        shell: bash
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+          ARTIFACT_VERSION: ${{ steps.meta.outputs.artifact_version }}
+        run: |
+          set -euo pipefail
+          AAPT2="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -x "$AAPT2"
+          rm -rf dist-unsigned
+          mkdir -p dist-unsigned
+          shopt -s nullglob
+
+          total=0
+          for flavor in anon nero; do
+            case "$flavor" in
+              anon) label="ANONERO"; expected_id="io.anonero.anon" ;;
+              nero) label="NERO"; expected_id="io.anonero.nero" ;;
+              *) echo "::error::unknown flavor $flavor"; exit 1 ;;
+            esac
+
+            apks=(app/build/outputs/apk/"$flavor"/release/*.apk)
+            if (( ${#apks[@]} == 0 )); then
+              echo "::error::no release APK produced for flavor $flavor"
+              exit 1
+            fi
+            if (( ${#apks[@]} != 3 )); then
+              echo "::error::expected 3 APKs (arm64-v8a, armeabi-v7a, universal) for $flavor, got ${#apks[@]}"
+              exit 1
+            fi
+
+            seen=()
+            for apk in "${apks[@]}"; do
+              [[ -s "$apk" ]] || { echo "::error::empty APK $apk"; exit 1; }
+
+              mapfile -t libs < <(unzip -l "$apk" | awk '/lib\/[^/]+\/libanonero\.so$/ {print $4}' | sort -u)
+              if (( ${#libs[@]} == 0 )); then
+                echo "::error::$apk does not contain libanonero.so"
+                exit 1
+              fi
+
+              mapfile -t abis < <(
+                for lib in "${libs[@]}"; do
+                  abi="${lib#lib/}"
+                  printf '%s\n' "${abi%%/*}"
+                done | sort -u
+              )
+              for abi in "${abis[@]}"; do
+                case "$abi" in
+                  arm64-v8a|armeabi-v7a) ;;
+                  *) echo "::error::$apk contains unsupported ABI $abi"; exit 1 ;;
+                esac
+              done
+
+              if (( ${#abis[@]} == 1 )); then
+                abi="${abis[0]}"
+              elif (( ${#abis[@]} > 1 )); then
+                abi="universal"
+                for need in arm64-v8a armeabi-v7a; do
+                  printf '%s\n' "${abis[@]}" | grep -qx "$need" || {
+                    echo "::error::universal APK $apk is missing $need"
+                    exit 1
+                  }
+                done
+              else
+                echo "::error::could not determine ABI for $apk"
+                exit 1
+              fi
+
+              badging="$("$AAPT2" dump badging "$apk")"
+              package_id="$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
+              package_version="$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n 1)"
+              package_code="$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" | head -n 1)"
+              package_min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
+              [[ "$package_id" == "$expected_id" ]] || {
+                echo "::error::$apk applicationId is '$package_id', expected '$expected_id'"
+                exit 1
+              }
+              [[ "$package_version" == "$VERSION" ]] || {
+                echo "::error::$apk versionName is '$package_version', expected '$VERSION'"
+                exit 1
+              }
+              [[ "$package_code" == "$VERSION_CODE" ]] || {
+                echo "::error::$apk versionCode is '$package_code', expected '$VERSION_CODE'"
+                exit 1
+              }
+              [[ "$package_min_sdk" == "$ANDROID_MIN_SDK" ]] || {
+                echo "::error::$apk minSdk is '$package_min_sdk', expected '$ANDROID_MIN_SDK' (Android 10)"
+                exit 1
+              }
+              if printf '%s\n' "$badging" | grep -q 'application-debuggable'; then
+                echo "::error::$apk is debuggable"
+                exit 1
+              fi
+
+              out="dist-unsigned/${label}-${ARTIFACT_VERSION}-${abi}.apk"
+              if [[ -e "$out" ]]; then
+                echo "::error::duplicate output name $out"
+                exit 1
+              fi
+              cp "$apk" "$out"
+              seen+=("$abi")
+              total=$((total + 1))
+            done
+
+            for need in arm64-v8a armeabi-v7a universal; do
+              printf '%s\n' "${seen[@]}" | grep -qx "$need" || {
+                echo "::error::$flavor did not produce $need"
+                exit 1
+              }
+            done
+          done
+
+          if (( total != 6 )); then
+            echo "::error::expected 6 APKs total, got $total"
+            exit 1
+          fi
+          ls -lh dist-unsigned
+
+      - name: Upload unsigned APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: anonero-unsigned-${{ github.run_id }}
+          path: dist-unsigned/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  sign:
+    name: Sign and checksum APKs
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    environment: release
+    outputs:
+      signed_artifact: anonero-signed-${{ github.run_id }}
+
+    steps:
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install apksigner
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install "build-tools;${ANDROID_BUILD_TOOLS}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+
+      - name: Download unsigned APKs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.unsigned_artifact }}
+          path: unsigned
+
+      - name: Sign APKs with protected release key
+        shell: bash
+        env:
+          ANONERO_KEYSTORE_BASE64: ${{ secrets.ANONERO_KEYSTORE_BASE64 }}
+          ANONERO_KEYSTORE_PASSWORD: ${{ secrets.ANONERO_KEYSTORE_PASSWORD }}
+          ANONERO_KEY_ALIAS: ${{ secrets.ANONERO_KEY_ALIAS }}
+          ANONERO_KEY_PASSWORD: ${{ secrets.ANONERO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in ANONERO_KEYSTORE_BASE64 ANONERO_KEYSTORE_PASSWORD ANONERO_KEY_ALIAS ANONERO_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is not configured. Add the release signing secrets to the 'release' environment."
+              missing=1
+            fi
+          done
+          (( missing == 0 )) || exit 1
+
+          KS="$RUNNER_TEMP/release.keystore"
+          trap 'rm -f "$KS" "$RUNNER_TEMP"/apksigner-*' EXIT
+          umask 077
+          printf '%s' "$ANONERO_KEYSTORE_BASE64" | base64 -d > "$KS"
+          [[ -s "$KS" ]] || { echo "::error::decoded keystore is empty"; exit 1; }
+
+          APKSIGNER="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          test -x "$APKSIGNER"
+          rm -rf dist
+          mkdir -p dist
+          shopt -s nullglob
+          apks=(unsigned/*.apk)
+          (( ${#apks[@]} == 6 )) || {
+            echo "::error::expected 6 unsigned APKs, got ${#apks[@]}"
+            exit 1
+          }
+          for apk in "${apks[@]}"; do
+            [[ -s "$apk" ]] || { echo "::error::empty APK $apk"; exit 1; }
+            out="dist/$(basename "$apk")"
+            "$APKSIGNER" sign \
+              --ks "$KS" \
+              --ks-key-alias "$ANONERO_KEY_ALIAS" \
+              --ks-pass env:ANONERO_KEYSTORE_PASSWORD \
+              --key-pass env:ANONERO_KEY_PASSWORD \
+              --out "$out" \
+              "$apk"
+            [[ -s "$out" ]] || { echo "::error::signing produced an empty APK: $out"; exit 1; }
+          done
+          ( cd dist && sha256sum ./*.apk > SHA256SUMS )
+          ls -lh dist
+
+      - name: Verify APK signatures and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          test -x "$APKSIGNER"
+          shopt -s nullglob
+          apks=(dist/*.apk)
+          (( ${#apks[@]} == 6 )) || { echo "::error::expected 6 signed APKs"; exit 1; }
+          for apk in "${apks[@]}"; do
+            "$APKSIGNER" verify --verbose --print-certs "$apk" >/dev/null
+          done
+          ( cd dist && sha256sum -c SHA256SUMS )
+
+      - name: Upload signed APKs and checksums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: anonero-signed-${{ github.run_id }}
+          path: |
+            dist/*.apk
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build, sign]
+    if: github.event_name == 'push' && needs.build.outputs.is_release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    environment: release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.build.outputs.tag }}
+      IS_PRERELEASE: ${{ needs.build.outputs.is_prerelease }}
+
+    steps:
+      - name: Re-check the tag before publishing
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.tag }}
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+
+      - name: Download signed APKs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.sign.outputs.signed_artifact }}
+          path: dist
+
+      - name: Verify release contents and checksums
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/tags/$TAG" ]]; then
+            echo "::error::Workflow ref does not match release tag $TAG"
+            exit 1
+          fi
+          TAG_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+          if [[ "$TAG_COMMIT" != "$SOURCE_SHA" ]]; then
+            echo "::error::Release tag moved after the build; refusing to publish"
+            exit 1
+          fi
+          shopt -s nullglob
+          apks=(dist/*.apk)
+          (( ${#apks[@]} == 6 )) || {
+            echo "::error::expected 6 signed APKs, got ${#apks[@]}"
+            exit 1
+          }
+          [[ -s dist/SHA256SUMS ]] || { echo "::error::SHA256SUMS is missing"; exit 1; }
+          ( cd dist && sha256sum -c SHA256SUMS )
+          ls -lh dist
+
+      - name: Create or extend the release without overwriting assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/assets.txt" 2>/dev/null; then
+            if [[ -s "$RUNNER_TEMP/assets.txt" ]]; then
+              echo "::error::Release $TAG already has assets; refusing to overwrite published files"
+              cat "$RUNNER_TEMP/assets.txt"
+              exit 1
+            fi
+            gh release upload "$TAG" dist/*.apk dist/SHA256SUMS
+            if [[ "$(gh release view "$TAG" --json isDraft --jq '.isDraft')" == "true" ]]; then
+              gh release edit "$TAG" --draft=false
+            fi
+          else
+            args=(--verify-tag --draft --title "ANONERO $TAG" --generate-notes)
+            if [[ "$IS_PRERELEASE" == "true" ]]; then
+              args+=(--prerelease)
+            fi
+            gh release create "$TAG" "${args[@]}"
+            gh release upload "$TAG" dist/*.apk dist/SHA256SUMS
+            gh release edit "$TAG" --draft=false
+          fi

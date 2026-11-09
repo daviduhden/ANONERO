@@ -1,0 +1,355 @@
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      run_instrumented:
+        description: Run the API 35 emulator tests
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      native_artifact:
+        description: Native Monero/JNI archives for the caller
+        value: ${{ jobs.native.outputs.artifact }}
+  workflow_dispatch:
+    inputs:
+      run_instrumented:
+        description: Run the API 35 emulator tests
+        required: false
+        type: boolean
+        default: true
+  pull_request:
+  push:
+    branches: [main]
+
+# Tests never need write access or production secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: anonero-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+  ANDROID_MIN_SDK: '29'
+  ANDROID_COMPILE_SDK: '37'
+  ANDROID_BUILD_TOOLS: '37.0.0'
+  ANDROID_NDK: '29.0.14206865'
+  ANDROID_CMAKE: '3.31.6'
+
+jobs:
+  unit:
+    name: JVM unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android platform and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.0" \
+            "build-tools;${ANDROID_BUILD_TOOLS}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+          validate-wrappers: true
+
+      - name: Run Kotlin/JVM unit tests for both flavors
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon \
+            :app:testAnonDebugUnitTest \
+            :app:testNeroDebugUnitTest
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-test-reports-${{ github.run_id }}
+          path: |
+            app/build/test-results/testAnonDebugUnitTest/**
+            app/build/test-results/testNeroDebugUnitTest/**
+            app/build/reports/tests/testAnonDebugUnitTest/**
+            app/build/reports/tests/testNeroDebugUnitTest/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  jni-contract:
+    name: JNI symbol contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare Kotlin external declarations and JNI exports
+        shell: bash
+        run: python3 scripts/check-jni-contract.py
+
+  i18n:
+    name: Localization resources
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check resource parity and hardcoded UI text
+        shell: bash
+        run: python3 scripts/check-i18n.py
+
+  native-language-policy:
+    name: Kotlin and C++ architecture policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reject project-owned Rust crates
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find . -name Cargo.toml -not -path './.git/*' -not -path './external-libs/*' -print -quit | grep -q .; then
+            echo "::error::Project-owned Rust crates conflict with the Kotlin/C++ architecture policy."
+            exit 1
+          fi
+
+  native:
+    name: Build native Monero/JNI archives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    outputs:
+      artifact: ${{ steps.meta.outputs.artifact }}
+    steps:
+      - name: Set native artifact name
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "artifact=anonero-native-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Free runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            /usr/share/swift \
+            /usr/local/.ghcup
+          docker system prune -af
+          df -h /
+
+      - name: Check out source and pinned Monero submodule
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Build native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C external-libs android NPROC=4
+          for f in \
+            external-libs/arm64-v8a/monero/libwallet_api.a \
+            external-libs/armeabi-v7a/monero/libwallet_api.a \
+            external-libs/include/wallet2_api.h; do
+            [[ -s "$f" ]] || { echo "::error::missing native artifact: $f"; exit 1; }
+          done
+
+      - name: Stage native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf native-out
+          mkdir -p native-out
+          cp -a external-libs/arm64-v8a native-out/
+          cp -a external-libs/armeabi-v7a native-out/
+          cp -a external-libs/include native-out/
+          cp -a external-libs/VERSION native-out/
+          du -sh native-out
+
+      - name: Upload native archives
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.meta.outputs.artifact }}
+          path: native-out
+          if-no-files-found: error
+          retention-days: 7
+
+  instrumented:
+    name: Instrumented tests (API ${{ matrix.api-level }})
+    needs: native
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || inputs.run_instrumented }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # API 35 Google APIs x86_64 includes ARM64 translation, so the
+          # arm64-v8a-only ANONERO APK can run on a hosted x86_64 emulator.
+          # API 29 has no equivalent ARM translation on these images; API 29
+          # compile/manifest coverage is in the assemble step below.
+          - api-level: 35
+            target: google_apis
+            arch: x86_64
+            profile: pixel_5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.0" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK}" \
+            "cmake;${ANDROID_CMAKE}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -d "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK}"
+
+      - name: Download native archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.native.outputs.artifact }}
+          path: native-artifact
+
+      - name: Install native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d native-artifact/native-out ]; then
+            cp -a native-artifact/native-out/. external-libs/
+          else
+            cp -a native-artifact/. external-libs/
+          fi
+          for f in \
+            external-libs/arm64-v8a/monero/libwallet_api.a \
+            external-libs/armeabi-v7a/monero/libwallet_api.a \
+            external-libs/include/wallet2_api.h; do
+            [[ -s "$f" ]] || { echo "::error::missing native artifact: $f"; exit 1; }
+          done
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+          validate-wrappers: true
+
+      - name: Assemble debug APKs and verify the API 29 floor
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT2="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -x "$AAPT2"
+          ./gradlew --no-daemon -PanonDisableSplits=true \
+            :app:assembleAnonDebug \
+            :app:assembleNeroDebug
+          for flavor in anon nero; do
+            apk="app/build/outputs/apk/${flavor}/debug/${flavor}-debug.apk"
+            [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
+            badging="$("$AAPT2" dump badging "$apk")"
+            min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
+            [[ "$min_sdk" == "$ANDROID_MIN_SDK" ]] || {
+              echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
+              exit 1
+            }
+            unzip -l "$apk" | grep -q 'lib/.*/libanonero\.so' || {
+              echo "::error::$apk has no libanonero.so"
+              exit 1
+            }
+          done
+
+      - name: Run instrumented tests on API ${{ matrix.api-level }}
+        uses: ReactiveCircus/android-emulator-runner@e93c997dcab69054e999e3924af3d21c4a736e13 # v2.9.0
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          profile: ${{ matrix.profile }}
+          cores: 4
+          ram-size: 4096M
+          disable-animations: true
+          emulator-boot-timeout: 600
+          emulator-options: >-
+            -no-window -gpu swiftshader_indirect -no-snapshot
+            -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: |
+            ./gradlew --no-daemon -PanonDisableSplits=true \
+              :app:connectedAnonDebugAndroidTest \
+              :app:connectedNeroDebugAndroidTest
+
+      - name: Upload instrumented reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: instrumented-api${{ matrix.api-level }}-reports-${{ github.run_id }}
+          path: |
+            app/build/outputs/androidTest-results/**
+            app/build/reports/androidTests/**
+          if-no-files-found: warn
+          retention-days: 14

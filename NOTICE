@@ -1,0 +1,15 @@
+ANONERO third-party notices
+
+ANONERO includes code derived from Monerujo
+(https://github.com/m2049r/xmrwallet).
+
+Monerujo
+Copyright (c) 2017-2024 m2049r
+Licensed under the Apache License, Version 2.0.
+
+The original Monerujo copyright and license notices apply to the derived
+portions. ANONERO's modifications are distributed under the Apache License,
+Version 2.0, as stated in LICENSE.
+
+This file records attribution. It is informational and does not replace the
+license text in LICENSE.

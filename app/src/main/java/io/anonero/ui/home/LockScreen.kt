@@ -1,0 +1,438 @@
+package io.anonero.ui.home
+
+import AnonNeroTheme
+import android.content.SharedPreferences
+import android.os.SystemClock
+import android.util.Log
+import android.view.HapticFeedbackConstants
+import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.Check
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
+import io.anonero.R
+import io.anonero.icons.AnonIcons
+import io.anonero.services.WalletState
+import io.anonero.ui.MainActivity
+import io.anonero.ui.viewmodels.AppViewModel
+import io.anonero.util.PinHash
+import io.anonero.util.PinThrottle
+import io.anonero.util.PREFS_PIN_HASH
+import io.anonero.util.WalletProfileStore
+import io.anonero.util.ShakeConfig
+import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.rememberShakeController
+import io.anonero.util.shake
+import io.anonero.util.shuffleExcept
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
+import org.koin.core.qualifier.named
+import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
+
+const val BackSpaceKey = -2
+const val ConfirmKey = -3
+val keys = listOf(
+    1, 2, 3, 4, 5, 6, 7, 8, 9, BackSpaceKey, 0, ConfirmKey
+)
+
+@Serializable
+enum class LockScreenMode {
+    OPEN_WALLET, LOCK_SCREEN, VERYFY_PIN
+}
+
+@Serializable
+enum class LockScreenShortCut {
+    HOME, RECEIVE, SEND
+}
+
+private const val TAG = "LockScreen"
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LockScreen(
+    modifier: Modifier = Modifier,
+    mode: LockScreenMode = LockScreenMode.OPEN_WALLET,
+    onUnLocked: (String, LockScreenShortCut) -> Unit = { _, _ -> }
+) {
+    val view = LocalView.current
+    val activity = LocalActivity.current
+    val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
+    val currentPin = remember { mutableStateListOf<Int>() }
+    val checkingPin = remember { AtomicBoolean(false) }
+    var pinError by remember { mutableStateOf(false) }
+    var pinKeys by remember { mutableStateOf(keys) }
+    val walletState = koinInject<WalletState>()
+    val errorColor: Color by animateColorAsState(
+        if (pinError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground, label = "error_anim"
+    )
+    val errorShake = rememberShakeController()
+    val scope = rememberCoroutineScope()
+    val appViewModel: AppViewModel = koinViewModel()
+
+    LaunchedEffect(true) {
+        pinKeys = keys.shuffleExcept(keys.indexOf(BackSpaceKey), keys.indexOf(ConfirmKey))
+    }
+
+    // ms left on a PIN wait: read once (a wait outlives a restart; off the main thread, since a
+    // reboot makes it write), then counted down on the boot clock -- nothing runs without a wait
+    var lockedFor by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) {
+        lockedFor = withContext(Dispatchers.IO) { PinThrottle.waitLeft(prefs) }
+    }
+    LaunchedEffect(lockedFor > 0) {
+        val until = SystemClock.elapsedRealtime() + lockedFor
+        while (lockedFor > 0) {
+            delay(1_000)
+            lockedFor = (until - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+        }
+    }
+
+    fun showError() {
+        errorShake.shake(
+            ShakeConfig(
+                6, translateX = 5f
+            )
+        )
+        scope.launch {
+            pinError = true
+            repeat(6) {
+                delay(50)
+                view.performHapticFeedback(
+                    HapticFeedbackConstants.CONTEXT_CLICK
+                )
+            }
+            delay(100)
+            pinError = false
+        }
+    }
+
+    fun checkPin(shortCut: LockScreenShortCut) {
+        val pin = currentPin.joinToString(separator = "")
+        if (pin.length >= 4) {
+            if (!checkingPin.compareAndSet(false, true)) return
+            scope.launch(Dispatchers.IO) {
+                // counted before the check: killing the app mid-check must not skip it
+                val wait = PinThrottle.tryAttempt(prefs)
+                if (wait > 0) {
+                    lockedFor = wait
+                    withContext(Dispatchers.Main) { showError() }
+                    return@launch
+                }
+                try {
+                    if (mode == LockScreenMode.VERYFY_PIN) {
+                        val prefsHash = prefs.getString(WalletProfileStore.activePinHashKey(), "")
+                        if (PinHash.matches(pin, prefsHash)) {
+                            PinThrottle.reset(prefs)
+                            // a legacy value is the reversible encoding; replace it now,
+                            // while the PIN is in hand
+                            if (PinHash.isLegacy(prefsHash)) {
+                                prefs.edit(commit = true) {
+                                    putString(WalletProfileStore.activePinHashKey(), PinHash.hash(pin))
+                                }
+                            }
+                            withContext(Dispatchers.Main) { onUnLocked(pin, shortCut) }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                showError()
+                            }
+                        }
+                    } else if (mode == LockScreenMode.OPEN_WALLET) {
+                        val result = appViewModel.openWallet(pin)
+                        // persist the gate hash only for a PIN that actually opened --
+                        // writing it for a wrong PIN would corrupt it. Hashed here, off the
+                        // main thread: 210k PBKDF2 rounds would freeze the UI.
+                        if (result) {
+                            PinThrottle.reset(prefs)
+                            prefs.edit(commit = true) {
+                                putString(WalletProfileStore.activePinHashKey(), PinHash.hash(pin))
+                            }
+                        }
+                        withContext(Dispatchers.Main) {
+                            if (result) {
+                                appViewModel.startService()
+                                withContext(Dispatchers.Main) {
+                                    onUnLocked(pin, shortCut)
+                                    (activity as MainActivity).startNotificationService()
+                                }
+                            } else {
+                                withContext(Dispatchers.Main) {
+                                    showError()
+                                }
+                            }
+                        }
+                    } else {
+                        //if wallet is already open, stop background sync from lock screen
+
+                        // Verify PIN locally against stored hash — instant, no network needed.
+                        val prefsHash = prefs.getString(WalletProfileStore.activePinHashKey(), "")
+                        if (!PinHash.matches(pin, prefsHash)) {
+                            withContext(Dispatchers.Main) { showError() }
+                        } else {
+                            PinThrottle.reset(prefs)
+                            if (PinHash.isLegacy(prefsHash)) {
+                                prefs.edit(commit = true) {
+                                    putString(WalletProfileStore.activePinHashKey(), PinHash.hash(pin))
+                                }
+                            }
+                            withContext(Dispatchers.Main) { onUnLocked(pin, shortCut) }
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    Timber.tag(TAG).e("PIN verification failed")
+                    withContext(Dispatchers.Main) { showError() }
+                } finally {
+                    // a correct PIN has cleared the wait by now; a wrong one shows it at once
+                    lockedFor = PinThrottle.waitLeft(prefs)
+                }
+            }.invokeOnCompletion { checkingPin.set(false) }
+        } else {
+            showError()
+        }
+
+    }
+
+    Scaffold(modifier = modifier) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceAround,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .weight(.2f),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_anon),
+                        contentDescription = stringResource(R.string.app_logo),
+                        modifier = Modifier
+                            .size(200.dp)
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+                Spacer(modifier = Modifier)
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.padding(top = 24.dp))
+                Text(
+                    if (lockedFor > 0) {
+                        val seconds = (lockedFor + 999) / 1000
+                        stringResource(R.string.pin_try_again_in, seconds / 60, seconds % 60)
+                    } else if (mode == LockScreenMode.VERYFY_PIN)
+                        stringResource(R.string.enter_current_pin)
+                    else
+                        stringResource(R.string.unlock_wallet)
+                )
+                Spacer(modifier = Modifier.padding(top = 12.dp))
+                Row(
+                    Modifier
+                        .height(24.dp)
+                        .shake(errorShake),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    currentPin.map {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .animateContentSize()
+                                .clip(RoundedCornerShape(50))
+                                .background(errorColor)
+                                .padding(horizontal = 24.dp)
+                        ) { }
+                    }
+                }
+
+            }
+            Column(
+                modifier = Modifier
+                    .weight(.8f)
+                    .wrapContentHeight()
+                    .alpha(if (lockedFor > 0) 0.4f else 1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LazyVerticalGrid(
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp, vertical = 0.dp),
+                    columns = GridCells.Fixed(3),
+                    verticalArrangement = Arrangement.Top,
+                    horizontalArrangement = Arrangement.Center,
+                    contentPadding = PaddingValues(
+                        vertical = 8.dp,
+                    )
+                ) {
+                    items(pinKeys.size) { index ->
+                        val key = pinKeys[index]
+                        if (currentPin.size == 0 && key == BackSpaceKey) {
+                            return@items
+                        }
+                        if (currentPin.size < 4 && key == ConfirmKey) {
+                            return@items
+                        }
+                        Column(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(shape = CircleShape)
+                                .combinedClickable(
+                                    onClick = {
+                                        if (lockedFor > 0) return@combinedClickable
+                                        if (key == BackSpaceKey && currentPin.isNotEmpty()) {
+                                            currentPin.removeAt(currentPin.size - 1)
+                                        } else if (key == ConfirmKey) {
+                                            checkPin(LockScreenShortCut.HOME)
+                                        } else {
+                                            if (currentPin.size < 12) {
+                                                currentPin.add(key)
+                                            }
+                                        }
+                                        //update state
+
+                                        view.performHapticFeedback(
+                                            HapticFeedbackConstants.KEYBOARD_TAP
+                                        )
+                                    },
+                                    onLongClick = {
+                                        if (key == BackSpaceKey) {
+                                            currentPin.clear()
+                                            view.performHapticFeedback(
+                                                HapticFeedbackConstants.LONG_PRESS
+                                            )
+                                        }
+                                    },
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (key == -2 || key == -3) {
+
+                                return@items Icon(
+                                    imageVector =
+                                        if (key == -2) AnonIcons.Backspace else Icons.TwoTone.Check,
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    contentDescription = stringResource(
+                                        if (key == BackSpaceKey) R.string.clear else R.string.confirm
+                                    ),
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                )
+                            }
+                            Text(
+                                text = "$key",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+
+                    }
+                }
+
+                if (mode != LockScreenMode.VERYFY_PIN) {
+                    Row(
+                        modifier = Modifier
+                            .alpha(if (currentPin.size >= 4) 1f else 0f)
+                            .wrapContentHeight(),
+                    ) {
+                        IconButton(onClick = {
+                            if (currentPin.size >= 4)
+                                checkPin(LockScreenShortCut.RECEIVE)
+                        }) {
+                            Icon(
+                                AnonIcons.ArrowDownLeft,
+                                contentDescription = stringResource(R.string.receive),
+                                modifier = Modifier.size(64.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(24.dp))
+                        IconButton(onClick = {
+                            if (currentPin.size >= 4)
+                                checkPin(LockScreenShortCut.SEND)
+                        }) {
+                            Icon(
+                                AnonIcons.ArrowUpRight,
+                                tint = MaterialTheme.colorScheme.primary,
+                                contentDescription = stringResource(R.string.send),
+                                modifier = Modifier.size(64.dp)
+                            )
+                        }
+
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_8")
+@Composable
+private fun SetupNodeComposablePreview() {
+    AnonNeroTheme {
+        LockScreen()
+    }
+}

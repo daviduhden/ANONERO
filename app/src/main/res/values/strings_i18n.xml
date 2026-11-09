@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <string name="language">Language</string>
+    <string name="language_system">System language</string>
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_chinese">简体中文</string>
+
+    <string name="settings_appearance_privacy">APPEARANCE &amp; PRIVACY</string>
+    <string name="theme">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="stealth_mode">Stealth mode</string>
+    <string name="stealth_mode_supporting">Hide amounts, redact notifications and auto-lock when backgrounded</string>
+    <string name="auto_lock_stealth">Auto-lock in stealth mode</string>
+    <string name="auto_lock_stealth_supporting">Enter background sync as soon as the app stops</string>
+    <string name="lws_settings_title">Light Wallet Server (LWS)</string>
+    <string name="lws_settings_supporting">Experimental view-key scanning offload over Tor</string>
+    <string name="accounts_settings_title">Accounts</string>
+    <string name="accounts_settings_supporting">Create, select and label wallet accounts</string>
+    <string name="sign_verify_settings_title">Sign / Verify messages</string>
+    <string name="sign_verify_settings_supporting">Prove control of an address without moving funds</string>
+    <string name="decoy_settings_title">Decoy wallet &amp; duress PIN</string>
+    <string name="decoy_settings_supporting">Separate wallet opened by an alternate PIN</string>
+    <string name="pin_changed_success">PIN changed successfully</string>
+    <string name="pin_change_error">Error changing PIN. Check logs for more details</string>
+    <string name="normal_pin_differs_duress">The normal PIN must differ from the duress PIN</string>
+    <string name="duress_pin_differs_normal">The duress PIN must differ from the normal PIN</string>
+    <string name="wallet_not_open">Wallet not open</string>
+    <string name="set_password_failed">Could not set the wallet password: %1$s</string>
+
+    <string name="accounts">Accounts</string>
+    <string name="new_account">New account</string>
+    <string name="rename_account">Rename account</string>
+    <string name="add_account">Add account</string>
+    <string name="selected">Selected</string>
+    <string name="account_label">Label</string>
+    <string name="no_accounts">No accounts available yet. Connect to a node/LWS and sync.</string>
+
+    <string name="sign_verify_title">Sign / Verify</string>
+    <string name="sign_verify_explanation">Sign with the spend key of the active account. A valid signature proves possession of that address\'s spend key; it does not prove who the person is.</string>
+    <string name="message_to_sign">Message to sign</string>
+    <string name="signature">Signature</string>
+    <string name="copy_signature">Copy signature</string>
+    <string name="sign">SIGN</string>
+    <string name="verify">VERIFY</string>
+    <string name="message">Message</string>
+    <string name="verify_signature">Verify a signature</string>
+    <string name="signing_failed">Signing failed. The wallet may be in background sync or view-only.</string>
+    <string name="signature_valid">Signature is valid for this address and message</string>
+    <string name="signature_invalid">Signature is NOT valid</string>
+
+    <string name="pay_to_many">Pay to many</string>
+    <string name="pay_to_many_description">One transaction with several outputs. Each row needs a valid Monero address and an exact amount.</string>
+    <string name="pay_to_many_view_only">Not available in this view-only build: the airgapped multi-destination flow is not implemented yet.</string>
+    <string name="pay_to_many_recipient">Recipient %1$d</string>
+    <string name="add_recipient">Add recipient</string>
+    <string name="remove_recipient">Remove recipient</string>
+    <string name="positive_amount">Enter a positive amount with at most 12 decimals</string>
+    <string name="total_exceeds_balance">Total exceeds the available balance</string>
+    <string name="could_not_export_unsigned">Could not export unsigned transaction</string>
+    <string name="transaction_construction_failed">Transaction construction failed</string>
+
+    <string name="lws_title">Light Wallet Server</string>
+    <string name="use_lws">Use LWS</string>
+    <string name="lws_supporting">Offloads view-key scanning to a Monero light-wallet server. Only the public address and private view key are sent; the spend key never leaves this device.</string>
+    <string name="lws_host">LWS host</string>
+    <string name="lws_port">Port</string>
+    <string name="lws_privacy_warning">Privacy: the LWS operator can see your address, every incoming amount, and approximately when it arrived. It cannot spend. Tor hides your IP from the operator but does not remove the trust you place in the server. Prefer a server you operate yourself.</string>
+    <string name="lws_tor_enabled">Built-in Tor is enabled. LWS traffic will use it.</string>
+    <string name="lws_tor_disabled">Built-in Tor is disabled. LWS cannot be enabled until Tor is on.</string>
+    <string name="lws_restart_warning">Applying LWS requires an app restart. Normal node settings are ignored while LWS is enabled. Light-wallet mode may not support every server (notably subaddress-heavy wallets) and is experimental in ANONERO.</string>
+    <string name="lws_saved_restart">Saved. Restart ANONERO to use this configuration.</string>
+    <string name="lws_requires_tor">LWS requires Tor. Enable built-in Tor in Proxy settings first.</string>
+    <string name="lws_error_host_empty">Host cannot be empty</string>
+    <string name="lws_error_host_too_long">Host is too long</string>
+    <string name="lws_error_host_format">Enter only the host name, without scheme, path or port</string>
+    <string name="lws_error_host_invalid">Invalid host name</string>
+    <string name="lws_error_port_range">Port must be between 1 and 65535</string>
+
+    <string name="decoy_duress_title">Decoy &amp; Duress</string>
+    <string name="decoy_not_available">This setting is not available for the current wallet.</string>
+    <string name="decoy_remove_title">Remove decoy wallet?</string>
+    <string name="decoy_remove_warning">This deletes the decoy wallet file, its Keystore key, and its duress PIN. Funds in the decoy are lost unless you have its seed. The legitimate wallet is not touched.</string>
+    <string name="remove">Remove</string>
+    <string name="decoy_intro">The decoy is a completely separate wallet file with its own Keystore-wrapped secret, PIN, passphrase and history. The normal PIN opens this wallet; the duress PIN opens the decoy.</string>
+    <string name="decoy_limits">Limits: this is separation, not plausible deniability. Forensic access to an unlocked device can reveal that two wallets exist. Do not rely on the decoy against device seizure.</string>
+    <string name="creating_decoy_wallet">Creating decoy wallet…</string>
+    <string name="setup_decoy_wallet">SET UP DECOY WALLET</string>
+    <string name="decoy_passphrase_hint">Choose a passphrase for the decoy\'s seed. It must not be the same as the legitimate wallet\'s passphrase.</string>
+    <string name="decoy_passphrase_min">Decoy passphrase (min. 8 characters)</string>
+    <string name="confirm_decoy_passphrase">Confirm decoy passphrase</string>
+    <string name="continue_action">CONTINUE</string>
+    <string name="change_duress_pin">CHANGE DURESS PIN</string>
+    <string name="remove_decoy_wallet">REMOVE DECOY WALLET</string>
+    <string name="enter_duress_pin">Enter duress PIN</string>
+    <string name="new_duress_pin">New duress PIN</string>
+    <string name="duress_pin_differs">The duress PIN must differ from the normal PIN</string>
+    <string name="decoy_passphrase_differs">The decoy passphrase must differ from the main passphrase</string>
+    <string name="app_context_unavailable">Application context unavailable</string>
+    <string name="decoy_exists">A decoy wallet already exists; remove it first</string>
+    <string name="decoy_creation_failed">Could not create decoy wallet</string>
+    <string name="decoy_write_failed">Could not write decoy wallet: %1$s</string>
+    <string name="decoy_seed_failed">Could not read decoy seed</string>
+    <string name="decoy_credentials_failed">Could not persist decoy credentials</string>
+    <string name="decoy_configured_help">Duress PIN is configured. The decoy wallet opens with it from the initial lock screen after a cold start; an already-open main session is not hot-switched. Unlock it that way to reach its Receive and Send screens.</string>
+
+    <string name="frozen">FROZEN</string>
+    <string name="freeze_output">Freeze output</string>
+    <string name="frozen_outputs_note">Frozen outputs stay in the wallet but are excluded from transaction input selection. They are not spent or locked by consensus.</string>
+    <string name="thaw_output">Thaw output</string>
+
+    <string name="broadcast_question">Do you want to broadcast transaction?</string>
+    <string name="yes">Yes</string>
+    <string name="exit_question">Do you want to exit %1$s?</string>
+    <string name="exit">Exit</string>
+    <string name="scan">Scan</string>
+    <string name="tor_status">Tor status</string>
+    <string name="more">More</string>
+
+    <string name="wallet_locked_offline">Wallet Locked: Offline</string>
+    <string name="offline">Offline</string>
+    <string name="wallet_locked_synced">Wallet Locked: Synced: %1$d</string>
+    <string name="loading_wallet">Loading wallet...</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="daemon_disconnected">Daemon Disconnected</string>
+    <string name="wrong_version">Wrong Version</string>
+    <string name="synced_height">Synced: %1$d</string>
+    <string name="syncing">Syncing...</string>
+    <string name="syncing_blocks_left">Syncing: %1$s blocks left</string>
+    <string name="syncing_completed">Syncing blocks completed</string>
+    <string name="transaction_received">Transaction received</string>
+    <string name="notification_channel_wallet">Wallet service</string>
+    <string name="notification_channel_wallet_activity">Wallet activity</string>
+    <string name="tor_daemon_suffix"> | Tor Daemon: %1$s</string>
+    <string name="notification_channel_transactions">Transactions</string>
+
+    <string name="allow">Allow</string>
+    <string name="open_app_settings">Open App Settings</string>
+    <string name="app_logo">ANONERO logo</string>
+    <string name="camera_permission_message">Allow camera access to scan QR code</string>
+    <string name="camera_permission_required">Camera permission is required to scan QR codes. Please enable it in app settings.</string>
+    <string name="label_cannot_be_empty">Label cannot be empty</string>
+    <string name="update">Update</string>
+    <string name="could_not_unlock_wallet">Could not unlock the wallet. Try again, or restart the app.</string>
+
+    <string name="backup_failed">Backup failed: %1$s</string>
+    <string name="backup_failed_generic">Backup failed</string>
+    <string name="file_saved">File saved</string>
+    <string name="could_not_save_file">Could not save the file</string>
+    <string name="unknown_error">Unknown error</string>
+    <string name="success">Success</string>
+    <string name="what_will_be_signed">What will be signed</string>
+    <string name="signed_tx">SIGNED TX</string>
+    <string name="broadcast_failed_generic">Unable to broadcast transaction</string>
+    <string name="signing_hint_omit_outputs">On NERO open the menu, tap Show Outputs, scan it here, then send again.</string>
+    <string name="unsigned_tx">UNSIGNED TX</string>
+    <string name="scan_signed_tx">SCAN SIGNED TX</string>
+
+    <string name="import_polyseed">IMPORT POLYSEED MNEMONIC</string>
+    <string name="enter_seed">ENTER SEED</string>
+    <string name="invalid_seed">Invalid seed</string>
+    <string name="restore_height_required">Restore height required for 25 word seed</string>
+    <string name="view_logs">View Logs</string>
+    <string name="seed">Seed</string>
+    <string name="primary_address_title">Primary Address</string>
+    <string name="balance">Balance</string>
+    <string name="restore_height_title">Restore Height</string>
+    <string name="extracting_backup">Extracting backup...</string>
+    <string name="invalid_network">Invalid network</string>
+    <string name="unable_extract_backup">Unable to extract backup.</string>
+    <string name="entering_backup_pin">Enter the PIN this backup was made with</string>
+    <string name="backup_created_at">Created at %1$s</string>
+    <string name="restore_failed">Restore failed</string>
+
+    <string name="url_cannot_be_empty">URL cannot be empty</string>
+    <string name="connection_failed">Error connecting to server</string>
+
+    <string name="invalid_url">Invalid URL</string>
+    <string name="add_node">Add Node</string>
+    <string name="nodes">Nodes</string>
+    <string name="available_nodes">Available Nodes</string>
+    <string name="remove_node">Remove</string>
+    <string name="node_label">NODE</string>
+    <string name="daemon_height">Daemon Height: %1$s</string>
+    <string name="error_connecting">Error connecting to server: %1$s</string>
+    <string name="disable_lws_restart">Disable LWS and restart before connecting a node</string>
+    <string name="error_prefix">Error: %1$s</string>
+
+    <string name="key_images_imported">Key images imported</string>
+    <string name="ok">OK</string>
+    <string name="wallet_title">Wallet</string>
+    <string name="resync_failed">Could not resync the blockchain</string>
+
+    <string name="wiping_wallet">Wiping wallet</string>
+    <string name="wallet_cleared">Wallet cleared</string>
+    <string name="clearing_preferences">Clearing preferences</string>
+    <string name="clearing_nodes">Clearing nodes</string>
+    <string name="clearing_logs">Clearing logs</string>
+    <string name="logs_cleared">Logs cleared</string>
+    <string name="share_logs">Share logs</string>
+    <string name="clear_logs">Clear logs</string>
+    <string name="wallet_wiped_successfully">Wallet wiped successfully</string>
+    <string name="wipe_failed">Could not wipe the wallet</string>
+    <string name="multi">MULTI</string>
+    <string name="edit">Edit</string>
+    <string name="clear">Clear</string>
+
+    <string name="sweeping_balance_amount">Sweeping balance: %1$s (minus fees)</string>
+    <string name="available_balance_amount">Available balance: %1$s</string>
+    <string name="address_index_of_count">Address %1$d of %2$d</string>
+    <string name="label_value">%1$s: %2$s</string>
+
+    <plurals name="coins_selected_count">
+        <item quantity="one">%1$d coin selected</item>
+        <item quantity="other">%1$d coins selected</item>
+    </plurals>
+    <plurals name="recipients_count">
+        <item quantity="one">%1$d recipient</item>
+        <item quantity="other">%1$d recipients</item>
+    </plurals>
+    <plurals name="blocks_left_count">
+        <item quantity="one">%1$s block left</item>
+        <item quantity="other">%1$s blocks left</item>
+    </plurals>
+    <string name="invalid_restore_height">Enter a non-negative whole restore height.</string>
+    <string name="nero_backup_passphrase_prompt">Choose a backup passphrase with at least 8 characters. You will need it to restore this view-only wallet.</string>
+    <string name="wallet_target_not_empty">Wallet data or credentials already exist. Recover that wallet before continuing. To replace it, keep its seed or backup and explicitly wipe it first.</string>
+</resources>

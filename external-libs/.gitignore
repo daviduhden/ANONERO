@@ -1,0 +1,7 @@
+/arm64-v8a
+/armeabi-v7a
+/linux-x86_64
+/include
+VERSION
+/patches/*.rej
+/patches/*.orig
