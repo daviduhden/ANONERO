@@ -174,6 +174,7 @@ dependencies {
     implementation(libs.koin.androidx.compose)
 
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.org.boofcv.boofcv.core)
     implementation(libs.com.google.zxing.core)
