@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, David Uhden Collado
- * Copyright (c) 2023-2026 r4v3r23
+ * Copyright (c) 2022-2026, r4v3r23
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,9 @@ android {
     namespace = "io.anonero"
     // compile/target are independent of the minimum. Android 10 (API 29) is the
     // supported floor; raising targetSdk changes runtime behavior and needs tests.
+    // Compile against the latest stable API 37 minor release; target stays 37.0.
     compileSdk = 37
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId = "io.anonero"
@@ -86,11 +88,11 @@ android {
     }
 
     // The JNI adapter is compiled here; Monero itself is prebuilt by external-libs.
-    // CMake 4 is not used because app/CMakeLists.txt still requires 3.4.1.
+    // Use the current Android SDK CMake; app/CMakeLists.txt requires >= 3.22.
     externalNativeBuild {
         cmake {
             path = file("CMakeLists.txt")
-            version = "3.31.6"
+            version = "4.1.2"
         }
     }
 
@@ -132,8 +134,10 @@ android {
         }
 
     }
+    // Keep these in sync with ANDROID_BUILD_TOOLS / ANDROID_NDK in the workflows and
+    // with NDK_REVISION in external-libs/build.sh. The native archives are built there.
     buildToolsVersion = "37.0.0"
-    ndkVersion = "29.0.14206865"
+    ndkVersion = "30.0.16248370"
 }
 
 dependencies {

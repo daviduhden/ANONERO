@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2026, David Uhden Collado
-# Copyright (c) 2023-2026 r4v3r23
+# Copyright (c) 2022-2026, r4v3r23
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.22)
 
 if(NOT DEFINED ANON_ABI)
     set(ANON_ABI ${ANDROID_ABI})
