@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42707311457` | `ba3b3f6` | `workflow_dispatch` | failure | native | Patch series applied cleanly; Debian snapshot 503 blocked the container base stage |
 | `42700250719` | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native failed before the series was restored |
 | `42699227920` | `0006659` | `workflow_dispatch` | failure | native | Lint 0 errors / 0 warnings; native blocked |
 | `42698560608` | `2788e92` | `workflow_dispatch` | failure | native | Lint had 2 warnings left; fixed afterwards |
@@ -271,6 +272,24 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next run (`42694063725`) compiled both flavors and passed JVM
   tests.
 - **Status:** verified in CI.
+
+### CI-017 — Debian snapshot 503 during the native container build
+
+- **Run:** `42707311457`.
+- **Job:** Build native Monero/JNI archives.
+- **Diagnostic:** `E: Failed to fetch http://snapshot.debian.org/... 503 No healthy backends`
+  for `flex`, `autotools-dev`, `bison`, `cpp`, `libtool`, and `python-is-python3`;
+  the container base image stage exited 100.
+- **Root cause:** transient outage/rate limiting at the pinned Debian snapshot mirror.
+  The Monero patch preflight and all five patches applied cleanly before this stage.
+- **Pattern search:** the same container base stage is used by every `external-libs`
+  target; the `linux` target has a separate `default-jdk-headless` install.
+- **Correction:** retry the full `apt-get update`/`install` transaction up to five times
+  with increasing backoff. The snapshot date, package set, and reproducibility inputs are
+  unchanged.
+- **Regression check:** the `native` job must reach the Monero build stage; a genuine
+  package or patch failure still fails after the last attempt.
+- **Status:** implemented; native compile validation pending the next run.
 
 ## Warning inventory
 
