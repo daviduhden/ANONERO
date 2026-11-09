@@ -134,8 +134,9 @@ class AnonNeroService : Service() {
             }
             launch {
                 walletState.syncProgress.collect {
-                    val torSate = if (torService.socks != null) {
-                        getString(R.string.tor_daemon_suffix, torService.socks?.port.toString())
+                    val socks = torService.socks
+                    val torSate = if (socks != null) {
+                        getString(R.string.tor_daemon_suffix, socks.port.toString())
                     } else {
                         ""
                     }
@@ -175,8 +176,9 @@ class AnonNeroService : Service() {
         } else {
             prefs.getString(NodeFields.RPC_HOST.value, "") ?: ""
         }
-        var torSate = if (torService.socks != null && !StealthMode.isEnabled(prefs)) {
-            getString(R.string.tor_daemon_suffix, torService.socks?.port.toString())
+        val socks = torService.socks
+        var torSate = if (socks != null && !StealthMode.isEnabled(prefs)) {
+            getString(R.string.tor_daemon_suffix, socks.port.toString())
         } else {
             ""
         }
@@ -245,6 +247,7 @@ class AnonNeroService : Service() {
             getString(
                 R.string.syncing_blocks_left,
                 Formats.convertNumber(it.left, Locale.getDefault())
+                    ?: it.left.toString()
             ) + torSate
         } else {
             getString(R.string.syncing_completed) + torSate

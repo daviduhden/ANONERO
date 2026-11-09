@@ -361,11 +361,12 @@ class AnonWalletHandler(
                 throw CancellationException("Wallet session changed while waiting for Tor")
             }
             check(manager.setProxy(socket.value)) { "Tor proxy was rejected" }
-        } else if (proxyHost.isNotEmpty() && proxyPort in 1..65535) {
+        } else if (!proxyHost.isNullOrEmpty() && proxyPort in 1..65535) {
+            val host = proxyHost ?: throw Exception("no proxy")
             if (WalletManager.instance !== manager || manager.wallet !== wallet) {
                 throw CancellationException("Wallet session changed before applying proxy")
             }
-            check(manager.setProxy(proxyAddress(proxyHost, proxyPort))) { "Manual proxy was rejected" }
+            check(manager.setProxy(proxyAddress(host, proxyPort))) { "Manual proxy was rejected" }
         } else {
             throw Exception("no proxy")
         }

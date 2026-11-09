@@ -86,6 +86,7 @@ import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.ui.theme.DangerColor
 import io.anonero.ui.theme.SuccessColor
 import io.anonero.util.Formats
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -152,7 +153,7 @@ class ReviewTransactionViewModel : ViewModel() {
         val unsignedTransaction = wallet?.getUnsginedTx()
 
         if (unsignedTransaction != null) {
-            this.unsignedTransaction = unsignedTransaction
+            this@ReviewTransactionViewModel.unsignedTransaction = unsignedTransaction
             // Rows come from wallet2's own summary of the outputs sign() will construct,
             // never from the set's advisory destination list. If the sentence cannot be
             // parsed it is shown raw; the advisory getters are not a fallback.
@@ -175,7 +176,7 @@ class ReviewTransactionViewModel : ViewModel() {
             // the amount/fee are still authoritative, and the reviewed destinations come
             // from the navigation route. Do not blank the review screen in that case.
             if (txId != null || pendingTransaction.getAmount() > 0L) {
-                this.pendingTransaction = pendingTransaction
+                this@ReviewTransactionViewModel.pendingTransaction = pendingTransaction
                 reviewModel.postValue(
                     ReviewModel(
                         address = null,

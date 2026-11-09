@@ -126,7 +126,7 @@ fun TransactionDetailScreen(
             var destination = ""
             var key = "____"
             if (found != null) {
-                found.transfers.forEach {
+                found.transfers.orEmpty().forEach {
                     destination = "${it.address}\n$destination"
                 }
                 if (wallet != null) {

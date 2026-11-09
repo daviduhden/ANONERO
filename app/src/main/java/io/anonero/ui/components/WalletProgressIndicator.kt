@@ -118,6 +118,7 @@ fun WalletProgressIndicator(modifier: Modifier = Modifier, refreshIndicatorProgr
                             R.plurals.blocks_left_count,
                             progress.left.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                             Formats.convertNumber(progress.left, Locale.getDefault())
+                                ?: progress.left.toString()
                         ),
                         modifier = Modifier.padding(top = 8.dp),
                         style = MaterialTheme.typography.labelSmall,

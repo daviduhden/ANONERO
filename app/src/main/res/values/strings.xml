@@ -131,7 +131,7 @@
     <string name="invalid_port">Invalid port</string>
     <string name="proxy_update_failed">Could not update the proxy</string>
     <string name="securely_wipe_title">Securely Wipe</string>
-    <string name="securely_wipe_warning">This action will permanently erase the active wallet's data and encryption keys using secure deletion methods. Other wallet profiles and their keys are not touched. This process cannot be undone.</string>
+    <string name="securely_wipe_warning">This action will permanently erase the active wallet\'s data and encryption keys using secure deletion methods. Other wallet profiles and their keys are not touched. This process cannot be undone.</string>
     <string name="securely_wipe_passphrase_prompt">Enter wallet passphrase to continue</string>
     <string name="wipe">Wipe</string>
     <string name="nero_keys">[ИΞR0] keys</string>
