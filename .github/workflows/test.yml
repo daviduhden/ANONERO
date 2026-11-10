@@ -460,6 +460,8 @@ jobs:
           ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
             :app:assembleAnonDebug \
             :app:assembleNeroDebug
+          echo "=== debug APK outputs ==="
+          find app/build/outputs -maxdepth 4 -type f -printf '%p %s\n' | sort || true
           for flavor in anon nero; do
             apk="app/build/outputs/apk/${flavor}/debug/${flavor}-debug.apk"
             [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }

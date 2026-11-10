@@ -103,7 +103,8 @@ android {
             // These are the only ABIs for which external-libs/Makefile builds the
             // Monero static archives. Do not advertise x86_64 without native support.
             include("armeabi-v7a", "arm64-v8a")
-            isUniversalApk = true
+            // The universal APK only makes sense when ABI splits are enabled.
+            isUniversalApk = !disableAbiSplitsForTests
         }
     }
 
