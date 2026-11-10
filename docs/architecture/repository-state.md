@@ -135,7 +135,7 @@ was committed in `52d67d4`. The CI compile-failure fixes were committed afterwar
 
 ## Known gaps and follow-ups
 
-1. **Validate the restored Monero patch series.** The six patches and their nested
+1. **Validate the restored Monero patch series.** The seven patches and their nested
    submodule pins are checked in, but the native archives have not been compiled. The
    manual `native` CI job is the authority; the series is adapted from `monero_c` under
    LGPL-3.0 (see `external-libs/patches/README.md`).

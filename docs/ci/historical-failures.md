@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42741706801` | `de7fbb6` | `workflow_dispatch` | failure | native | JVM tests and lint pass; native compiled for 15m and failed in `wallet_rpc_server.cpp` after the coin-control signature change |
 | `42740103758` | `f99ade3` | `workflow_dispatch` | failure | JVM unit tests (SDK download); native (translations tool) | Patches applied; Monero tried to run an ARM64 translations binary on the host; Android SDK download timed out |
 | `42708047372` | `7fe1daa` | `workflow_dispatch` | failure | native | Patch preflight and all five patches pass; Debian snapshot 503 persisted through five apt retries |
 | `42707311457` | `ba3b3f6` | `workflow_dispatch` | failure | native | Patch series applied cleanly; Debian snapshot 503 blocked the container base stage |
@@ -327,6 +328,24 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** none in the repository. Rerun the workflow; a persistent failure would
   need a pinned tooling mirror or a preinstalled SDK strategy.
 - **Status:** external infrastructure failure; monitor on rerun.
+
+### CI-020 — `wallet_rpc_server` call site not updated for preferred inputs
+
+- **Run:** `42741706801`.
+- **Job:** Build native Monero/JNI archives.
+- **Diagnostic:** `wallet_rpc_server.cpp:1285:155: error: no viable conversion from
+  'const std::set<uint32_t>' to 'const std::vector<crypto::key_image>'`.
+- **Root cause:** the coin-control patch inserts `preferred_input_list` before
+  `subtract_fee_from_outputs` in `wallet2::create_transactions_2`. The 85f036
+  `wallet_rpc_server.cpp` call still passes the old argument order. The `monero_c` base
+  had already updated this call site in patch 0011.
+- **Pattern search:** every `create_transactions_2` and `create_transactions_all` caller;
+  `simplewallet` and `wallet_api` were already updated by patch 0008.
+- **Correction:** add `0007-add-monero-submodule-support.patch`, which updates the RPC
+  call site and makes CMake use `CMAKE_CURRENT_SOURCE_DIR` for submodule builds.
+- **Regression check:** all seven patches apply with `git apply --index --3way`; the
+  `native` job must compile `wallet_rpc_server.cpp`.
+- **Status:** implemented; native compile validation pending the next run.
 
 ## Warning inventory
 

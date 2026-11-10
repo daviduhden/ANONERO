@@ -20,6 +20,7 @@ The series is adapted from the Monero patches in
 - `0007-polyseed.patch`
 - `0008-coin-control.patch`
 - `0017-drop-generate_translations_header.c-requirement.patch`
+- `0011-add-monero-submodule-support.patch`
 
 `monero_c` is licensed under LGPL-3.0; the licence text is in
 `LICENSE-LGPL-3.0`. The patches modify Monero, which remains under its own
@@ -50,6 +51,8 @@ Apache-2.0 application code.
   builds it for the Android ABI and then tries to execute it on the x86_64 build host.
   wallet2 embedded translations become an empty table; Android UI localization is
   unaffected.
+- A `wallet_rpc_server` call-site update for the new preferred-input parameter, plus
+  `CMAKE_CURRENT_SOURCE_DIR` paths so the submodule build does not touch the parent tree.
 
 ## Nested submodules
 
@@ -65,7 +68,7 @@ patches are applied:
 ## Validation
 
 - Every patch applies with `git apply --index --3way` on a clean checkout of the
-  pinned base (six patches).
+  pinned base (seven patches).
 - `git submodule update --init --recursive --depth 1` fetched all three new
   submodules at the commits above.
 - `apply.sh` and the `Containerfile` use `struct CoinsInfo` and
