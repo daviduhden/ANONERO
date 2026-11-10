@@ -4,6 +4,8 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42841238523` | `1044ec8` | `workflow_dispatch` | failure | assemble | Native, tests, and lint pass; APK produced as `app-anon-debug.apk`; minSdk extraction returned empty |
+| `42750259391` | `c059214` | `workflow_dispatch` | failure | assemble | Native passes; Gradle produces `app-<flavor>-debug.apk` but the workflow still expected `<flavor>-debug.apk` |
 | `42743643959` | `a80dbe7` | `workflow_dispatch` | failure | assemble | Native archives built successfully; the adapter failed to compile because `Get*ArrayRegion` returns void in C++ JNI |
 | `42741706801` | `de7fbb6` | `workflow_dispatch` | failure | native | JVM tests and lint pass; native compiled for 15m and failed in `wallet_rpc_server.cpp` after the coin-control signature change |
 | `42740103758` | `f99ade3` | `workflow_dispatch` | failure | JVM unit tests (SDK download); native (translations tool) | Patches applied; Monero tried to run an ARM64 translations binary on the host; Android SDK download timed out |
@@ -51,7 +53,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   checkout step succeeds; in the local audit checkout the submodule is uninitialized.
 - **Pattern search:** the native build, assemble/link, instrumented tests, release build,
   signing, and publication all depend on these inputs.
-- **Correction:** the five wallet-API patches were reconstructed from the `monero_c`
+- **Correction:** the seven wallet-API patches were reconstructed from the `monero_c`
   lineage, rebased onto the pinned `85f036ba` commit, and checked in with `apply.sh`,
   provenance, and licence. They apply with `git apply --index --3way`; the nested
   `bc-ur`, `polyseed`, and `utf8proc` gitlinks resolve.
@@ -312,7 +314,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** add `0006-drop-generate_translations_header.c-requirement.patch` from
   the same `monero_c` series, replacing the helper with a static empty translations table.
   Android UI localization is unaffected.
-- **Regression check:** the six patches apply with `git apply --index --3way` on the
+- **Regression check:** the seven patches apply with `git apply --index --3way` on the
   pinned base; the `native` job must pass the translations stage.
 - **Status:** implemented; native compile validation pending the next run.
 
@@ -377,6 +379,22 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   already uses a directory glob and is unaffected.
 - **Regression check:** the assemble job lists outputs on failure and verifies minSdk and
   `libanonero.so` in each APK.
+- **Status:** implemented; assemble/instrumented validation pending the next run.
+
+### CI-023 — `aapt2 dump badging` minSdk label mismatch
+
+- **Run:** `42841238523`.
+- **Job:** Assemble debug APKs and link JNI.
+- **Diagnostic:** `app-anon-debug.apk reports minSdk '', expected '29'`.
+- **Root cause:** the workflow only matched `sdkVersion:'…'`. The build-tools 37 badging
+  output did not provide that label for this APK, so the extraction was empty even though
+  the APK existed and Gradle succeeded.
+- **Pattern search:** the same extraction existed in the assemble and instrumented jobs and
+  in the release APK verification.
+- **Correction:** accept `minSdkVersion` or `sdkVersion`, tolerate leading whitespace, and
+  print the first badging lines if the value is still empty. Applied to all three sites.
+- **Regression check:** the assemble job now fails with a diagnostic only when the APK is
+  genuinely unreadable.
 - **Status:** implemented; assemble/instrumented validation pending the next run.
 
 ## Warning inventory

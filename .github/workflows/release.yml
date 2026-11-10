@@ -356,7 +356,12 @@ jobs:
               package_id="$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
               package_version="$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n 1)"
               package_code="$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" | head -n 1)"
-              package_min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
+              package_min_sdk="$(printf '%s\n' "$badging" | sed -n -E "s/^[[:space:]]*(minSdkVersion|sdkVersion):'([^']*)'.*/\2/p" | head -n 1)"
+              if [[ -z "$package_min_sdk" ]]; then
+                echo "::error::could not read minSdk from $apk"
+                printf '%s\n' "$badging" | sed -n '1,20p'
+                exit 1
+              fi
               [[ "$package_id" == "$expected_id" ]] || {
                 echo "::error::$apk applicationId is '$package_id', expected '$expected_id'"
                 exit 1

@@ -466,7 +466,12 @@ jobs:
             apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
             [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
             badging="$("$AAPT2" dump badging "$apk")"
-            min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
+            min_sdk="$(printf '%s\n' "$badging" | sed -n -E "s/^[[:space:]]*(minSdkVersion|sdkVersion):'([^']*)'.*/\2/p" | head -n 1)"
+            if [[ -z "$min_sdk" ]]; then
+              echo "::error::could not read minSdk from $apk"
+              printf '%s\n' "$badging" | sed -n '1,20p'
+              exit 1
+            fi
             [[ "$min_sdk" == "$ANDROID_MIN_SDK" ]] || {
               echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
               exit 1
@@ -587,7 +592,12 @@ jobs:
             apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
             [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
             badging="$("$AAPT2" dump badging "$apk")"
-            min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
+            min_sdk="$(printf '%s\n' "$badging" | sed -n -E "s/^[[:space:]]*(minSdkVersion|sdkVersion):'([^']*)'.*/\2/p" | head -n 1)"
+            if [[ -z "$min_sdk" ]]; then
+              echo "::error::could not read minSdk from $apk"
+              printf '%s\n' "$badging" | sed -n '1,20p'
+              exit 1
+            fi
             [[ "$min_sdk" == "$ANDROID_MIN_SDK" ]] || {
               echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
               exit 1
