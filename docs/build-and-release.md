@@ -70,7 +70,7 @@ dependency versions and hashes, CMake/NDK archives, `SOURCE_DATE_EPOCH`, `ZERO_A
 `TZ=UTC`, and static archives. Do not add an unpinned download or a host toolchain
 dependency.
 
-**Current state:** the five wallet-API patches are checked in under
+**Current state:** the six wallet-API patches are checked in under
 `external-libs/patches/` and apply cleanly to the pinned commit, but the local Monero
 submodule is uninitialized and the native archives have not been compiled. The manual
 `native` CI job is the authority for the native build.

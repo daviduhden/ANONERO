@@ -200,7 +200,7 @@ correlate the two profiles.
 These are current limitations. Items fixed in the latest development cycle are listed
 separately below.
 
-1. **Monero patch series licensing and native validation.** The five wallet-API patches
+1. **Monero patch series licensing and native validation.** The six wallet-API patches
    are checked in and apply to the pinned commit, but they are adapted from `monero_c`
    under LGPL-3.0 (see `external-libs/patches/README.md`) and the native archives have not
    been compiled. Treat the native build as unvalidated until the manual `native` CI job

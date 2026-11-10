@@ -19,6 +19,7 @@ The series is adapted from the Monero patches in
 - `0006-add-dummy-device-for-ledger.patch`
 - `0007-polyseed.patch`
 - `0008-coin-control.patch`
+- `0017-drop-generate_translations_header.c-requirement.patch`
 
 `monero_c` is licensed under LGPL-3.0; the licence text is in
 `LICENSE-LGPL-3.0`. The patches modify Monero, which remains under its own
@@ -45,6 +46,10 @@ Apache-2.0 application code.
 - A dummy hardware-device implementation so `createWalletFromDevice` and
   `queryWalletDevice` build without a Ledger dependency.
 - Proper `get_seed` error handling used by the legacy-mnemonic fallback.
+- Removal of the cross-compiled `generate_translations_header` tool. Monero otherwise
+  builds it for the Android ABI and then tries to execute it on the x86_64 build host.
+  wallet2 embedded translations become an empty table; Android UI localization is
+  unaffected.
 
 ## Nested submodules
 
@@ -60,7 +65,7 @@ patches are applied:
 ## Validation
 
 - Every patch applies with `git apply --index --3way` on a clean checkout of the
-  pinned base.
+  pinned base (six patches).
 - `git submodule update --init --recursive --depth 1` fetched all three new
   submodules at the commits above.
 - `apply.sh` and the `Containerfile` use `struct CoinsInfo` and

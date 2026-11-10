@@ -33,7 +33,7 @@ The build is intended to be reproducible. Treat every pin as a security input.
 - The ANONERO patch series under `patches/` is part of the Monero input. Patches must
   be applied to the official submodule; do not commit a locally modified Monero tree.
 
-**Current checkout state:** the five wallet-API patches, `apply.sh`, `README.md`, and
+**Current checkout state:** the six wallet-API patches, `apply.sh`, `README.md`, and
 `LICENSE-LGPL-3.0` are checked in under `patches/`. They apply cleanly to the pinned
 `85f036ba` commit. `external-libs/monero` is uninitialized locally and the native archives
 have not been compiled, so the manual `native` CI job remains the authority.

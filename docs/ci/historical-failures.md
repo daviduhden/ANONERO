@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42740103758` | `f99ade3` | `workflow_dispatch` | failure | JVM unit tests (SDK download); native (translations tool) | Patches applied; Monero tried to run an ARM64 translations binary on the host; Android SDK download timed out |
 | `42708047372` | `7fe1daa` | `workflow_dispatch` | failure | native | Patch preflight and all five patches pass; Debian snapshot 503 persisted through five apt retries |
 | `42707311457` | `ba3b3f6` | `workflow_dispatch` | failure | native | Patch series applied cleanly; Debian snapshot 503 blocked the container base stage |
 | `42700250719` | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native failed before the series was restored |
@@ -294,6 +295,38 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   package or patch failure still fails after the last attempt.
 - **Status:** external infrastructure outage. The retry loop is in place; rerun the manual
   `native` job once the snapshot backend recovers.
+
+### CI-018 — Cross-compiled translations generator executed on the build host
+
+- **Run:** `42740103758`.
+- **Job:** Build native Monero/JNI archives.
+- **Diagnostic:** `./generate_translations_header: 4: Syntax error: word unexpected
+  (expecting ")")`, preceded by `ELF` bytes being interpreted as shell input.
+- **Root cause:** Monero's `generate_translations_header` helper is cross-compiled for
+  the Android ABI and then executed on the x86_64 container host. The host cannot run the
+  ARM64 ELF, so the shell falls back to interpreting it as a script.
+- **Pattern search:** the failure occurs for every Android ABI; the host `linux` target
+  builds a native helper and does not hit it.
+- **Correction:** add `0006-drop-generate_translations_header.c-requirement.patch` from
+  the same `monero_c` series, replacing the helper with a static empty translations table.
+  Android UI localization is unaffected.
+- **Regression check:** the six patches apply with `git apply --index --3way` on the
+  pinned base; the `native` job must pass the translations stage.
+- **Status:** implemented; native compile validation pending the next run.
+
+### CI-019 — Android command-line tools download timeout
+
+- **Run:** `42740103758`.
+- **Job:** JVM unit tests, `Set up Android SDK`.
+- **Diagnostic:** `Request timeout:
+  /android/repository/commandlinetools-linux-15859902_latest.zip` from
+  `android-actions/setup-android`; the action retried and then aborted.
+- **Root cause:** transient `dl.google.com` timeout. Not project code; the previous run
+  and the lint job fetched the same tooling successfully.
+- **Pattern search:** every Gradle job uses the same action; only one job failed.
+- **Correction:** none in the repository. Rerun the workflow; a persistent failure would
+  need a pinned tooling mirror or a preinstalled SDK strategy.
+- **Status:** external infrastructure failure; monitor on rerun.
 
 ## Warning inventory
 

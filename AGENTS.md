@@ -45,7 +45,7 @@ relying on it after a significant change.
   alternate project-owned native runtime or FFI layer.
 - `external-libs/monero` is a git submodule pinned to
   `85f036ba7019cd36f08e8a38a27c37ea7b522618` (README: Monero `v0.18.5.4`).
-- `external-libs/patches/` contains the five wallet-API patches plus `apply.sh` and
+- `external-libs/patches/` contains the six wallet-API patches plus `apply.sh` and
   `README.md`. The series is adapted from the `monero_c` Monero patches and applies to
   the pinned commit; see `external-libs/patches/README.md` for provenance and licence.
   The local submodule is still unpopulated, so the native build requires CI or a manual

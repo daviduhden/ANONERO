@@ -147,7 +147,7 @@ records progress; it is not a release note and does not claim CI validation.
 - Manual CI run `42700250719` confirms: JVM unit tests pass, Android Lint reports zero
   errors and zero warnings for both flavors, Kotlin compilation emits zero warnings, and
   JNI/i18n/policy gates pass.
-- Restored the Monero wallet-API patch series: five patches adapted from the `monero_c`
+- Restored the Monero wallet-API patch series: six patches adapted from the `monero_c`
   lineage, rebased onto the pinned `85f036ba` commit, checked in with provenance and the
   LGPL-3.0 licence. They apply with `git apply --index --3way`, and the `bc-ur`,
   `polyseed`, and `utf8proc` submodules resolve at pinned commits. Native compile remains
