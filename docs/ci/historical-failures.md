@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42743643959` | `a80dbe7` | `workflow_dispatch` | failure | assemble | Native archives built successfully; the adapter failed to compile because `Get*ArrayRegion` returns void in C++ JNI |
 | `42741706801` | `de7fbb6` | `workflow_dispatch` | failure | native | JVM tests and lint pass; native compiled for 15m and failed in `wallet_rpc_server.cpp` after the coin-control signature change |
 | `42740103758` | `f99ade3` | `workflow_dispatch` | failure | JVM unit tests (SDK download); native (translations tool) | Patches applied; Monero tried to run an ARM64 translations binary on the host; Android SDK download timed out |
 | `42708047372` | `7fe1daa` | `workflow_dispatch` | failure | native | Patch preflight and all five patches pass; Debian snapshot 503 persisted through five apt retries |
@@ -346,6 +347,22 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** all seven patches apply with `git apply --index --3way`; the
   `native` job must compile `wallet_rpc_server.cpp`.
 - **Status:** implemented; native compile validation pending the next run.
+
+### CI-021 — C++ JNI array-region calls compared against an int
+
+- **Run:** `42743643959`.
+- **Job:** Assemble debug APKs and link JNI.
+- **Diagnostic:** `anonero.cpp:412:61: error: invalid operands to binary expression
+  ('void' and 'int')` and the same at line 443.
+- **Root cause:** the C++ `JNIEnv::GetLongArrayRegion` and `GetByteArrayRegion` wrappers
+  return `void` and signal failure with a pending exception; the adapter compared their
+  result with `0` as if they were the C JNI functions.
+- **Pattern search:** every `Get*ArrayRegion` and `Set*ArrayRegion` call in the adapter.
+- **Correction:** call the function, then check `ExceptionCheck()` and clear the pending
+  exception. `SetByteArrayRegion` is not compared.
+- **Regression check:** the new `assemble` job compiles both ABIs; native unit tests alone
+  would not have caught it because they did not link the adapter.
+- **Status:** implemented; assemble/link validation pending the next run.
 
 ## Warning inventory
 

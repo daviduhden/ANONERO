@@ -409,7 +409,9 @@ private:
 jlong getElement(JNIEnv *env, jlongArray arr_j, int element) {
     jlong result = 0;
     if (arr_j == nullptr) return result;
-    if (env->GetLongArrayRegion(arr_j, element, 1, &result) != 0) {
+    // JNI C++ Get*ArrayRegion returns void and raises a pending exception on failure.
+    env->GetLongArrayRegion(arr_j, element, 1, &result);
+    if (env->ExceptionCheck()) {
         env->ExceptionClear();
         return 0;
     }
@@ -439,8 +441,8 @@ std::string java2cpp_bytes(JNIEnv *env, jbyteArray array) {
     std::string result;
     result.resize(len);
     if (len > 0) {
-        if (env->GetByteArrayRegion(array, 0, len,
-                                    reinterpret_cast<jbyte *>(&result[0])) != 0) {
+        env->GetByteArrayRegion(array, 0, len, reinterpret_cast<jbyte *>(&result[0]));
+        if (env->ExceptionCheck()) {
             env->ExceptionClear();
             return std::string();
         }
