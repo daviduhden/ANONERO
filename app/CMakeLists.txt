@@ -16,6 +16,7 @@
 #
 
 cmake_minimum_required(VERSION 3.22)
+project(anonero LANGUAGES C CXX)
 
 if(NOT DEFINED ANON_ABI)
     set(ANON_ABI ${ANDROID_ABI})

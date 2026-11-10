@@ -69,8 +69,10 @@ so `assemble` and `instrumented` remain unverified.
 ### Instrumented and emulator coverage
 
 - The instrumented job is skipped whenever native fails.
-- A separate `assemble` job now links the JNI library and checks the API 29 floor even when
-  instrumented tests are skipped, but it has never run.
+- A separate `assemble` job links the JNI library and checks the API 29 floor even when
+  instrumented tests are skipped. It passes on `42847493558`.
+- The instrumented job boots the API 35 emulator but has not yet completed a test run;
+  the runner script was fixed after run `42847493558`.
 - No successful instrumented run is available, so lock/unlock, background sync, decoy,
   duress, wipe, Tor, LWS, and JNI callbacks are unverified on device.
 - The emulator matrix is API 35 x86_64 only; API 29 compile/manifest checks are separated

@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42847493558` | `27c0987` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots; runner treated the `\` continuation as a Gradle task named `\` |
 | `42841238523` | `1044ec8` | `workflow_dispatch` | failure | assemble | Native, tests, and lint pass; APK produced as `app-anon-debug.apk`; minSdk extraction returned empty |
 | `42750259391` | `c059214` | `workflow_dispatch` | failure | assemble | Native passes; Gradle produces `app-<flavor>-debug.apk` but the workflow still expected `<flavor>-debug.apk` |
 | `42743643959` | `a80dbe7` | `workflow_dispatch` | failure | assemble | Native archives built successfully; the adapter failed to compile because `Get*ArrayRegion` returns void in C++ JNI |
@@ -397,6 +398,37 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   genuinely unreadable.
 - **Status:** implemented; assemble/instrumented validation pending the next run.
 
+### CI-024 — Emulator runner interpreted a backslash as a Gradle task
+
+- **Run:** `42847493558`.
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** `Task '\' not found in root project 'anonero' and its subprojects.`
+- **Root cause:** the `android-emulator-runner` `script` input passed the multi-line Gradle
+  command without preserving the shell continuation, so the trailing `\` became a task
+  argument. The emulator itself booted.
+- **Pattern search:** the instrumented job was the only place using a `script:` block with
+  a backslash continuation.
+- **Correction:** put the two connected-test tasks on one line.
+- **Regression check:** the next instrumented run must start the tests instead of failing
+  task selection.
+- **Status:** implemented; instrumented validation pending the next run.
+
+### CI-025 — CMake warning from the missing project() declaration
+
+- **Run:** `42841238523` (assemble log).
+- **Job:** Assemble debug APKs and link JNI.
+- **Diagnostic:** `CMake Warning (dev) ... No project() command is present` in
+  `app/CMakeLists.txt`.
+- **Root cause:** the adapter CMake file declared only `cmake_minimum_required`, so CMake
+  invented a default project and emitted developer warnings.
+- **Pattern search:** the project-owned CMake files; `app/CMakeLists.txt` was the only one
+  without `project()`.
+- **Correction:** add `project(anonero LANGUAGES C CXX)` immediately after
+  `cmake_minimum_required`.
+- **Regression check:** the assemble job's CMake configure output must be free of this
+  warning.
+- **Status:** implemented; assemble validation pending the next run.
+
 ## Warning inventory
 
 ### W-001 — `sdkmanager` deprecation
@@ -437,9 +469,11 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - JVM tests pass on `dd692a8` and later.
 - Android Lint passes with zero errors and zero warnings on `0006659` and later.
 - Kotlin compilation emits zero `w:` diagnostics on `e0afc7f`.
-- The assemble/link job has never run because `native` stopped at the patch preflight
-  before the series was restored.
-- No C++ warning report.
-- No native link, instrumented, release, signing, sanitizer, or fuzz run.
-- The native job must compile the restored patch series before any of the above can be
-  validated.
+- The native archives build successfully on `42743643959` and later.
+- The assemble/link job passes on `42847493558`; it caught the JNI array-region compile
+  error, AGP 9 APK naming, and minSdk extraction issues along the way.
+- No successful instrumented run yet; the emulator boots, but the runner's script has
+  been fixed and needs one more run.
+- No C++ warning report beyond the compiler output; the adapter compiles without warnings
+  under `-Wall -Wextra -Wpedantic`.
+- No release, signing, sanitizer, or fuzz run.
