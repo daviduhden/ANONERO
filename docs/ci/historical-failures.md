@@ -364,6 +364,21 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   would not have caught it because they did not link the adapter.
 - **Status:** implemented; assemble/link validation pending the next run.
 
+### CI-022 — Debug APK names changed under AGP 9
+
+- **Run:** `42750259391`.
+- **Job:** Assemble debug APKs and link JNI.
+- **Diagnostic:** `missing app/build/outputs/apk/anon/debug/anon-debug.apk`, while the
+  diagnostic listing showed `app/build/outputs/apk/anon/debug/app-anon-debug.apk`.
+- **Root cause:** AGP 9 names the module APK `app-<flavor>-<buildType>.apk`; the workflow
+  still expected the older `<flavor>-<buildType>.apk` name. Gradle had succeeded.
+- **Pattern search:** both `assemble` and `instrumented` used the same hardcoded path.
+- **Correction:** use `app-${flavor}-debug.apk` in both jobs. The release verification
+  already uses a directory glob and is unaffected.
+- **Regression check:** the assemble job lists outputs on failure and verifies minSdk and
+  `libanonero.so` in each APK.
+- **Status:** implemented; assemble/instrumented validation pending the next run.
+
 ## Warning inventory
 
 ### W-001 — `sdkmanager` deprecation

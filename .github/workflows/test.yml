@@ -463,7 +463,7 @@ jobs:
           echo "=== debug APK outputs ==="
           find app/build/outputs -maxdepth 4 -type f -printf '%p %s\n' | sort || true
           for flavor in anon nero; do
-            apk="app/build/outputs/apk/${flavor}/debug/${flavor}-debug.apk"
+            apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
             [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
             badging="$("$AAPT2" dump badging "$apk")"
             min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
@@ -584,7 +584,7 @@ jobs:
             :app:assembleAnonDebug \
             :app:assembleNeroDebug
           for flavor in anon nero; do
-            apk="app/build/outputs/apk/${flavor}/debug/${flavor}-debug.apk"
+            apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
             [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
             badging="$("$AAPT2" dump badging "$apk")"
             min_sdk="$(printf '%s\n' "$badging" | sed -n "s/^sdkVersion:'\([^']*\)'.*/\1/p" | head -n 1)"
