@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42862824199` | `30075de` | `workflow_dispatch` | success (masked failure) | none | All jobs reported success, but the NERO XML contained `failures=1` with `failed to attach`; the runner returned 0. XML validation added afterwards |
 | `42854503254` | `578bd38` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots after 16m then dies with `Broken pipe`/adb 224 (no KVM, software x86_64) |
 | `42847493558` | `27c0987` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots; runner treated the `\` continuation as a Gradle task named `\` |
 | `42841238523` | `1044ec8` | `workflow_dispatch` | failure | assemble | Native, tests, and lint pass; APK produced as `app-anon-debug.apk`; minSdk extraction returned empty |
@@ -448,6 +449,28 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next run must reach `connectedAnonDebugAndroidTest` instead of
   dying during the post-boot adb calls.
 - **Status:** implemented; instrumented validation pending the next run.
+
+### CI-027 — Instrumented job green while the NERO report had a failure
+
+- **Run:** `42862824199`.
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** the job reported success, but
+  `flavors/nero/TEST-test(AVD) - 15.xml` contained `tests="1" failures="1"` with
+  `testRunFailed ... Instrumentation run failed due to failed to attach`.
+  `test-result-exit-code.txt` was `0`. The ANON report passed.
+- **Root cause:** the emulator runner/AGP returned success despite an instrumentation
+  attach failure, so the workflow trusted the exit code and ignored the XML. NERO may have
+  started while the software-emulated device was still settling, or its app process failed
+  to start.
+- **Pattern search:** the upload step only warns when reports are absent; no step parsed
+  the report contents. This affected both flavors.
+- **Correction:** add a required `Verify instrumented results` step that parses every
+  `TEST-*.xml`, requires anon and nero reports with at least one test, and fails on any
+  `failures`/`errors`. Add `adb wait-for-device` and a 10-second settle before Gradle.
+- **Regression check:** the next instrumented run must either pass both XML reports or fail
+  the job; a green job with a failed XML is no longer possible.
+- **Status:** validation implemented; the NERO attach failure is still open until the next
+  run.
 
 ## Warning inventory
 

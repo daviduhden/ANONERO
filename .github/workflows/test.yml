@@ -623,7 +623,48 @@ jobs:
             -no-window -gpu swiftshader_indirect -no-snapshot
             -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
+            adb wait-for-device
+            sleep 10
             ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true :app:connectedAnonDebugAndroidTest :app:connectedNeroDebugAndroidTest
+
+      - name: Verify instrumented results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          files = sorted(glob.glob(
+              "app/build/outputs/androidTest-results/**/TEST-*.xml",
+              recursive=True,
+          ))
+          if not files:
+              print("::error::no instrumented test reports were produced")
+              sys.exit(1)
+
+          flavors = set()
+          failed = []
+          for path in files:
+              root = ET.parse(path).getroot()
+              tests = int(root.get("tests", "0"))
+              failures = int(root.get("failures", "0"))
+              errors = int(root.get("errors", "0"))
+              print(f"{path}: tests={tests} failures={failures} errors={errors}")
+              if "flavors/" in path:
+                  flavors.add(path.split("flavors/", 1)[1].split("/", 1)[0])
+              if failures or errors or tests == 0:
+                  failed.append(path)
+
+          if flavors != {"anon", "nero"}:
+              print(f"::error::expected anon and nero reports, got {sorted(flavors)}")
+              sys.exit(1)
+          if failed:
+              print("::error::instrumented test failures: " + ", ".join(failed))
+              sys.exit(1)
+          PY
 
       - name: Upload instrumented reports
         if: always()

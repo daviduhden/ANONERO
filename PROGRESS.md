@@ -150,25 +150,25 @@ records progress; it is not a release note and does not claim CI validation.
 - Restored the Monero wallet-API patch series: seven patches adapted from the `monero_c`
   lineage, rebased onto the pinned `85f036ba` commit, checked in with provenance and the
   LGPL-3.0 licence. They apply with `git apply --index --3way`, and the `bc-ur`,
-  `polyseed`, and `utf8proc` submodules resolve at pinned commits. Native compile remains
-  pending; runs `42707311457` and `42708047372` applied every patch but stopped at a
-  Debian snapshot 503 in the container base image.
+  `polyseed`, and `utf8proc` submodules resolve at pinned commits. Runs `42743643959` and
+  later build the native archives and link the adapter; `assemble` produces both debug
+  APKs. Run `42862824199` reported an all-green workflow, but a post-run check found that
+  the NERO instrumented XML contained a `failed to attach` failure while the runner
+  returned 0; an explicit XML validation step was added afterwards.
 
 ## Pending validation
 
-- **Native build:** the wallet-API patch series is checked in and applies to the pinned
-  commit, but the local Monero submodule is uninitialized and the archives have not been
-  compiled. The manual `native` job is the authority. CMake/NDK/Boost/zlib changes are
-  statically reviewed only.
-- **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 have not
-  been built or instrumented locally.
+- **Native build:** the archives build and the adapter links in CI. `-Werror` and a
+  warning-free native report are still pending.
+- **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
+  CI; the instrumented NERO attach failure is still open.
 - **Runtime behavior:** lock/unlock, background sync, decoy switching, Tor transitions,
   LWS reconnect, notifications, and wipe need CI/device validation.
 - **Cryptography:** no independent side-channel or Keystore audit has been performed.
 
 ## Blocked
 
-- Native compile of the restored patch series (local submodule uninitialized; CI required).
+- Instrumented NERO attach on the KVM-less hosted runner; XML validation is now required.
 - OpenSSL 4.x, Polyseed/utf8proc updates, Debian base/snapshot, and Gradle lockfile
   generation have technical or validation blockers; see
   [`docs/architecture/dependencies.md`](docs/architecture/dependencies.md).

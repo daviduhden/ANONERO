@@ -22,15 +22,15 @@ the rationale to `ROADMAP.md`.
       signing secrets; confirm no other collaborator can run workflows from a modified ref.
 - [ ] Protect `.github/workflows/` and `main` with branch protection/CODEOWNERS.
 - [ ] Pin the expected release certificate SHA-256 and verify every signed APK against it.
-- [ ] Get a green `native` CI job with CMake 4.4.5, NDK r30, Boost 1.92, zlib 1.4, and
-      verify every archive imported by `app/CMakeLists.txt`, not only `libwallet_api.a`.
+- [ ] Verify every archive imported by `app/CMakeLists.txt`, not only `libwallet_api.a`;
+      the native archives and adapter link now build in CI.
 - [ ] Validate the Android toolchain (AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, CMake 4.1.2).
 - [ ] Run instrumented tests for lock/unlock, background sync, decoy/duress, and wipe.
 
 ## Correctness and tests
 
-- [ ] Re-run the manual Tests workflow after restoring the native inputs; JVM tests,
-      Android Lint (0/0), JNI, i18n, and policy already pass on run `42700250719`.
+- [ ] Diagnose the NERO `failed to attach` instrumented failure; the new XML validation
+      must fail the job until both anon and nero reports pass.
 - [ ] Turn on `-Werror` for the project-owned C++ target once the native build is
       reproducible and warning-free.
 - [ ] Add sanitizer/fuzz jobs (ASan/UBSan/TSan/LeakSanitizer) after native inputs are
