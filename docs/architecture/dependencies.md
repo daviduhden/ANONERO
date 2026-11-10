@@ -83,9 +83,9 @@ enumerated; `kotlinx.coroutines` was promoted to a direct declaration.
 | Unbound | 1.26.2 | 1.26.2 | 1.26.2 | Already latest stable; security release |
 | libzmq | 4.3.5 / `622fc6d…` | 4.3.5 / `622fc6d…` | 4.3.5 | Already latest stable |
 | libiconv | 1.19.1 | 1.19.1 | 1.19.1 | Already latest stable |
-| Polyseed | `bd79f50…` | `bd79f50…` | v3.0.2 | Pinned by the restored Monero patch series; native compile pending |
-| utf8proc | `3de4596…` | `3de4596…` | v2.12.0 | Pinned by the restored Monero patch series; native compile pending |
-| bc-ur | `d82e7c7…` | `d82e7c7…` | `MrCyjaneK/bc-ur` | Pinned by the restored Monero patch series; native compile pending |
+| Polyseed | `bd79f50…` | `bd79f50…` | v3.0.2 | Pinned by the restored Monero patch series; native archives built in CI |
+| utf8proc | `3de4596…` | `3de4596…` | v2.12.0 | Pinned by the restored Monero patch series; native archives built in CI |
+| bc-ur | `d82e7c7…` | `d82e7c7…` | `MrCyjaneK/bc-ur` | Pinned by the restored Monero patch series; native archives built in CI |
 | Debian base | bookworm digest `6ebd97f…` | unchanged | latest bookworm digest not verified | Blocked; digest/snapshot update needs a verified build |
 | Debian snapshot | `20260824T000000Z` | unchanged | newer snapshots exist | Blocked for reproducibility review |
 

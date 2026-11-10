@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42854503254` | `578bd38` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots after 16m then dies with `Broken pipe`/adb 224 (no KVM, software x86_64) |
 | `42847493558` | `27c0987` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots; runner treated the `\` continuation as a Gradle task named `\` |
 | `42841238523` | `1044ec8` | `workflow_dispatch` | failure | assemble | Native, tests, and lint pass; APK produced as `app-anon-debug.apk`; minSdk extraction returned empty |
 | `42750259391` | `c059214` | `workflow_dispatch` | failure | assemble | Native passes; Gradle produces `app-<flavor>-debug.apk` but the workflow still expected `<flavor>-debug.apk` |
@@ -60,7 +61,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `bc-ur`, `polyseed`, and `utf8proc` gitlinks resolve.
 - **Regression check:** native preflight requires an initialized submodule and at least one
   patch file; `assemble` now links the JNI library even when instrumented tests are skipped.
-- **Status:** patch series restored; native compile and link still pending CI.
+- **Status:** patch series restored; native archives and adapter link build in CI; instrumented still pending.
 
 ### CI-003 — Invalid resource string / apostrophe escaping
 
@@ -428,6 +429,25 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the assemble job's CMake configure output must be free of this
   warning.
 - **Status:** implemented; assemble validation pending the next run.
+
+### CI-026 — API 35 emulator dies after boot without KVM
+
+- **Run:** `42854503254`.
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** emulator boot took `963951 ms`, then `settings put` and `input keyevent`
+  failed with `Broken pipe`; adb exited 224. The log shows `/dev/kvm` is unavailable and
+  the emulator runs with `-accel off`.
+- **Root cause:** hosted Linux runners do not expose KVM, so the x86_64 image runs under
+  software emulation. The 4 GB guest plus 4 cores on the runner is unstable and the
+  emulator process died immediately after boot.
+- **Pattern search:** the instrumented job is the only emulator consumer; API 29 and ARM64
+  images are not viable on this runner either.
+- **Correction:** reduce the guest to 2 GB and 2 cores, and raise the boot timeout to
+  1200 seconds. This does not replace KVM; if the emulator still dies, the job needs a
+  self-hosted KVM runner or a device farm.
+- **Regression check:** the next run must reach `connectedAnonDebugAndroidTest` instead of
+  dying during the post-boot adb calls.
+- **Status:** implemented; instrumented validation pending the next run.
 
 ## Warning inventory
 

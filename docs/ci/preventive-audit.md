@@ -98,17 +98,17 @@ so `assemble` and `instrumented` remain unverified.
 ## Regression checks added or prepared
 
 1. `scripts/check-i18n.py` now rejects unescaped apostrophes and invalid backslash escapes
-   in Android string resources (implemented; CI pending).
+   in Android string resources (passes in CI).
 2. Kotlin import/static scan for the CI-004/CI-006/CI-008/CI-009 patterns (prepared in the
    audit; CI compilation is authoritative).
-3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (implemented;
-   CI pending).
-4. Project-owned C++ warning flags (`-Wall -Wextra -Wpedantic`) with system include trees
-   (implemented; native CI blocked). `-Werror` is deferred until a reproducible native run
-   is warning-free.
+3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (passes with
+   zero errors and zero warnings).
+4. Project-owned C++ warning flags (`-Wall -Wextra -Wpedantic`) with system include trees.
+   Native archives build and the adapter compiles without warnings; `-Werror` remains
+   deferred.
 5. JNI signature/constructor parity checks where derivable statically (pending).
-6. Gradle problems report paths in unit-test artifacts (implemented; CI pending).
-7. Assemble/link job independent of `run_instrumented` (implemented; CI pending).
+6. Gradle problems report paths in unit-test artifacts (unit job passes).
+7. Assemble/link job independent of `run_instrumented` (passes on `42847493558`).
 8. Artifact names include `run_attempt`, so a rerun cannot collide (implemented).
 9. Release tags are resolved through `refs/tags/` with an existence check (implemented).
 10. Sanitizer/fuzz jobs after the native build is reproducible; platform limits must be
@@ -130,8 +130,9 @@ These are settings, not workflow code, and cannot be supplied by this audit:
 
 - **Verified static:** resource scan, import scan, handle/string/object-factory scans,
   workflow syntax/shell/security checks, `git diff --check`.
-- **Implemented, CI pending:** the CI-003 through CI-013 fixes and the new workflow jobs.
-- **Unverified:** Kotlin compilation, C++ compilation/link, unit tests, lint, instrumented
-  tests, sanitizers, release signing.
-- **Blocked:** native build inputs, release environment, branch protection, certificate
+- **Validated in CI:** JVM unit tests, Android Lint (0/0), Kotlin compilation (0 warnings),
+  JNI symbol parity, localization, architecture policy, native archives, and debug APK
+  assembly/link.
+- **Unverified:** instrumented tests, sanitizers, release signing and publication.
+- **Blocked:** release environment, branch protection, certificate
   pinning, instrumented/sanitizer execution.

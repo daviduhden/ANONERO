@@ -615,10 +615,10 @@ jobs:
           target: ${{ matrix.target }}
           arch: ${{ matrix.arch }}
           profile: ${{ matrix.profile }}
-          cores: 4
-          ram-size: 4096M
+          cores: 2
+          ram-size: 2048M
           disable-animations: true
-          emulator-boot-timeout: 600
+          emulator-boot-timeout: 1200
           emulator-options: >-
             -no-window -gpu swiftshader_indirect -no-snapshot
             -noaudio -no-boot-anim -camera-back none -camera-front none
