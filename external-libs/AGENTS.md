@@ -47,6 +47,8 @@ the patches and do not relicense them as Apache-2.0.
   build authority.
 - Do not edit the Monero submodule working tree. Add a patch file and extend
   `patches/apply.sh` when changing the series.
+- Do not remove `external-libs/.clang-format`; its `DisableFormat: true` prevents a
+  recursive clang-format run from rewriting the vendored Monero tree.
 - Do not modify a pinned dependency version or hash to “make it build”.
 - Do not add a new native dependency unless it is required by Monero or the JNI
   adapter, is pinned, is license-compatible, and has a reproducible source URL.

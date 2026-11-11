@@ -1,0 +1,3 @@
+# Vendored Monero is pinned and patched through external-libs/patches.
+# Never reformat it from a recursive clang-format invocation.
+DisableFormat: true

@@ -1,6 +1,7 @@
 # ANONERO C++/JNI style. Keep this file in sync with the project-owned sources
 # under app/src/main/cpp; vendored Monero sources are not formatted by this file.
 BasedOnStyle: LLVM
+Standard: c++17
 IndentWidth: 4
 ColumnLimit: 100
 PointerAlignment: Right
@@ -10,3 +11,4 @@ BreakBeforeBraces: Attach
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+BreakStringLiterals: false

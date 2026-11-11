@@ -237,8 +237,8 @@ struct MyWalletListener : Monero::WalletListener {
     }
 
     /*
- * @brief updated  - generic callback, called when any event (sent/received/block reveived/etc) happened with the wallet;
- */
+     * @brief updated  - generic callback, called when any event (sent/received/block reveived/etc) happened with the wallet;
+     */
     void updated() {
         ScopedCallbackEnv callbackEnv;
         JNIEnv *jenv = callbackEnv.get();
@@ -358,8 +358,8 @@ struct MyWalletListener : Monero::WalletListener {
     }
 
     /*
- * @brief refreshed - called when wallet refreshed by background thread or explicitly refreshed by calling "refresh" synchronously
- */
+     * @brief refreshed - called when wallet refreshed by background thread or explicitly refreshed by calling "refresh" synchronously
+     */
     void refreshed() {
         ScopedCallbackEnv callbackEnv;
         JNIEnv *jenv = callbackEnv.get();
@@ -1906,9 +1906,9 @@ jobject newCoinsInfo(JNIEnv *env, Monero::CoinsInfo *info) {
     if (info == nullptr)
         return nullptr;
     // Keep this signature in sync with io.anonero.model.CoinsInfo's primary constructor.
-    jmethodID c = env->GetMethodID(class_CoinsInfo, "<init>",
-                                   "(JZLjava/lang/String;JLjava/lang/String;Ljava/lang/"
-                                   "String;ZJZIIJLjava/lang/String;Ljava/lang/String;Z)V");
+    // clang-format off
+    jmethodID c = env->GetMethodID(class_CoinsInfo, "<init>", "(JZLjava/lang/String;JLjava/lang/String;Ljava/lang/String;ZJZIIJLjava/lang/String;Ljava/lang/String;Z)V");
+    // clang-format on
     if (c == nullptr) {
         if (env->ExceptionCheck())
             env->ExceptionClear();
