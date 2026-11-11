@@ -616,7 +616,7 @@ jobs:
           arch: ${{ matrix.arch }}
           profile: ${{ matrix.profile }}
           cores: 2
-          ram-size: 2048M
+          ram-size: 3072M
           disable-animations: true
           emulator-boot-timeout: 1200
           emulator-options: >-
@@ -624,7 +624,7 @@ jobs:
             -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
             adb wait-for-device
-            sleep 10
+            sleep 60
             ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true :app:connectedAnonDebugAndroidTest :app:connectedNeroDebugAndroidTest
 
       - name: Verify instrumented results

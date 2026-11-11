@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43034549647` | `9fa5c8e` | `workflow_dispatch` | failure | instrumented | All code gates, native, and assemble pass; the first instrumented flavor (anon) failed to attach, the second (nero) passed |
 | `42874760135` | `c228e36` | `workflow_dispatch` | success | none | All jobs pass; instrumented XML validation confirms anon and nero each ran 1 test with 0 failures; lint 1 external Gradle advisory, suppressed afterwards |
 | `42862824199` | `30075de` | `workflow_dispatch` | success (masked failure) | none | All jobs reported success, but the NERO XML contained `failures=1` with `failed to attach`; the runner returned 0. XML validation added afterwards |
 | `42854503254` | `578bd38` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots after 16m then dies with `Broken pipe`/adb 224 (no KVM, software x86_64) |
@@ -488,6 +489,23 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next lint report must remain 0/0; a code warning is still
   reported.
 - **Status:** implemented; lint validation pending the final run.
+
+### CI-029 — First instrumented flavor fails to attach on the KVM-less runner
+
+- **Runs:** `42862824199` (nero first), `43034549647` (anon first).
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** the first flavor's XML contains `testRunFailed ... Instrumentation run
+  failed due to failed to attach`; the second flavor passes about 12 minutes later.
+- **Root cause:** the software-emulated device is slow immediately after boot; the first
+  instrumentation attach times out while ART/package work is still settling. The failure
+  alternates with task order, so it is not tied to one flavor's code.
+- **Pattern search:** both flavors and both runs; only the first task fails.
+- **Correction:** raise the guest to 3 GB and wait 60 seconds after `adb wait-for-device`
+  before Gradle. The XML validation remains mandatory, so a real failure still fails.
+- **Regression check:** the next run must show one passing test for each flavor; if the
+  first attach still times out, the emulator job needs a KVM-capable runner or a
+  device farm.
+- **Status:** implemented; validation pending.
 
 ## Warning inventory
 
