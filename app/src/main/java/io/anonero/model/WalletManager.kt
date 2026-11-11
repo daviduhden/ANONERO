@@ -384,12 +384,12 @@ class WalletManager {
     }
 
     companion object {
-        var LOGLEVEL_SILENT = -1
-        var LOGLEVEL_WARN = 0
-        var LOGLEVEL_INFO = 1
-        var LOGLEVEL_DEBUG = 2
-        var LOGLEVEL_TRACE = 3
-        var LOGLEVEL_MAX = 4
+        const val LOGLEVEL_SILENT = -1
+        const val LOGLEVEL_WARN = 0
+        const val LOGLEVEL_INFO = 1
+        const val LOGLEVEL_DEBUG = 2
+        const val LOGLEVEL_TRACE = 3
+        const val LOGLEVEL_MAX = 4
 
         // no need to keep a reference to the REAL WalletManager (we get it every tvTime we need it)
         @get:Synchronized

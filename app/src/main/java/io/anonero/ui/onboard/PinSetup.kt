@@ -75,8 +75,8 @@ import io.anonero.util.shake
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-const val BackSpaceKey = -2
-const val ConfirmKey = -3
+const val BACKSPACE_KEY = -2
+const val CONFIRM_KEY = -3
 val keys =
     listOf(
         1,
@@ -88,9 +88,9 @@ val keys =
         7,
         8,
         9,
-        BackSpaceKey,
+        BACKSPACE_KEY,
         0,
-        ConfirmKey,
+        CONFIRM_KEY,
     )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -206,10 +206,10 @@ fun PinSetup(
                 ) {
                     items(keys.size) { index ->
                         val key = keys[index]
-                        if (currentPin.size == 0 && key == BackSpaceKey) {
+                        if (currentPin.size == 0 && key == BACKSPACE_KEY) {
                             return@items
                         }
-                        if (currentPin.size < minimumDigits && key == ConfirmKey) {
+                        if (currentPin.size < minimumDigits && key == CONFIRM_KEY) {
                             return@items
                         }
                         Column(
@@ -220,9 +220,9 @@ fun PinSetup(
                                     .align(Alignment.Center)
                                     .combinedClickable(
                                         onClick = {
-                                            if (key == BackSpaceKey && currentPin.isNotEmpty()) {
+                                            if (key == BACKSPACE_KEY && currentPin.isNotEmpty()) {
                                                 currentPin.removeAt(currentPin.size - 1)
-                                            } else if (key == ConfirmKey) {
+                                            } else if (key == CONFIRM_KEY) {
                                                 if (confirming) {
                                                     if (currentPin.joinToString() == pinEntered.joinToString()) {
                                                         onNext.invoke(currentPin.joinToString(separator = ""))
@@ -263,7 +263,7 @@ fun PinSetup(
                                             )
                                         },
                                         onLongClick = {
-                                            if (key == BackSpaceKey) {
+                                            if (key == BACKSPACE_KEY) {
                                                 currentPin.clear()
                                                 view.performHapticFeedback(
                                                     HapticFeedbackConstants.LONG_PRESS,
@@ -281,7 +281,7 @@ fun PinSetup(
                                     tint = MaterialTheme.colorScheme.onBackground,
                                     contentDescription =
                                         stringResource(
-                                            if (key == BackSpaceKey) R.string.clear else R.string.confirm,
+                                            if (key == BACKSPACE_KEY) R.string.clear else R.string.confirm,
                                         ),
                                     modifier =
                                         Modifier

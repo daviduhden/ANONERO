@@ -290,22 +290,22 @@ open class Node {
         const val MAINNET = "mainnet"
         const val STAGENET = "stagenet"
         const val TESTNET = "testnet"
-        private var DEFAULT_LEVIN_PORT = 0
-        private var DEFAULT_RPC_PORT = 0
+        private var defaultLevinPortCache = 0
+        private var defaultRpcPortCache = 0
 
         val defaultRpcPort: Int
             // every node knows its network, but they are all the same
             get() {
 
-                if (DEFAULT_RPC_PORT > 0) return DEFAULT_RPC_PORT
-                DEFAULT_RPC_PORT =
+                if (defaultRpcPortCache > 0) return defaultRpcPortCache
+                defaultRpcPortCache =
                     when (WalletManager.instance?.networkType) {
                         NetworkType.NetworkType_Mainnet -> 18081
                         NetworkType.NetworkType_Testnet -> 28081
                         NetworkType.NetworkType_Stagenet -> 38081
                         else -> throw IllegalStateException("unsupported net " + WalletManager.instance?.networkType)
                     }
-                return DEFAULT_RPC_PORT
+                return defaultRpcPortCache
             }
 
         fun fromString(nodeString: String?): Node? =
@@ -334,14 +334,14 @@ open class Node {
     private val defaultLevinPort: Int
         // every node knows its network, but they are all the same
         get() {
-            if (DEFAULT_LEVIN_PORT > 0) return DEFAULT_LEVIN_PORT
-            DEFAULT_LEVIN_PORT =
+            if (defaultLevinPortCache > 0) return defaultLevinPortCache
+            defaultLevinPortCache =
                 when (WalletManager.instance?.networkType) {
                     NetworkType.NetworkType_Mainnet -> 18080
                     NetworkType.NetworkType_Testnet -> 28080
                     NetworkType.NetworkType_Stagenet -> 38080
                     else -> throw IllegalStateException("unsupported net " + WalletManager.instance?.networkType)
                 }
-            return DEFAULT_LEVIN_PORT
+            return defaultLevinPortCache
         }
 }

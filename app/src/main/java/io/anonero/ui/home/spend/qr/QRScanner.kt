@@ -218,8 +218,8 @@ class QRScannerVM : ViewModel() {
         )
     }
 
-    var _currentImportState: MutableLiveData<AnonUrRegistryTypes?> = MutableLiveData(null)
-    var _loaderState: MutableLiveData<Boolean> = MutableLiveData(false)
+    private var _currentImportState: MutableLiveData<AnonUrRegistryTypes?> = MutableLiveData(null)
+    private var _loaderState: MutableLiveData<Boolean> = MutableLiveData(false)
     val loaderState: LiveData<Boolean> = _loaderState
 
     @OptIn(ExperimentalCoroutinesApi::class)

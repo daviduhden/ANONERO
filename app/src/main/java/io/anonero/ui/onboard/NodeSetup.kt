@@ -74,6 +74,9 @@ import io.anonero.store.NodesRepository
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.koin.compose.koinInject
+import timber.log.Timber
+
+private const val TAG = "NodeSetup"
 
 @Composable
 fun SetupNodeComposable(
@@ -276,13 +279,15 @@ fun SetupNodeComposable(
                                         }
                                     }
                                 val validatedUrl = urlForParsing.toUri()
-                                if (validatedUrl.host == null) {
+                                val host = validatedUrl.host
+                                if (host.isNullOrBlank()) {
                                     error = resources.getString(R.string.invalid_url)
+                                    return@launch
                                 }
                                 val nodeJson =
                                     JSONObject()
                                         .apply {
-                                            put(NodeFields.RPC_HOST.value, validatedUrl.host)
+                                            put(NodeFields.RPC_HOST.value, host)
                                             put(
                                                 NodeFields.RPC_PORT.value,
                                                 if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
@@ -296,7 +301,7 @@ fun SetupNodeComposable(
                                             put(NodeFields.NODE_NAME.value, "anon")
                                         }
 
-                                editor.putString(NodeFields.RPC_HOST.value, validatedUrl.host)
+                                editor.putString(NodeFields.RPC_HOST.value, host)
                                 editor.putInt(
                                     NodeFields.RPC_PORT.value,
                                     if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
@@ -311,6 +316,7 @@ fun SetupNodeComposable(
                             }
                             oNextPressed()
                         } catch (_: Exception) {
+                            Timber.tag(TAG).w("Node setup failed")
                         }
                     }
                 },

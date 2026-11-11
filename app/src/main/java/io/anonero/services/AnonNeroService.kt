@@ -78,7 +78,7 @@ fun startAnonService(context: Context) {
  * balances, heights, addresses, or the product name.
  */
 class AnonNeroService : Service() {
-    private val TAG: String = AnonNeroService::class.java.simpleName
+    private val tag: String = AnonNeroService::class.java.simpleName
     private val job = SupervisorJob()
     private var updateJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + job)
@@ -166,7 +166,7 @@ class AnonNeroService : Service() {
             throw cancelled
         } catch (_: Exception) {
             // A transient wallet/notification error must not stop the other collectors.
-            Timber.tag(TAG).w("Notification update failed")
+            Timber.tag(tag).w("Notification update failed")
         }
     }
 
@@ -348,13 +348,13 @@ class AnonNeroService : Service() {
 
     override fun onDestroy() {
         updateJob?.cancel()
-        Timber.tag(TAG).i("onDestroy: ")
+        Timber.tag(tag).i("onDestroy: ")
         super.onDestroy()
         job.cancel()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        Timber.tag(TAG).i("onTaskRemoved: ")
+        Timber.tag(tag).i("onTaskRemoved: ")
         torService.dispose()
         updateJob?.cancel()
         job.cancel()

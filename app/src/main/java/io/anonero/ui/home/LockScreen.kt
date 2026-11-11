@@ -102,8 +102,8 @@ import org.koin.core.qualifier.named
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
-const val BackSpaceKey = -2
-const val ConfirmKey = -3
+const val BACKSPACE_KEY = -2
+const val CONFIRM_KEY = -3
 val keys =
     listOf(
         1,
@@ -115,9 +115,9 @@ val keys =
         7,
         8,
         9,
-        BackSpaceKey,
+        BACKSPACE_KEY,
         0,
-        ConfirmKey,
+        CONFIRM_KEY,
     )
 
 @Serializable
@@ -170,7 +170,7 @@ fun LockScreen(
     val appViewModel: AppViewModel = koinViewModel()
 
     LaunchedEffect(true) {
-        pinKeys = keys.shuffleExcept(keys.indexOf(BackSpaceKey), keys.indexOf(ConfirmKey))
+        pinKeys = keys.shuffleExcept(keys.indexOf(BACKSPACE_KEY), keys.indexOf(CONFIRM_KEY))
     }
 
     // ms left on a PIN wait: read once (a wait outlives a restart; off the main thread, since a
@@ -383,10 +383,10 @@ fun LockScreen(
                 ) {
                     items(pinKeys.size) { index ->
                         val key = pinKeys[index]
-                        if (currentPin.size == 0 && key == BackSpaceKey) {
+                        if (currentPin.size == 0 && key == BACKSPACE_KEY) {
                             return@items
                         }
-                        if (currentPin.size < 4 && key == ConfirmKey) {
+                        if (currentPin.size < 4 && key == CONFIRM_KEY) {
                             return@items
                         }
                         Column(
@@ -397,9 +397,9 @@ fun LockScreen(
                                     .combinedClickable(
                                         onClick = {
                                             if (lockedFor > 0) return@combinedClickable
-                                            if (key == BackSpaceKey && currentPin.isNotEmpty()) {
+                                            if (key == BACKSPACE_KEY && currentPin.isNotEmpty()) {
                                                 currentPin.removeAt(currentPin.size - 1)
-                                            } else if (key == ConfirmKey) {
+                                            } else if (key == CONFIRM_KEY) {
                                                 checkPin(LockScreenShortCut.HOME)
                                             } else {
                                                 if (currentPin.size < 12) {
@@ -413,7 +413,7 @@ fun LockScreen(
                                             )
                                         },
                                         onLongClick = {
-                                            if (key == BackSpaceKey) {
+                                            if (key == BACKSPACE_KEY) {
                                                 currentPin.clear()
                                                 view.performHapticFeedback(
                                                     HapticFeedbackConstants.LONG_PRESS,
@@ -431,7 +431,7 @@ fun LockScreen(
                                     tint = MaterialTheme.colorScheme.onBackground,
                                     contentDescription =
                                         stringResource(
-                                            if (key == BackSpaceKey) R.string.clear else R.string.confirm,
+                                            if (key == BACKSPACE_KEY) R.string.clear else R.string.confirm,
                                         ),
                                     modifier =
                                         Modifier

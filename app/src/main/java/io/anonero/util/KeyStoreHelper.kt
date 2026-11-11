@@ -540,7 +540,7 @@ object KeyStoreHelper {
     @Throws(GeneralSecurityException::class)
     private fun signData(data: ByteArray): ByteArray? {
         val privateKey = getPrivateKey(RSA_ALIAS) ?: return null
-        val signature = Signature.getInstance(SecurityConstants.SIGNATURE_SHA256withRSA)
+        val signature = Signature.getInstance(SecurityConstants.SIGNATURE_SHA256_WITH_RSA)
         signature.initSign(privateKey)
         signature.update(data)
         return signature.sign()
@@ -549,7 +549,7 @@ object KeyStoreHelper {
     object SecurityConstants {
         const val KEYSTORE_PROVIDER_ANDROID_KEYSTORE = "AndroidKeyStore"
         const val TYPE_RSA = "RSA"
-        const val SIGNATURE_SHA256withRSA = "SHA256withRSA"
+        const val SIGNATURE_SHA256_WITH_RSA = "SHA256withRSA"
         const val CIPHER_RSA_ECB_PKCS1 = "RSA/ECB/PKCS1Padding"
         const val WALLET_PASS_PREFS_NAME = "wallet"
         const val WALLET_PASS_KEY_PREFIX = "walletKey-"

@@ -12,13 +12,13 @@ indent_size = 4
 ktlint_code_style = ktlint_official
 # Compose UI functions are PascalCase by convention.
 ktlint_function_naming_ignore_when_annotated_with = Composable
-# wallet2/JNI and backup formats use the NetworkType_*/Status_* spellings.
+# NetworkType_* is persisted by kotlinx.serialization in nodes_store and used by the
+# backup format; the other *_ names intentionally mirror wallet2 enum spellings.
 ktlint_standard_enum-entry-name-case = disabled
-# The project uses _name backing properties for StateFlow/LiveData; ktlint
-# cannot distinguish them from unrelated underscore properties.
+# The codebase uses a leading underscore for private state, not only for observable
+# backing properties with a public counterpart. Enforcing the rule would force a
+# repository-wide rename without fixing a defect.
 ktlint_standard_backing-property-naming = disabled
-# Preserve legacy/JNI property names (TAG, const aliases) across the codebase.
-ktlint_standard_property-naming = disabled
 max_line_length = 140
 
 [*.sh]

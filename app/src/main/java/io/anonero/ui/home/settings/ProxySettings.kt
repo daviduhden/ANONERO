@@ -90,7 +90,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
-import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -403,10 +402,6 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                     shape = MaterialTheme.shapes.medium,
                     onValueChange = { text ->
                         proxyAddress = text
-                        try {
-                            text.toUri()
-                        } catch (_: Exception) {
-                        }
                     },
                     keyboardOptions =
                         KeyboardOptions(
