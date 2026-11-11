@@ -72,7 +72,7 @@ It cannot sign with the wallet spend key.
 
 ## 5. Airgapped QR/UR exchange
 
-The airgapped flow uses the UR registry types in `AnonUrTypes`:
+The airgapped flow uses the UR registry types in `AnonUrRegistryTypes`:
 
 | Type | Purpose |
 | --- | --- |

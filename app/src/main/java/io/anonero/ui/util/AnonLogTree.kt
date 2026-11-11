@@ -34,12 +34,10 @@ import timber.log.Timber
 import java.io.File
 import java.util.Date
 
-
 class AnonLogTree(
     private val logFile: File,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
 ) : Timber.DebugTree() {
-
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val prefs by lazy {
@@ -50,14 +48,22 @@ class AnonLogTree(
     // above; debug-level lines (per-block sync, QR payloads) stay in debug builds only.
     // Stealth mode suppresses persistence entirely: a log file is an at-rest record of
     // amounts (historically), node addresses and wallet lifecycle.
-    override fun isLoggable(tag: String?, priority: Int): Boolean {
+    override fun isLoggable(
+        tag: String?,
+        priority: Int,
+    ): Boolean {
         val stealth = prefs?.let { StealthMode.isEnabled(it) } == true
         return !stealth && (BuildConfig.DEBUG || priority >= Log.INFO)
     }
 
     // This is the Timber tree itself; using Timber here would recurse into this method.
     @Suppress("LogNotTimber")
-    override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+    override fun log(
+        priority: Int,
+        tag: String?,
+        message: String,
+        t: Throwable?,
+    ) {
         // Timber has already appended t's stack trace to message
         val item = AnonLog(date = Date().time, message = message, priority = priority, tag = tag ?: "Anon")
         ioScope.launch {

@@ -24,27 +24,24 @@ import com.sparrowwallet.hummingbird.UR
  * UR registry types used by ANONERO's airgapped transaction exchange.
  *
  * The strings and tags are part of the interchange format and must match the UR
- * implementation on the other side. See `AnonUrTypes` consumers in `Send.kt`,
+ * implementation on the other side. See `AnonUrRegistryTypes` consumers in `Send.kt`,
  * `SpendQRExchange.kt`, and `QRScanner.kt`.
  */
-enum class AnonUrRegistryTypes(val type: String, val tag: Int) {
+enum class AnonUrRegistryTypes(
+    val type: String,
+    val tag: Int,
+) {
     XMR_OUTPUT("xmr-output", 610),
     XMR_KEY_IMAGE("xmr-keyimage", 611),
     XMR_TX_UNSIGNED("xmr-txunsigned", 612),
-    XMR_TX_SIGNED("xmr-txsigned", 613);
+    XMR_TX_SIGNED("xmr-txsigned", 613),
+    ;
 
-    override fun toString(): String {
-        return type
-    }
+    override fun toString(): String = type
 
     companion object {
-        fun fromString(type: String): AnonUrRegistryTypes? {
-            return AnonUrRegistryTypes.values().find { it.type == type }
-        }
+        fun fromString(type: String): AnonUrRegistryTypes? = AnonUrRegistryTypes.values().find { it.type == type }
 
-        fun fromUrTag(ur: UR): AnonUrRegistryTypes? {
-            return AnonUrRegistryTypes.values().find { it.type == ur.type }
-        }
+        fun fromUrTag(ur: UR): AnonUrRegistryTypes? = AnonUrRegistryTypes.values().find { it.type == ur.type }
     }
-
 }

@@ -38,11 +38,8 @@ import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-
 @Composable
-fun rememberShakeController(): ShakeController {
-    return remember { ShakeController() }
-}
+fun rememberShakeController(): ShakeController = remember { ShakeController() }
 
 class ShakeController {
     var shakeConfig: ShakeConfig? by mutableStateOf(null)
@@ -54,18 +51,18 @@ class ShakeController {
 
     suspend fun shake(view: View) {
         ShakeConfig(
-            6, translateX = 5f
+            6,
+            translateX = 5f,
         )
         repeat(6) {
             delay(50)
             view.performHapticFeedback(
-                HapticFeedbackConstants.CONTEXT_CLICK
+                HapticFeedbackConstants.CONTEXT_CLICK,
             )
         }
         delay(100)
     }
 }
-
 
 data class ShakeConfig(
     val iterations: Int,
@@ -80,34 +77,33 @@ data class ShakeConfig(
     val trigger: Long = System.currentTimeMillis(),
 )
 
-fun Modifier.shake(shakeController: ShakeController) = composed {
-    shakeController.shakeConfig?.let { shakeConfig ->
-        val shake = remember { Animatable(0f) }
-        LaunchedEffect(shakeController.shakeConfig) {
-            for (i in 0..shakeConfig.iterations) {
-                when (i % 2) {
-                    0 -> shake.animateTo(1f, spring(stiffness = shakeConfig.intensity))
-                    else -> shake.animateTo(-1f, spring(stiffness = shakeConfig.intensity))
+fun Modifier.shake(shakeController: ShakeController) =
+    composed {
+        shakeController.shakeConfig?.let { shakeConfig ->
+            val shake = remember { Animatable(0f) }
+            LaunchedEffect(shakeController.shakeConfig) {
+                for (i in 0..shakeConfig.iterations) {
+                    when (i % 2) {
+                        0 -> shake.animateTo(1f, spring(stiffness = shakeConfig.intensity))
+                        else -> shake.animateTo(-1f, spring(stiffness = shakeConfig.intensity))
+                    }
                 }
+                shake.animateTo(0f)
             }
-            shake.animateTo(0f)
-        }
 
-        this
-            .rotate(shake.value * shakeConfig.rotate)
-            .graphicsLayer {
-                rotationX = shake.value * shakeConfig.rotateX
-                rotationY = shake.value * shakeConfig.rotateY
-            }
-            .scale(
-                scaleX = 1f + (shake.value * shakeConfig.scaleX),
-                scaleY = 1f + (shake.value * shakeConfig.scaleY),
-            )
-            .offset {
-                IntOffset(
-                    (shake.value * shakeConfig.translateX).roundToInt(),
-                    (shake.value * shakeConfig.translateY).roundToInt(),
-                )
-            }
-    } ?: this@shake
-}
+            this
+                .rotate(shake.value * shakeConfig.rotate)
+                .graphicsLayer {
+                    rotationX = shake.value * shakeConfig.rotateX
+                    rotationY = shake.value * shakeConfig.rotateY
+                }.scale(
+                    scaleX = 1f + (shake.value * shakeConfig.scaleX),
+                    scaleY = 1f + (shake.value * shakeConfig.scaleY),
+                ).offset {
+                    IntOffset(
+                        (shake.value * shakeConfig.translateX).roundToInt(),
+                        (shake.value * shakeConfig.translateY).roundToInt(),
+                    )
+                }
+        } ?: this@shake
+    }
