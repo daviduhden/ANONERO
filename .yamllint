@@ -1,0 +1,10 @@
+extends: default
+
+rules:
+  # Workflow YAML is intentionally kept on single logical lines where that is
+  # clearer (commands, long expressions); the 80-column rule is not a project
+  # requirement.
+  line-length: disable
+  document-start: disable
+  comments: disable
+  truthy: disable

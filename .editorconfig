@@ -1,0 +1,38 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+ktlint_code_style = ktlint_official
+# Compose UI functions are PascalCase by convention.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# wallet2/JNI and backup formats use the NetworkType_*/Status_* spellings.
+ktlint_standard_enum-entry-name-case = disabled
+# The project uses _name backing properties for StateFlow/LiveData; ktlint
+# cannot distinguish them from unrelated underscore properties.
+ktlint_standard_backing-property-naming = disabled
+# Preserve legacy/JNI property names (TAG, const aliases) across the codebase.
+ktlint_standard_property-naming = disabled
+max_line_length = 140
+
+[*.sh]
+indent_style = space
+indent_size = 4
+switch_case_indent = true
+binary_next_line = false
+
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+[**/NavGraph.kt]
+# Deliberate legacy stub, documented in docs/; remove in a dedicated cleanup.
+ktlint_standard_no-empty-file = disabled
+ktlint_standard_no-consecutive-comments = disabled

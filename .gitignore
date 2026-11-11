@@ -39,3 +39,8 @@ app/anon/stageNet/*.json
 # Signing keystores must never be committed
 *.jks
 *.keystore
+
+# Python tooling caches
+__pycache__/
+*.py[cod]
+.ruff_cache/
