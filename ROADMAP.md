@@ -60,6 +60,9 @@ then maintainability.
 - Add Android Lint and project-owned C++ warning gates, then move to `-Werror` when the
   native build is reproducible. Add sanitizer/fuzz coverage only with a working native
   matrix.
+- Move instrumented tests to a KVM-capable runner or a device farm; the hosted Linux
+  runner cannot run the x86_64 emulator deterministically under TCG.
+- Add a pinned format/lint gate for Kotlin, C++, Python, shell, and workflows.
 
 ## 6. Documentation and maintainability
 

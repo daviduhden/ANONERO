@@ -187,6 +187,13 @@ decision and documentation, not a local workaround.
   `workflow_call` used by the manual release workflow). Do not trigger, rerun, or cancel a
   workflow without explicit authorization; the agent is not authorized to start Actions.
   The owner gate and repository protections are described in `.github/workflows/AGENTS.md`.
+- **Static linting and formatting are allowed.** Run the checked-in linters without
+  compiling: `ktlint`, `clang-format --dry-run --Werror`, `ruff check` /
+  `ruff format --check`, `shfmt -d`, `shellcheck`, `yamllint`, `zizmor`, and `actionlint`.
+  The configurations in `.editorconfig`, `.clang-format`, `.yamllint`, and
+  `pyproject.toml` are authoritative. Never reformat vendored Monero or bypass a linter
+  by disabling a rule without a documented project reason. A formatting-only change is
+  not proof of compilation; CI remains the build and test authority.
 - **CI is the build authority.**
   - `.github/workflows/test.yml`: JVM unit tests, Android Lint, JNI symbol contract,
     localization, Kotlin/C++ policy, native archives, instrumented tests.

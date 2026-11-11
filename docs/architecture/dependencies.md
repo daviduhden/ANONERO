@@ -131,6 +131,28 @@ No application source API changes were required by these updates. The AGP 9.5 an
 Gradle 9.9 APIs used by the project are the same APIs already used under AGP 9.3 and
 Gradle 9.7.
 
+## 4.1 Static analysis tooling (not build dependencies)
+
+The repository checks in `.editorconfig`, `.clang-format`, `.yamllint`, `pyproject.toml`,
+and `external-libs/.clang-format`. These tools are run manually and are **not** build
+dependencies:
+
+| Tool | Scope | Version used for the formatting audit |
+| --- | --- | --- |
+| ktlint | `*.kt`, `*.kts` | 1.8.0 |
+| clang-format | `app/src/main/cpp/*` | 23.1.5 |
+| Ruff | `scripts/*.py` | 0.17.4 |
+| shfmt | `*.sh` | 3.14.1 |
+| ShellCheck | `*.sh` | 0.11.0 |
+| yamllint | `.github/workflows` | 1.38.0 |
+| actionlint | `.github/workflows` | 1.7.12 |
+| zizmor | `.github/workflows` | 1.32.0 |
+
+The versions are not pinned by the repository and no CI job enforces the formatting yet;
+a future gate must pin them to avoid spurious diffs between formatter releases. The
+checked-in `external-libs/.clang-format` sets `DisableFormat: true` so a recursive
+invocation cannot reformat the vendored Monero tree.
+
 ## 5. Security review
 
 - OSV queries for the pinned Maven artifacts (Bouncy Castle, ZXing, Timber, BoofCV,

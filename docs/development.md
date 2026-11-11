@@ -152,6 +152,14 @@ Allowed for agent work:
 python3 scripts/check-jni-contract.py
 python3 scripts/check-i18n.py
 bash -n external-libs/build.sh external-libs/patches/apply.sh
+git ls-files -z '*.kt' '*.kts' | xargs -0 ktlint
+clang-format --dry-run --Werror app/src/main/cpp/anonero.cpp app/src/main/cpp/anonero.h
+ruff check scripts && ruff format --check scripts
+shfmt -d -i 4 -ci $(git ls-files '*.sh')
+shellcheck -x $(git ls-files '*.sh')
+yamllint .github/workflows
+actionlint .github/workflows/*.yml
+zizmor .github/workflows
 git diff --check
 grep/rg, file inspection, XML/TOML parsing
 ```

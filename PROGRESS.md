@@ -156,19 +156,40 @@ records progress; it is not a release note and does not claim CI validation.
   instrumented smoke tests pass for both anon and nero, with the XML validation confirming
   one test and zero failures per flavor. A prior run had exposed a masked NERO attach
   failure; the runner now fails on any failed XML.
+- Adopted ktlint, clang-format, Ruff, shfmt, shellcheck, yamllint, zizmor, and actionlint
+  with checked-in configuration, and applied the formatters across the Kotlin, C++, Python,
+  and shell sources. All linters pass locally. The formatting commits `a487cf5`..`32d8c1a`
+  have no CI run yet.
+- Run `43108046671` (`02b97b8`) passed every job except instrumented: the KVM-less
+  emulator lost `system_server` during install and produced `tests=0` XML reports. Added
+  a guest health gate, crash diagnostics, stricter XML/exit-code validation, disk cleanup,
+  and returned to the only configuration with a green run (2048M). The root trigger is
+  still unverified without logcat.
+- The post-format static audit found and fixed two fail-open data paths: a corrupt
+  `nodes_store` no longer reads as an empty list (writes fail closed and the settings screen
+  reports the error), and a malformed backup version now fails the restore instead of
+  selecting the legacy PIN key. `QRScannerVM` no longer exposes its import state as a
+  public `var`, `property-naming` is enforced by ktlint again, and
+  `external-libs/.clang-format` prevents recursive formatting of vendored Monero.
+  Onboarding now refuses an invalid node URL instead of persisting it and advancing, and a
+  dead exception-swallowing block in proxy settings was removed. New JVM regressions cover
+  both serializers.
 
 ## Pending validation
 
 - **Native build:** the archives build and the adapter links in CI. `-Werror` and a
   warning-free native report are still pending.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
-  CI; the API 35 instrumented smoke tests pass for both flavors.
+  CI. The API 35 smoke tests passed once (`42874760135`) but are not stable on hosted
+  runners without KVM.
 - **Runtime behavior:** lock/unlock, background sync, decoy switching, Tor transitions,
   LWS reconnect, notifications, and wipe still need dedicated device tests.
 - **Cryptography:** no independent side-channel or Keystore audit has been performed.
 
 ## Blocked
 
+- Deterministic instrumented execution requires a self-hosted KVM runner or a device
+  farm; the hosted runner uses software x86_64 emulation.
 - Broader instrumented wallet, Tor, LWS, lock/decoy, and wipe coverage still requires
   dedicated device tests; the current emulator job runs only the package smoke test.
 - OpenSSL 4.x, Polyseed/utf8proc updates, Debian base/snapshot, and Gradle lockfile
