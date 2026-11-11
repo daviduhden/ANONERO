@@ -500,12 +500,12 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   instrumentation attach times out while ART/package work is still settling. The failure
   alternates with task order, so it is not tied to one flavor's code.
 - **Pattern search:** both flavors and both runs; only the first task fails.
-- **Correction:** raise the guest to 3 GB and wait 60 seconds after `adb wait-for-device`
-  before Gradle. The XML validation remains mandatory, so a real failure still fails.
+- **Correction:** raise the guest to 3 GB, wait 60 seconds after `adb wait-for-device`,
+  and retry only a flavor whose XML contains `failed to attach`. Assertion, crash, and
+  test failures are not retried; the XML validation remains mandatory.
 - **Regression check:** the next run must show one passing test for each flavor; if the
-  first attach still times out, the emulator job needs a KVM-capable runner or a
-  device farm.
-- **Status:** implemented; validation pending.
+  retry also fails, the emulator job needs a KVM-capable runner or a device farm.
+- **Status:** implemented with a targeted cold-start retry; validation pending.
 
 ## Warning inventory
 
