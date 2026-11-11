@@ -75,7 +75,8 @@ jobs:
   test:
     name: Required test suite
     needs: authorize
-    uses: ./.github/workflows/test.yml
+    # actionlint 1.x does not accept $/ yet; keep ./ for compatibility.
+    uses: ./.github/workflows/test.yml # zizmor: ignore[self-repository]
     permissions:
       contents: read
     with:
