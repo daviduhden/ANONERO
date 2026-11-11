@@ -50,9 +50,7 @@ def kotlin_external_names() -> set[str]:
         # Kotlin generates getX()/setX() for a property; the adapter exports getX.
         for marker in re.finditer(r"\bexternal\s+get\b", text):
             prefix = text[: marker.start()]
-            properties = list(
-                re.finditer(r"\bval\s+([A-Za-z_]\w*)\s*:", prefix)
-            )
+            properties = list(re.finditer(r"\bval\s+([A-Za-z_]\w*)\s*:", prefix))
             if properties:
                 prop = properties[-1].group(1)
                 names.add("get" + prop[0].upper() + prop[1:])
@@ -66,10 +64,7 @@ def native_exports() -> set[str]:
 
 def has_export(method: str, exports: set[str]) -> bool:
     escaped = method.replace("_", "_1")
-    return any(
-        export.endswith("_" + method) or export.endswith("_" + escaped)
-        for export in exports
-    )
+    return any(export.endswith(("_" + method, "_" + escaped)) for export in exports)
 
 
 def main() -> int:
@@ -98,10 +93,7 @@ def main() -> int:
 
 
 def has_export_any(export: str, external: set[str]) -> bool:
-    return any(
-        export.endswith("_" + name) or export.endswith("_" + name.replace("_", "_1"))
-        for name in external
-    )
+    return any(export.endswith(("_" + name, "_" + name.replace("_", "_1"))) for name in external)
 
 
 if __name__ == "__main__":

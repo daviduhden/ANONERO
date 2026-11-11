@@ -38,7 +38,6 @@ from __future__ import annotations
 import re
 import sys
 import xml.etree.ElementTree as ET
-from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -100,14 +99,10 @@ def parse_catalog(paths: list[Path]) -> tuple[dict[str, str], dict[str, list[str
             elif element.tag == "plurals":
                 if name in plurals:
                     raise SystemExit(f"duplicate plurals '{name}' in {path}")
-                quantities = [
-                    item.get("quantity", "") for item in element.findall("item")
-                ]
+                quantities = [item.get("quantity", "") for item in element.findall("item")]
                 plurals[name] = quantities
                 for item in element.findall("item"):
-                    strings[f"{name}[{item.get('quantity')}]"] = "".join(
-                        item.itertext()
-                    )
+                    strings[f"{name}[{item.get('quantity')}]"] = "".join(item.itertext())
     return strings, plurals
 
 
@@ -119,7 +114,7 @@ def android_escape_errors(path: Path) -> list[str]:
     """AAPT rejects unescaped apostrophes and unknown backslash escapes in string text."""
     errors: list[str] = []
     text = path.read_text(encoding="utf-8")
-    element = re.compile(r"<(?:string|item)\b[^>]*>(.*?)</(?:string|item)>", re.S)
+    element = re.compile(r"<(?:string|item)\b[^>]*>(.*?)</(?:string|item)>", re.DOTALL)
     for match in element.finditer(text):
         body = match.group(1)
         line = text.count("\n", 0, match.start(1)) + 1
@@ -128,11 +123,11 @@ def android_escape_errors(path: Path) -> list[str]:
         while i < len(body):
             char = body[i]
             if char == "\\":
-                nxt = body[i + 1:i + 2]
+                nxt = body[i + 1 : i + 2]
                 if nxt in "nt'\"\\@?":
                     i += 2
                     continue
-                if nxt == "u" and re.fullmatch(r"[0-9A-Fa-f]{4}", body[i + 2:i + 6] or ""):
+                if nxt == "u" and re.fullmatch(r"[0-9A-Fa-f]{4}", body[i + 2 : i + 6] or ""):
                     i += 6
                     continue
                 errors.append(f"{path.relative_to(ROOT)}:{line}: invalid string escape")
@@ -150,9 +145,7 @@ def main() -> int:
     errors = 0
     base_strings, base_plurals = parse_catalog(BASE_FILES)
     base_keys = set(base_strings)
-    base_names = {
-        key for key in base_strings if not key.endswith("]") and "[" not in key
-    }
+    base_names = {key for key in base_strings if not key.endswith("]") and "[" not in key}
 
     for locale, files in LOCALES.items():
         strings, plurals = parse_catalog(files)
@@ -173,8 +166,7 @@ def main() -> int:
             missing_quantities = REQUIRED_QUANTITIES[locale] - set(quantities)
             if missing_quantities:
                 fail(
-                    f"{locale}: plural '{name}' is missing quantities "
-                    f"{sorted(missing_quantities)}"
+                    f"{locale}: plural '{name}' is missing quantities {sorted(missing_quantities)}"
                 )
                 errors += 1
         for name in sorted(base_keys & set(strings)):
@@ -197,9 +189,7 @@ def main() -> int:
                 errors += 1
 
     for path in kotlin_files:
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             for pattern in KOTLIN_UI_PATTERNS:
                 match = pattern.search(line)
                 if not match:
@@ -213,10 +203,7 @@ def main() -> int:
                     continue
                 if not any(character.isalpha() for character in value):
                     continue
-                fail(
-                    f"{path.relative_to(ROOT)}:{line_number}: hardcoded UI text "
-                    f"'{value}'"
-                )
+                fail(f"{path.relative_to(ROOT)}:{line_number}: hardcoded UI text '{value}'")
                 errors += 1
 
     for path in sorted(RES.glob("values*/*.xml")):
