@@ -36,7 +36,7 @@ The build is intended to be reproducible. Treat every pin as a security input.
 **Current checkout state:** the seven wallet-API patches, `apply.sh`, `README.md`, and
 `LICENSE-LGPL-3.0` are checked in under `patches/`. They apply cleanly to the pinned
 `85f036ba` commit. `external-libs/monero` is uninitialized locally and the native archives
-have not been compiled, so the manual `native` CI job remains the authority.
+build in CI; the local submodule is still uninitialized, so local native work needs the submodule checkout.
 
 The patch series is adapted from `monero_c` and is LGPL-3.0; keep the licence file with
 the patches and do not relicense them as Apache-2.0.

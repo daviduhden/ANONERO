@@ -21,6 +21,10 @@
     <issue id="UnusedResources">
         <ignore path="src/main/res/raw/words.txt" />
     </issue>
+    <!-- The Gradle/AGP pins are upgraded deliberately with a validated toolchain
+         change; the "newer version available" advisory is not a code defect. -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+
     <!-- Brand artwork is intentionally detailed; keep the original paths. -->
     <issue id="VectorPath">
         <ignore path="src/main/res/drawable/anon_notification.xml" />

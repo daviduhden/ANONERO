@@ -72,8 +72,8 @@ dependency.
 
 **Current state:** the seven wallet-API patches are checked in under
 `external-libs/patches/` and apply cleanly to the pinned commit, but the local Monero
-submodule is uninitialized and the native archives have not been compiled. The manual
-`native` CI job is the authority for the native build.
+submodule is uninitialized locally; CI builds the native archives, assembles both debug
+APKs, and runs the API 35 smoke tests.
 
 ## 4. GitHub Actions: test pipeline
 

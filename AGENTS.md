@@ -378,12 +378,12 @@ Rules for documentation:
 ## 12. Known limitations (current checkout)
 
 - The Monero wallet-API patch series is checked in and applies cleanly to the pinned
-  commit, but the native build has not been compiled in this checkout. Do not claim
-  native build success until the manual CI `native` job passes.
+  commit. CI builds the native archives, both debug APKs, and the API 35 smoke tests.
+  Broader runtime and device behavior remains unverified.
 - The Monero submodule is uninitialized locally; CI checks it out.
-- The native toolchain update (CMake 4.4.5, NDK r30, Boost 1.92.0, zlib 1.4) and the
-  Android toolchain update (AGP 9.5.1, Gradle 9.9.0, CMake 4.1.2, NDK 30) have not
-  been compiled or linked. CI must validate them.
+- The native toolchain (CMake 4.4.5, NDK r30, Boost 1.92.0, zlib 1.4) and the Android
+  toolchain (AGP 9.5.1, Gradle 9.9.0, CMake 4.1.2, NDK 30) build in CI; `-Werror` is
+  still pending.
 - No Gradle dependency lockfile or dependency verification metadata is checked in;
   generating them requires a resolution step that is not permitted locally.
 - No runtime or device verification was performed for these instructions.

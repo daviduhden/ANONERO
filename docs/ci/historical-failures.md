@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `42874760135` | `c228e36` | `workflow_dispatch` | success | none | All jobs pass; instrumented XML validation confirms anon and nero each ran 1 test with 0 failures; lint 1 external Gradle advisory, suppressed afterwards |
 | `42862824199` | `30075de` | `workflow_dispatch` | success (masked failure) | none | All jobs reported success, but the NERO XML contained `failures=1` with `failed to attach`; the runner returned 0. XML validation added afterwards |
 | `42854503254` | `578bd38` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots after 16m then dies with `Broken pipe`/adb 224 (no KVM, software x86_64) |
 | `42847493558` | `27c0987` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots; runner treated the `\` continuation as a Gradle task named `\` |
@@ -62,7 +63,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `bc-ur`, `polyseed`, and `utf8proc` gitlinks resolve.
 - **Regression check:** native preflight requires an initialized submodule and at least one
   patch file; `assemble` now links the JNI library even when instrumented tests are skipped.
-- **Status:** patch series restored; native archives and adapter link build in CI; instrumented still pending.
+- **Status:** patch series restored; native archives, adapter link, and the API 35 smoke tests pass in CI.
 
 ### CI-003 — Invalid resource string / apostrophe escaping
 
@@ -382,7 +383,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   already uses a directory glob and is unaffected.
 - **Regression check:** the assemble job lists outputs on failure and verifies minSdk and
   `libanonero.so` in each APK.
-- **Status:** implemented; assemble/instrumented validation pending the next run.
+- **Status:** validated in CI.
 
 ### CI-023 — `aapt2 dump badging` minSdk label mismatch
 
@@ -398,7 +399,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   print the first badging lines if the value is still empty. Applied to all three sites.
 - **Regression check:** the assemble job now fails with a diagnostic only when the APK is
   genuinely unreadable.
-- **Status:** implemented; assemble/instrumented validation pending the next run.
+- **Status:** validated in CI.
 
 ### CI-024 — Emulator runner interpreted a backslash as a Gradle task
 
@@ -413,7 +414,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** put the two connected-test tasks on one line.
 - **Regression check:** the next instrumented run must start the tests instead of failing
   task selection.
-- **Status:** implemented; instrumented validation pending the next run.
+- **Status:** validated in CI.
 
 ### CI-025 — CMake warning from the missing project() declaration
 
@@ -448,7 +449,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   self-hosted KVM runner or a device farm.
 - **Regression check:** the next run must reach `connectedAnonDebugAndroidTest` instead of
   dying during the post-boot adb calls.
-- **Status:** implemented; instrumented validation pending the next run.
+- **Status:** validated in CI.
 
 ### CI-027 — Instrumented job green while the NERO report had a failure
 
@@ -469,8 +470,24 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `failures`/`errors`. Add `adb wait-for-device` and a 10-second settle before Gradle.
 - **Regression check:** the next instrumented run must either pass both XML reports or fail
   the job; a green job with a failed XML is no longer possible.
-- **Status:** validation implemented; the NERO attach failure is still open until the next
-  run.
+- **Status:** validated on `42874760135`: both anon and nero XML reports contain one test,
+  zero failures, and zero errors. The 10-second settle resolved the cold-start attach
+  failure.
+
+### CI-028 — Gradle update advisory after the green run
+
+- **Run:** `42874760135` (lint reports).
+- **Diagnostic:** `AndroidGradlePluginVersion: A newer version of Gradle than 9.9.0 is
+  available: 9.9.1` for both flavors.
+- **Root cause:** external release metadata changed after the earlier zero-warning lint
+  run. The project pins Gradle 9.9.0 deliberately.
+- **Pattern search:** both flavors and the release lint use the same wrapper pin.
+- **Correction:** document the targeted `AndroidGradlePluginVersion` ignore in
+  `app/lint.xml`; toolchain upgrades remain a reviewed change and are recorded in
+  `docs/architecture/dependencies.md`.
+- **Regression check:** the next lint report must remain 0/0; a code warning is still
+  reported.
+- **Status:** implemented; lint validation pending the final run.
 
 ## Warning inventory
 
@@ -515,8 +532,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - The native archives build successfully on `42743643959` and later.
 - The assemble/link job passes on `42847493558`; it caught the JNI array-region compile
   error, AGP 9 APK naming, and minSdk extraction issues along the way.
-- No successful instrumented run yet; the emulator boots, but the runner's script has
-  been fixed and needs one more run.
+- Instrumented smoke tests pass for both flavors on `42874760135` (1 test, 0 failures each).
 - No C++ warning report beyond the compiler output; the adapter compiles without warnings
   under `-Wall -Wextra -Wpedantic`.
 - No release, signing, sanitizer, or fuzz run.

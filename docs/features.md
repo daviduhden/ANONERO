@@ -157,7 +157,7 @@ These are privacy and coercion mitigations, not anonymity. See
 ## 11. Known functional limitations
 
 - Native build/release validation still requires the manual CI `native` job; the patch
-  series is restored but the archives have not been compiled here. See
+  series is restored and CI builds the native archives and debug APKs. See
   [`architecture/repository-state.md`](architecture/repository-state.md).
 - Manual proxy validation rejects compressed IPv6 forms.
 - The decoy is separation of wallet files and secrets, not plausible deniability.

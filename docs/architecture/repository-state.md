@@ -33,7 +33,7 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 | Submodule not populated locally | `external-libs/monero` empty |
 | Wallet-API patch series present | `external-libs/patches/0001..0005`, `apply.sh`, `README.md` |
 | Patch series applies to the pin | `git apply --index --3way` on a clean `85f036ba` checkout |
-| Native archives not compiled | requires the manual CI `native` job |
+| Native archives and adapter link | build in CI; API 35 smoke tests pass |
 | Embedded Tor with mandatory proxy | `TorService.kt`, `AnonWalletHandler.applyProxy`, `WALLET_USE_TOR` default true |
 | Optional LWS over Tor | `PrivacySettings.kt` `LwsConfig`, `AnonWalletHandler.startService` |
 | Keystore-bound wallet secret | `KeyStoreHelper.kt`, `WalletKey.kt` |
@@ -65,8 +65,8 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 ### In progress or incomplete
 
 - Native reproducibility: the wallet-API patch series is checked in and applies to the
-  pinned commit. The local submodule is uninitialized and the native archives have not
-  been compiled; the manual CI `native` job must validate them.
+  pinned commit. The local submodule is uninitialized; CI builds the native archives, the
+  adapter, and the debug APKs, and runs the API 35 smoke tests.
 - Documentation: `docs/` was empty; this audit adds the documentation index, architecture
   and JNI docs, security model, features, development, build/release, state, dependency
   record, progress/roadmap/todo files, and the instruction system.
@@ -136,9 +136,9 @@ was committed in `52d67d4`. The CI compile-failure fixes were committed afterwar
 ## Known gaps and follow-ups
 
 1. **Validate the restored Monero patch series.** The seven patches and their nested
-   submodule pins are checked in, but the native archives have not been compiled. The
-   manual `native` CI job is the authority; the series is adapted from `monero_c` under
-   LGPL-3.0 (see `external-libs/patches/README.md`).
+   submodule pins are checked in; CI builds the native archives, the adapter, and the
+   debug APKs, and runs the API 35 smoke tests. The series is adapted from `monero_c`
+   under LGPL-3.0 (see `external-libs/patches/README.md`).
 2. **Initialize the Monero submodule for local native work.**
    `git submodule update --init --recursive` is required before patch application or a
    native build. Do not run it as part of an unrelated change.

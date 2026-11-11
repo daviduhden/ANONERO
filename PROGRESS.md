@@ -152,23 +152,25 @@ records progress; it is not a release note and does not claim CI validation.
   LGPL-3.0 licence. They apply with `git apply --index --3way`, and the `bc-ur`,
   `polyseed`, and `utf8proc` submodules resolve at pinned commits. Runs `42743643959` and
   later build the native archives and link the adapter; `assemble` produces both debug
-  APKs. Run `42862824199` reported an all-green workflow, but a post-run check found that
-  the NERO instrumented XML contained a `failed to attach` failure while the runner
-  returned 0; an explicit XML validation step was added afterwards.
+  APKs. Run `42874760135` is fully green: native archives, assemble/link, and the API 35
+  instrumented smoke tests pass for both anon and nero, with the XML validation confirming
+  one test and zero failures per flavor. A prior run had exposed a masked NERO attach
+  failure; the runner now fails on any failed XML.
 
 ## Pending validation
 
 - **Native build:** the archives build and the adapter links in CI. `-Werror` and a
   warning-free native report are still pending.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
-  CI; the instrumented NERO attach failure is still open.
+  CI; the API 35 instrumented smoke tests pass for both flavors.
 - **Runtime behavior:** lock/unlock, background sync, decoy switching, Tor transitions,
-  LWS reconnect, notifications, and wipe need CI/device validation.
+  LWS reconnect, notifications, and wipe still need dedicated device tests.
 - **Cryptography:** no independent side-channel or Keystore audit has been performed.
 
 ## Blocked
 
-- Instrumented NERO attach on the KVM-less hosted runner; XML validation is now required.
+- Broader instrumented wallet, Tor, LWS, lock/decoy, and wipe coverage still requires
+  dedicated device tests; the current emulator job runs only the package smoke test.
 - OpenSSL 4.x, Polyseed/utf8proc updates, Debian base/snapshot, and Gradle lockfile
   generation have technical or validation blockers; see
   [`docs/architecture/dependencies.md`](docs/architecture/dependencies.md).

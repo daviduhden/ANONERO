@@ -108,9 +108,8 @@ build consumes `external-libs/arm64-v8a` and `external-libs/armeabi-v7a`.
 
 **Current checkout note:** the pinned ANONERO patch series is present under
 `external-libs/patches/` and applies cleanly to the pinned commit, but the Monero submodule
-is uninitialized locally and the native build has not been compiled. Run the manual CI
-`native` job or initialize the submodule and apply the patches before claiming native
-success. See [`external-libs/patches/README.md`](external-libs/patches/README.md) and
+is uninitialized locally; CI builds the native archives, both debug APKs, and runs the
+API 35 smoke tests. See [`external-libs/patches/README.md`](external-libs/patches/README.md) and
 [`docs/architecture/repository-state.md`](docs/architecture/repository-state.md).
 
 For the full build/release pipeline, including CI jobs, signing, and artifact checks, see
