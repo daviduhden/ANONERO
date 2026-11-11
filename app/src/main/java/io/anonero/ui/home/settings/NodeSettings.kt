@@ -129,6 +129,7 @@ enum class NodeValidationError(
     INVALID_URL(R.string.invalid_url),
     LWS_ACTIVE(R.string.disable_lws_restart),
     CONNECT_FAILED(R.string.connection_failed),
+    STORAGE_UNAVAILABLE(R.string.node_storage_unavailable),
 }
 
 class NodeSettingsViewModel(
@@ -288,14 +289,20 @@ class NodeSettingsViewModel(
     // Add a new item
     fun addItem(item: Node) {
         viewModelScope.launch {
-            nodesRepository.addItem(item)
+            if (nodesRepository.addItem(item)) {
+                uriValidationError.postValue(null)
+            } else {
+                uriValidationError.postValue(NodeValidationError.STORAGE_UNAVAILABLE)
+            }
         }
     }
 
     // Remove an item
     fun removeItem(nodeString: String) {
         viewModelScope.launch {
-            nodesRepository.removeItemByNodeString(nodeString)
+            if (!nodesRepository.removeItemByNodeString(nodeString)) {
+                uriValidationError.postValue(NodeValidationError.STORAGE_UNAVAILABLE)
+            }
         }
     }
 }

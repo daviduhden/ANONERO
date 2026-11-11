@@ -329,6 +329,7 @@
 
     <string name="url_cannot_be_empty">URL не может быть пустым</string>
     <string name="connection_failed">Ошибка подключения к серверу</string>
+    <string name="node_storage_unavailable">Не удалось сохранить узел: локальное хранилище недоступно для чтения</string>
 
     <string name="invalid_url">Неверный URL</string>
     <string name="add_node">Добавить узел</string>

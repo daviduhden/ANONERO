@@ -19,6 +19,7 @@
 package io.anonero.store
 
 import android.content.Context
+import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.IOException
 import androidx.datastore.core.Serializer
@@ -29,8 +30,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -41,13 +44,25 @@ private const val TAG = "NodeDataStore"
 object NodeListSerializer : Serializer<List<Node>> {
     override val defaultValue: List<Node> = emptyList()
 
-    override suspend fun readFrom(input: InputStream): List<Node> =
-        try {
-            val json = input.readBytes().decodeToString()
+    override suspend fun readFrom(input: InputStream): List<Node> {
+        val bytes = input.readBytes()
+        // DataStore calls readFrom on an empty file before the first write.
+        if (bytes.isEmpty()) return defaultValue
+        val json = bytes.decodeToString()
+        if (json.isBlank()) return defaultValue
+        return try {
             jsonDecoder.decodeFromString(ListSerializer(Node.serializer()), json)
-        } catch (e: Exception) {
-            emptyList()
+        } catch (e: SerializationException) {
+            // Do not turn an unreadable store into an empty list: the next updateData
+            // would overwrite the user's saved nodes. Surface corruption instead so
+            // writes fail closed and the original file is preserved.
+            Timber.tag(TAG).e("Saved node list is unreadable")
+            throw CorruptionException("Saved node list is unreadable", e)
+        } catch (e: IllegalArgumentException) {
+            Timber.tag(TAG).e("Saved node list is invalid")
+            throw CorruptionException("Saved node list is invalid", e)
         }
+    }
 
     override suspend fun writeTo(
         t: List<Node>,
@@ -79,10 +94,21 @@ class NodesRepository(
     val nodesFlow: Flow<List<Node>> =
         context.nodeDataStore.data
             .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyList()) // Handle errors by emitting an empty list
-                } else {
-                    throw exception
+                when (exception) {
+                    is CorruptionException -> {
+                        // Read-only display can continue, but the file stays untouched and
+                        // every write keeps failing until the store is repaired or wiped.
+                        Timber.tag(TAG).e("Saved node list is corrupt")
+                        emit(emptyList())
+                    }
+
+                    is IOException -> {
+                        emit(emptyList())
+                    }
+
+                    else -> {
+                        throw exception
+                    }
                 }
             }
 
@@ -91,34 +117,53 @@ class NodesRepository(
         context.nodeDataStore.updateData { items }
     }
 
-    // Add a new item to the list
-    suspend fun addItem(item: Node) {
-        context.nodeDataStore.updateData { currentItems ->
-            if (currentItems.find { it.toNodeString() == item.toNodeString() } == null) {
-                currentItems + item
-            } else {
-                currentItems
+    // Add a new item to the list. Returns false on an unreadable store so the caller can
+    // report the failure instead of overwriting saved nodes from a corrupt read.
+    suspend fun addItem(item: Node): Boolean =
+        try {
+            context.nodeDataStore.updateData { currentItems ->
+                if (currentItems.find { it.toNodeString() == item.toNodeString() } == null) {
+                    currentItems + item
+                } else {
+                    currentItems
+                }
             }
+            true
+        } catch (e: CorruptionException) {
+            Timber.tag(TAG).e("Cannot add node: saved node list is corrupt")
+            false
+        } catch (e: IOException) {
+            Timber.tag(TAG).w(e, "Cannot add node")
+            false
         }
-    }
 
     // Read the current list without observing future changes.
-    suspend fun getAll(): List<Node> {
+    suspend fun getAll(): List<Node> =
         try {
-            return context.nodeDataStore.data.first()
-        } catch (e: Exception) {
-            return emptyList()
+            context.nodeDataStore.data.first()
+        } catch (e: CorruptionException) {
+            // A backup must not silently omit saved nodes. Surface the corruption and let
+            // the caller fail the export instead of producing an incomplete archive.
+            Timber.tag(TAG).e("Cannot export nodes: saved node list is corrupt")
+            throw e
         }
-    }
 
-    // Remove an item by NodeString
-    suspend fun removeItemByNodeString(nodeString: String) {
-        context.nodeDataStore.updateData { currentItems ->
-            currentItems.filter {
-                it.toNodeString() != nodeString
+    // Remove an item by NodeString. Returns false when the store cannot be read or written.
+    suspend fun removeItemByNodeString(nodeString: String): Boolean =
+        try {
+            context.nodeDataStore.updateData { currentItems ->
+                currentItems.filter {
+                    it.toNodeString() != nodeString
+                }
             }
+            true
+        } catch (e: CorruptionException) {
+            Timber.tag(TAG).e("Cannot remove node: saved node list is corrupt")
+            false
+        } catch (e: IOException) {
+            Timber.tag(TAG).w(e, "Cannot remove node")
+            false
         }
-    }
 
     suspend fun clearAll() {
         context.nodeDataStore.updateData {

@@ -22,13 +22,13 @@ import io.anonero.model.node.Node
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.int
 
 object VersionAsIntSerializer : KSerializer<Int> {
     override val descriptor: SerialDescriptor =
@@ -37,22 +37,16 @@ object VersionAsIntSerializer : KSerializer<Int> {
     override fun deserialize(decoder: Decoder): Int {
         val jsonPrimitive =
             decoder as? kotlinx.serialization.json.JsonDecoder
-                ?: error("This serializer only works with JSON")
+                ?: throw SerializationException("Backup version requires JSON")
 
         val element = jsonPrimitive.decodeJsonElement()
-        return when (element) {
-            is JsonPrimitive -> {
-                if (element.isString) {
-                    element.content.substringBefore(".").toIntOrNull() ?: 0
-                } else {
-                    element.int
-                }
-            }
-
-            else -> {
-                0
-            }
-        }
+        // Older writers may encode the version as "3.0". An unrecognised encoding must
+        // fail the restore instead of silently becoming version 0 and selecting the
+        // legacy PIN key for a passphrase-keyed backup.
+        val version =
+            (element as? JsonPrimitive)?.content?.substringBefore(".")?.toIntOrNull()
+                ?: throw SerializationException("Unsupported backup version encoding")
+        return version
     }
 
     override fun serialize(

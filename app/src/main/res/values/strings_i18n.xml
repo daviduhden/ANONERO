@@ -187,6 +187,7 @@
 
     <string name="url_cannot_be_empty">URL cannot be empty</string>
     <string name="connection_failed">Error connecting to server</string>
+    <string name="node_storage_unavailable">Could not save the node: local storage is unreadable</string>
 
     <string name="invalid_url">Invalid URL</string>
     <string name="add_node">Add Node</string>

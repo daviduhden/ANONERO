@@ -53,6 +53,9 @@ object LogSerializer : Serializer<List<AnonLog>> {
             val json = input.readBytes().decodeToString()
             jsonDecoder.decodeFromString(ListSerializer(AnonLog.serializer()), json)
         } catch (e: Exception) {
+            // Logs are diagnostic, capped, and cleared on unlock. A corrupt log store must
+            // never break logging or block the app, so reset it instead of failing closed
+            // like the security-relevant node store.
             emptyList()
         }
 
