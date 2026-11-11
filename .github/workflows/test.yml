@@ -623,28 +623,7 @@ jobs:
             -no-window -gpu swiftshader_indirect -no-snapshot
             -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
-            adb wait-for-device
-            sleep 60
-            set +e
-            ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true :app:connectedAnonDebugAndroidTest :app:connectedNeroDebugAndroidTest
-            status=$?
-            # The first instrumentation attach on this KVM-less software emulator can
-            # time out while the device is still settling; the second attempt succeeds.
-            # Retry only a flavor whose report says "failed to attach". Real assertion,
-            # crash, or test failures are not retried and the XML check below is final.
-            for flavor in anon nero; do
-              report=$(find app/build/outputs/androidTest-results -path "*flavors/${flavor}/*" -name 'TEST-*.xml' | head -n 1)
-              if [ -n "$report" ] && grep -q "failed to attach" "$report"; then
-                case "$flavor" in
-                  anon) task=:app:connectedAnonDebugAndroidTest ;;
-                  nero) task=:app:connectedNeroDebugAndroidTest ;;
-                esac
-                echo "Retrying ${flavor} after an instrumentation attach timeout"
-                ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true "$task"
-                status=$?
-              fi
-            done
-            exit $status
+            bash .github/scripts/run-instrumented.sh
 
       - name: Verify instrumented results
         if: always()

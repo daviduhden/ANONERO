@@ -4,6 +4,8 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43058769285` | `76fcb79` | `workflow_dispatch` | failure | instrumented | Gradle ran both flavors successfully and XML validation passed; the inline retry loop failed because the emulator runner executes `script` line by line |
+| `43045996049` | `452f4b6` | `workflow_dispatch` | failure | instrumented | 3 GB + 60 s settle: first flavor (anon) still failed to attach; XML validation correctly failed the job |
 | `43034549647` | `9fa5c8e` | `workflow_dispatch` | failure | instrumented | All code gates, native, and assemble pass; the first instrumented flavor (anon) failed to attach, the second (nero) passed |
 | `42874760135` | `c228e36` | `workflow_dispatch` | success | none | All jobs pass; instrumented XML validation confirms anon and nero each ran 1 test with 0 failures; lint 1 external Gradle advisory, suppressed afterwards |
 | `42862824199` | `30075de` | `workflow_dispatch` | success (masked failure) | none | All jobs reported success, but the NERO XML contained `failures=1` with `failed to attach`; the runner returned 0. XML validation added afterwards |
@@ -506,6 +508,25 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next run must show one passing test for each flavor; if the
   retry also fails, the emulator job needs a KVM-capable runner or a device farm.
 - **Status:** implemented with a targeted cold-start retry; validation pending.
+
+### CI-030 — Emulator runner executes `script` line by line
+
+- **Run:** `43058769285`.
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** `[command]/usr/bin/sh -c for flavor in anon nero; do` followed by
+  `Syntax error: end of file unexpected (expecting "done")`. Gradle had completed
+  successfully and the XML validation step passed.
+- **Root cause:** `ReactiveCircus/android-emulator-runner` runs each line of the `script`
+  input as a separate shell command. Multi-line loops and backslash continuations cannot
+  live there.
+- **Pattern search:** the same input previously failed with `Task '\' not found` when a
+  Gradle command used a backslash continuation.
+- **Correction:** move the wait, Gradle invocation, attach-only retry, and exit status into
+  `.github/scripts/run-instrumented.sh`; the workflow calls `bash` on that file in one
+  line.
+- **Regression check:** `bash -n` and actionlint validate the script; the XML validation
+  remains mandatory.
+- **Status:** implemented; final orchestration validation pending.
 
 ## Warning inventory
 
