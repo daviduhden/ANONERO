@@ -36,53 +36,52 @@
 */
 
 inline jfieldID getHandleField(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
-    if (obj == nullptr) return nullptr;
+    if (obj == nullptr)
+        return nullptr;
     jclass c = env->GetObjectClass(obj);
     if (c == nullptr) {
-        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (env->ExceptionCheck())
+            env->ExceptionClear();
         return nullptr;
     }
     jfieldID field = env->GetFieldID(c, fieldName, "J"); // of type long
     env->DeleteLocalRef(c);
-    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (env->ExceptionCheck())
+        env->ExceptionClear();
     return field;
 }
 
 // Reinterprets the opaque `jlong` stored in a Kotlin wrapper. The caller must know that
 // the pointer is still owned by a live native object; this helper deliberately does not
 // validate lifetime.
-template<typename T>
-T *getHandle(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
+template <typename T> T *getHandle(JNIEnv *env, jobject obj, const char *fieldName = "handle") {
     jfieldID field = getHandleField(env, obj, fieldName);
-    if (field == nullptr) return nullptr;
+    if (field == nullptr)
+        return nullptr;
     jlong handle = env->GetLongField(obj, field);
     return reinterpret_cast<T *>(handle);
 }
 
 inline void setHandleFromLong(JNIEnv *env, jobject obj, jlong handle) {
     jfieldID field = getHandleField(env, obj);
-    if (field == nullptr) return;
+    if (field == nullptr)
+        return;
     env->SetLongField(obj, field, handle);
 }
 
-template<typename T>
-void setHandle(JNIEnv *env, jobject obj, T *t) {
+template <typename T> void setHandle(JNIEnv *env, jobject obj, T *t) {
     jlong handle = reinterpret_cast<jlong>(t);
     setHandleFromLong(env, obj, handle);
 }
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 extern const char *const MONERO_VERSION; // the actual monero core version
 
 // from monero-core crypto/hash-ops.h - avoid #including monero code here
-enum {
-    HASH_SIZE = 32,
-    HASH_DATA_AREA = 136
-};
+enum { HASH_SIZE = 32, HASH_DATA_AREA = 136 };
 
 void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int prehashed,
                   uint64_t height);
