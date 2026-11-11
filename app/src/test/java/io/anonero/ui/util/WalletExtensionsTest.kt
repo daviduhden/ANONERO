@@ -22,7 +22,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WalletExtensionsTest {
-
     @Test
     fun `next index follows created subaddresses even without payments`() {
         // Only the primary address exists.

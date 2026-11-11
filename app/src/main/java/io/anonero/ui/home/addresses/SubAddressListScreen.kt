@@ -61,22 +61,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 
-
 class SubAddressListViewModel : ViewModel() {
-
     private val walletState: WalletState by inject(WalletState::class.java)
 
     val subAddresses = walletState.subAddresses.asLiveData()
     val hideAmounts = walletState.hideAmountsFlow.asLiveData()
     val offline = walletState.offlineFlow.asLiveData()
 
-
     fun getNextAddress() {
         viewModelScope.launch(Dispatchers.IO) {
             walletState.getNewAddress()
         }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -100,7 +96,7 @@ fun SubAddressesScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
@@ -110,45 +106,47 @@ fun SubAddressesScreen(
                     IconButton(
                         onClick = {
                             vm.getNextAddress()
-                        }
+                        },
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         LazyColumn(modifier = Modifier.padding(paddingValues)) {
             items(addresses.size) {
                 val address = addresses[it]
                 with(sharedTransitionScope) {
                     ListItem(
-                        modifier = Modifier
-                            .sharedElement(
-                                sharedTransitionScope.rememberSharedContentState(key = "${address.address}:${address.addressIndex}"),
-                                animatedVisibilityScope = animatedContentScope
-                            )
-                            .padding(
-                                horizontal = 4.dp,
-                                vertical = 6.dp
-                            )
-
-                            .clickable {
-                                navigateToDetails(address)
-                            },
+                        modifier =
+                            Modifier
+                                .sharedElement(
+                                    sharedTransitionScope.rememberSharedContentState(key = "${address.address}:${address.addressIndex}"),
+                                    animatedVisibilityScope = animatedContentScope,
+                                ).padding(
+                                    horizontal = 4.dp,
+                                    vertical = 6.dp,
+                                ).clickable {
+                                    navigateToDetails(address)
+                                },
                         headlineContent = {
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(
-                                    address.displayLabel, color = MaterialTheme.colorScheme.primary,
+                                    address.displayLabel,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
-                                    if (hideAmounts || offline) Formats.maskAmount(address.totalAmount)
-                                    else Formats.getDisplayAmount(address.totalAmount),
+                                    if (hideAmounts || offline) {
+                                        Formats.maskAmount(address.totalAmount)
+                                    } else {
+                                        Formats.getDisplayAmount(address.totalAmount)
+                                    },
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                             }
                         },
@@ -158,7 +156,7 @@ fun SubAddressesScreen(
                                     address.squashedAddress,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 14.sp,
-                                    textAlign = TextAlign.Justify
+                                    textAlign = TextAlign.Justify,
                                 )
                             }
                         },
@@ -173,6 +171,5 @@ fun SubAddressesScreen(
 @Composable
 private fun SubAddressScreenPrev() {
     AnonNeroTheme {
-
     }
 }

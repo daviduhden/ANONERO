@@ -23,7 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SigningSummaryTest {
-
     // These are format fixtures, not valid Monero addresses with checksums.
     private val addressA =
         "44AFFq5kSiGBoZQm3vW6cD7eF8gH9iJ2kL3mN4pQ5rS6tU7vW8xY9zA"

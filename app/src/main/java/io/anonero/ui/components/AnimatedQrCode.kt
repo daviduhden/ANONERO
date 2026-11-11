@@ -43,10 +43,10 @@ import io.anonero.ui.components.qr.QrCodeView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-
 @Composable
 fun AnimatedQrCode(
-    modifier: Modifier = Modifier, Ur: UR,
+    modifier: Modifier = Modifier,
+    Ur: UR,
     minFragmentLength: Int = 10,
     maxFragmentLength: Int = 60,
     fps: Int = 10,
@@ -59,7 +59,7 @@ fun AnimatedQrCode(
     LaunchedEffect(true) {
         scope.launch {
             delay(100)
-            val encoder = UREncoder(Ur, maxFragmentLength, minFragmentLength, 0);
+            val encoder = UREncoder(Ur, maxFragmentLength, minFragmentLength, 0)
             while (true) {
                 frameString = encoder.nextPart().toString()
                 delay(frameDelayMillis)
@@ -68,26 +68,29 @@ fun AnimatedQrCode(
     }
 
     Box(
-        modifier = modifier
-            .size(200.dp)
-            .background(Color.Transparent),
+        modifier =
+            modifier
+                .size(200.dp)
+                .background(Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
         if (frameString != null) {
             QrCodeView(
                 data = frameString!!,
-                colors = QrCodeColors(
-                    background = MaterialTheme.colorScheme.background,
-                    foreground = MaterialTheme.colorScheme.onBackground,
-                ),
-                modifier = Modifier
-                    .size(size)
-                    .padding(18.dp),
+                colors =
+                    QrCodeColors(
+                        background = MaterialTheme.colorScheme.background,
+                        foreground = MaterialTheme.colorScheme.onBackground,
+                    ),
+                modifier =
+                    Modifier
+                        .size(size)
+                        .padding(18.dp),
             )
         } else {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 1.dp
+                strokeWidth = 1.dp,
             )
         }
     }

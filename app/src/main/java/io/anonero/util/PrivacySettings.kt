@@ -28,9 +28,9 @@ import androidx.core.content.edit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Reduces casual visual and notification exposure. It is not an anonymity guarantee:
@@ -42,37 +42,48 @@ object StealthMode {
     private val _enabled = MutableStateFlow(false)
     val enabled: StateFlow<Boolean> = _enabled
 
-    fun isEnabled(prefs: SharedPreferences): Boolean =
-        prefs.getBoolean(PREFS_STEALTH_MODE, false)
+    fun isEnabled(prefs: SharedPreferences): Boolean = prefs.getBoolean(PREFS_STEALTH_MODE, false)
 
     fun load(prefs: SharedPreferences) {
         _enabled.value = isEnabled(prefs)
     }
 
-    fun setEnabled(prefs: SharedPreferences, enabled: Boolean) {
+    fun setEnabled(
+        prefs: SharedPreferences,
+        enabled: Boolean,
+    ) {
         prefs.edit { putBoolean(PREFS_STEALTH_MODE, enabled) }
         _enabled.value = enabled
     }
 
-    fun autoLock(prefs: SharedPreferences): Boolean =
-        prefs.getBoolean(PREFS_STEALTH_AUTO_LOCK, true)
+    fun autoLock(prefs: SharedPreferences): Boolean = prefs.getBoolean(PREFS_STEALTH_AUTO_LOCK, true)
 
-    fun setAutoLock(prefs: SharedPreferences, enabled: Boolean) =
-        prefs.edit { putBoolean(PREFS_STEALTH_AUTO_LOCK, enabled) }
+    fun setAutoLock(
+        prefs: SharedPreferences,
+        enabled: Boolean,
+    ) = prefs.edit { putBoolean(PREFS_STEALTH_AUTO_LOCK, enabled) }
 
-    /* The app name is distinctive; a stealth notification should not announce the product. */
-    fun notificationTitle(prefs: SharedPreferences, normal: String): String =
-        if (isEnabled(prefs)) "Wallet" else normal
+    // The app name is distinctive; a stealth notification should not announce the product.
+    fun notificationTitle(
+        prefs: SharedPreferences,
+        normal: String,
+    ): String = if (isEnabled(prefs)) "Wallet" else normal
 
-    /* Never include balances, heights, addresses, or transaction counts in stealth mode. */
-    fun notificationBody(prefs: SharedPreferences, normal: String): String =
-        if (isEnabled(prefs)) "Background sync active" else normal
+    // Never include balances, heights, addresses, or transaction counts in stealth mode.
+    fun notificationBody(
+        prefs: SharedPreferences,
+        normal: String,
+    ): String = if (isEnabled(prefs)) "Background sync active" else normal
 
-    fun incomingTitle(prefs: SharedPreferences, normal: String): String =
-        if (isEnabled(prefs)) "Wallet" else normal
+    fun incomingTitle(
+        prefs: SharedPreferences,
+        normal: String,
+    ): String = if (isEnabled(prefs)) "Wallet" else normal
 
-    fun incomingBody(prefs: SharedPreferences, normal: String): String =
-        if (isEnabled(prefs)) "New activity" else normal
+    fun incomingBody(
+        prefs: SharedPreferences,
+        normal: String,
+    ): String = if (isEnabled(prefs)) "New activity" else normal
 }
 
 /**
@@ -87,13 +98,19 @@ object SecureClipboard {
         manager.clearPrimaryClip()
     }
 
-    fun copy(context: Context, text: String, clearAfterMs: Long = 60_000L) {
+    fun copy(
+        context: Context,
+        text: String,
+        clearAfterMs: Long = 60_000L,
+    ) {
         val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("address", text)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            clip.description.setExtras(android.os.PersistableBundle().apply {
-                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
-            })
+            clip.description.setExtras(
+                android.os.PersistableBundle().apply {
+                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                },
+            )
         }
         manager.setPrimaryClip(clip)
         CoroutineScope(Dispatchers.Main).launch {
@@ -115,7 +132,9 @@ object SecureClipboard {
  * transaction, amount, and the approximate timing, and can lie about chain state.
  * Communications are forced through Tor by AnonWalletHandler.
  */
-enum class LwsValidationError(val technicalMessage: String) {
+enum class LwsValidationError(
+    val technicalMessage: String,
+) {
     HOST_EMPTY("Host cannot be empty"),
     HOST_TOO_LONG("Host is too long"),
     HOST_HAS_SCHEME_OR_PORT("Enter only the host name, without scheme, path or port"),
@@ -133,13 +152,17 @@ data class LwsConfig(
     companion object {
         const val DEFAULT_PORT = 8443
 
-        fun load(prefs: SharedPreferences): LwsConfig = LwsConfig(
-            enabled = prefs.getBoolean(PREFS_LWS_ENABLED, false),
-            host = prefs.getString(PREFS_LWS_HOST, "").orEmpty().trim(),
-            port = prefs.getInt(PREFS_LWS_PORT, DEFAULT_PORT),
-        )
+        fun load(prefs: SharedPreferences): LwsConfig =
+            LwsConfig(
+                enabled = prefs.getBoolean(PREFS_LWS_ENABLED, false),
+                host = prefs.getString(PREFS_LWS_HOST, "").orEmpty().trim(),
+                port = prefs.getInt(PREFS_LWS_PORT, DEFAULT_PORT),
+            )
 
-        fun save(prefs: SharedPreferences, config: LwsConfig) {
+        fun save(
+            prefs: SharedPreferences,
+            config: LwsConfig,
+        ) {
             prefs.edit(commit = true) {
                 putBoolean(PREFS_LWS_ENABLED, config.enabled)
                 putString(PREFS_LWS_HOST, config.host)
@@ -168,10 +191,11 @@ data class LwsConfig(
             return null
         }
 
-        fun validatePort(port: Int): LwsValidationError? =
-            if (port !in 1..65535) LwsValidationError.PORT_RANGE else null
+        fun validatePort(port: Int): LwsValidationError? = if (port !in 1..65535) LwsValidationError.PORT_RANGE else null
 
-        fun validate(host: String, port: Int): LwsValidationError? =
-            validateHost(host) ?: validatePort(port)
+        fun validate(
+            host: String,
+            port: Int,
+        ): LwsValidationError? = validateHost(host) ?: validatePort(port)
     }
 }

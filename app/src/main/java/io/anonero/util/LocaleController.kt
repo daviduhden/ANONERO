@@ -42,7 +42,10 @@ import java.util.Locale
  * `SYSTEM` is the default and falls back to the device locale. A language change only
  * recreates the activity; it must not close the wallet, stop Tor or kill the process.
  */
-enum class AppLanguage(val tag: String, @StringRes val labelRes: Int) {
+enum class AppLanguage(
+    val tag: String,
+    @StringRes val labelRes: Int,
+) {
     SYSTEM("", R.string.language_system),
     ENGLISH("en", R.string.language_english),
     SPANISH("es-ES", R.string.language_spanish),
@@ -67,7 +70,11 @@ object LocaleController {
         apply(context, load(prefs))
     }
 
-    fun setLanguage(activity: Activity, prefs: SharedPreferences, language: AppLanguage) {
+    fun setLanguage(
+        activity: Activity,
+        prefs: SharedPreferences,
+        language: AppLanguage,
+    ) {
         prefs.edit(commit = true) { putString(PREFS_LANGUAGE, language.tag) }
         apply(activity, language)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
@@ -75,14 +82,18 @@ object LocaleController {
         }
     }
 
-    private fun apply(context: Context, language: AppLanguage) {
+    private fun apply(
+        context: Context,
+        language: AppLanguage,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val manager = context.getSystemService(LocaleManager::class.java) ?: return
-            val wanted = if (language.tag.isEmpty()) {
-                LocaleList.getEmptyLocaleList()
-            } else {
-                LocaleList.forLanguageTags(language.tag)
-            }
+            val wanted =
+                if (language.tag.isEmpty()) {
+                    LocaleList.getEmptyLocaleList()
+                } else {
+                    LocaleList.forLanguageTags(language.tag)
+                }
             if (manager.applicationLocales != wanted) {
                 manager.applicationLocales = wanted
             }
@@ -106,7 +117,7 @@ object LocaleController {
             @Suppress("DEPRECATION")
             app.resources.updateConfiguration(
                 appConfiguration,
-                app.resources.displayMetrics
+                app.resources.displayMetrics,
             )
         }
     }
@@ -126,10 +137,16 @@ object LocaleController {
         return base.createConfigurationContext(configuration)
     }
 
-    private fun localeFor(context: Context, language: AppLanguage): Locale =
+    private fun localeFor(
+        context: Context,
+        language: AppLanguage,
+    ): Locale =
         if (language == AppLanguage.SYSTEM) {
             // Resources.getSystem() is not affected by our in-process override.
-            Resources.getSystem().configuration.locales.get(0)
+            Resources
+                .getSystem()
+                .configuration.locales
+                .get(0)
         } else {
             Locale.forLanguageTag(language.tag)
         }

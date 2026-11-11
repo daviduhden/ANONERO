@@ -106,9 +106,10 @@ fun SignVerifyScreen(
         errorRes = null
         scope.launch {
             try {
-                val result = withContext(Dispatchers.IO) {
-                    WalletManager.instance?.wallet?.signMessage(message)
-                }
+                val result =
+                    withContext(Dispatchers.IO) {
+                        WalletManager.instance?.wallet?.signMessage(message)
+                    }
                 if (result.isNullOrEmpty()) {
                     errorRes = R.string.signing_failed
                 } else {
@@ -129,11 +130,14 @@ fun SignVerifyScreen(
         errorRes = null
         scope.launch {
             try {
-                verifyResult = withContext(Dispatchers.IO) {
-                    WalletManager.instance?.wallet?.verifySignedMessage(
-                        verifyMessage, verifyAddress, verifySignature
-                    ) ?: false
-                }
+                verifyResult =
+                    withContext(Dispatchers.IO) {
+                        WalletManager.instance?.wallet?.verifySignedMessage(
+                            verifyMessage,
+                            verifyAddress,
+                            verifySignature,
+                        ) ?: false
+                    }
             } catch (e: Exception) {
                 errorRes = R.string.signing_failed
             } finally {
@@ -144,14 +148,15 @@ fun SignVerifyScreen(
 
     if (confirmSign) {
         Dialog(
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = true,
-                dismissOnBackPress = true,
-                decorFitsSystemWindows = false,
-                securePolicy = SecureFlagPolicy.SecureOn
-            ),
-            onDismissRequest = { confirmSign = false }
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true,
+                    decorFitsSystemWindows = false,
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                ),
+            onDismissRequest = { confirmSign = false },
         ) {
             LockScreen(
                 mode = LockScreenMode.VERYFY_PIN,
@@ -159,7 +164,7 @@ fun SignVerifyScreen(
                 onUnLocked = { _, _ ->
                     confirmSign = false
                     doSign()
-                }
+                },
             )
         }
     }
@@ -173,19 +178,19 @@ fun SignVerifyScreen(
                     IconButton(onClick = onBackPress) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Text(
                     stringResource(R.string.sign_verify_explanation),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             item {
@@ -193,10 +198,10 @@ fun SignVerifyScreen(
                     stringResource(
                         R.string.label_value,
                         stringResource(R.string.primary_address),
-                        wallet?.address ?: "-"
+                        wallet?.address ?: "-",
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
                 )
             }
             item {
@@ -205,13 +210,13 @@ fun SignVerifyScreen(
                     onValueChange = { message = it },
                     label = { Text(stringResource(R.string.message_to_sign)) },
                     minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
                 AnonOutlineButton(
                     enabled = message.isNotEmpty() && !signing,
-                    onClick = { confirmSign = true }
+                    onClick = { confirmSign = true },
                 ) {
                     if (signing) CircularProgressIndicator() else Text(stringResource(R.string.sign))
                 }
@@ -235,7 +240,7 @@ fun SignVerifyScreen(
                 Text(
                     stringResource(R.string.verify_signature),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 16.dp)
+                    modifier = Modifier.padding(top = 16.dp),
                 )
             }
             item {
@@ -244,7 +249,7 @@ fun SignVerifyScreen(
                     onValueChange = { verifyAddress = it.trim() },
                     label = { Text(stringResource(R.string.address)) },
                     minLines = 2,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
@@ -253,7 +258,7 @@ fun SignVerifyScreen(
                     onValueChange = { verifyMessage = it },
                     label = { Text(stringResource(R.string.message)) },
                     minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
@@ -262,14 +267,15 @@ fun SignVerifyScreen(
                     onValueChange = { verifySignature = it.trim() },
                     label = { Text(stringResource(R.string.signature)) },
                     minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
                 AnonOutlineButton(
-                    enabled = !verifying && verifyMessage.isNotEmpty() &&
-                        verifyAddress.isNotEmpty() && verifySignature.isNotEmpty(),
-                    onClick = { doVerify() }
+                    enabled =
+                        !verifying && verifyMessage.isNotEmpty() &&
+                            verifyAddress.isNotEmpty() && verifySignature.isNotEmpty(),
+                    onClick = { doVerify() },
                 ) {
                     if (verifying) CircularProgressIndicator() else Text(stringResource(R.string.verify))
                 }
@@ -277,12 +283,19 @@ fun SignVerifyScreen(
             if (verifyResult != null) {
                 item {
                     Text(
-                        if (verifyResult == true) stringResource(R.string.signature_valid)
-                        else stringResource(R.string.signature_invalid),
-                        color = if (verifyResult == true) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error,
+                        if (verifyResult == true) {
+                            stringResource(R.string.signature_valid)
+                        } else {
+                            stringResource(R.string.signature_invalid)
+                        },
+                        color =
+                            if (verifyResult == true) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -293,7 +306,7 @@ fun SignVerifyScreen(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }

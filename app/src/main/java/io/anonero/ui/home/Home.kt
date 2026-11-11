@@ -61,17 +61,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import io.anonero.R
 import io.anonero.model.Subaddress
+import io.anonero.services.WalletState
 import io.anonero.ui.components.MainBottomNavigation
+import io.anonero.ui.home.PayToManyScreen
 import io.anonero.ui.home.accounts.AccountsScreen
 import io.anonero.ui.home.addresses.SubAddressDetailScreen
 import io.anonero.ui.home.addresses.SubAddressesScreen
 import io.anonero.ui.home.graph.routes.AccountsRoute
 import io.anonero.ui.home.graph.routes.CoinsScreenRoute
 import io.anonero.ui.home.graph.routes.DecoySettingsRoute
+import io.anonero.ui.home.graph.routes.HomeScreenRoute
 import io.anonero.ui.home.graph.routes.LwsSettingsRoute
 import io.anonero.ui.home.graph.routes.PayToManyRoute
-import io.anonero.ui.home.graph.routes.SignVerifyRoute
-import io.anonero.ui.home.graph.routes.HomeScreenRoute
 import io.anonero.ui.home.graph.routes.ProxySettingsRoute
 import io.anonero.ui.home.graph.routes.ReceiveRoute
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
@@ -82,24 +83,23 @@ import io.anonero.ui.home.graph.routes.SettingsLogs
 import io.anonero.ui.home.graph.routes.SettingsNodeRoute
 import io.anonero.ui.home.graph.routes.SettingsRoute
 import io.anonero.ui.home.graph.routes.SettingsViewSeedRoute
+import io.anonero.ui.home.graph.routes.SignVerifyRoute
 import io.anonero.ui.home.graph.routes.SubAddressesRoute
 import io.anonero.ui.home.graph.routes.TransactionDetailRoute
 import io.anonero.ui.home.graph.routes.TransactionsRoute
+import io.anonero.ui.home.settings.DecoySettingsScreen
 import io.anonero.ui.home.settings.ExportBackUp
 import io.anonero.ui.home.settings.LogViewer
+import io.anonero.ui.home.settings.LwsSettingsScreen
 import io.anonero.ui.home.settings.NodeSettings
 import io.anonero.ui.home.settings.ProxySettings
-import io.anonero.ui.home.settings.DecoySettingsScreen
-import io.anonero.ui.home.settings.LwsSettingsScreen
 import io.anonero.ui.home.settings.SecureWipe
 import io.anonero.ui.home.settings.SeedSettingsPage
 import io.anonero.ui.home.settings.SettingsPage
-import io.anonero.ui.home.PayToManyScreen
 import io.anonero.ui.home.sign.SignVerifyScreen
 import io.anonero.ui.home.spend.ReviewTransactionScreen
 import io.anonero.util.isIgnoringBatteryOptimizations
 import org.koin.compose.koinInject
-import io.anonero.services.WalletState
 
 /**
  * Hosts the bottom-navigation graph and translates lock-screen shortcuts into navigation.
@@ -111,8 +111,10 @@ import io.anonero.services.WalletState
 @OptIn(ExperimentalSharedTransitionApi::class)
 @SuppressLint("BatteryLife")
 @Composable
-fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHostController?) {
-
+fun HomeScreenComposable(
+    modifier: Modifier = Modifier,
+    mainNavController: NavHostController?,
+) {
     var showBottomNavigation by remember { mutableStateOf(true) }
     val bottomNavController = rememberNavController()
     val context = LocalContext.current
@@ -126,17 +128,25 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
     LaunchedEffect(Unit) {
         walletState.unlockShortcut.collect { shortcut ->
             when (shortcut) {
-                LockScreenShortCut.HOME -> bottomNavController.navigate(TransactionsRoute) {
-                    popUpTo(TransactionsRoute) { inclusive = true }
-                    launchSingleTop = true
+                LockScreenShortCut.HOME -> {
+                    bottomNavController.navigate(TransactionsRoute) {
+                        popUpTo(TransactionsRoute) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
-                LockScreenShortCut.RECEIVE -> bottomNavController.navigate(ReceiveRoute) {
-                    popUpTo(TransactionsRoute) { inclusive = false }
-                    launchSingleTop = true
+
+                LockScreenShortCut.RECEIVE -> {
+                    bottomNavController.navigate(ReceiveRoute) {
+                        popUpTo(TransactionsRoute) { inclusive = false }
+                        launchSingleTop = true
+                    }
                 }
-                LockScreenShortCut.SEND -> bottomNavController.navigate(SendScreenRoute(address = "")) {
-                    popUpTo(TransactionsRoute) { inclusive = false }
-                    launchSingleTop = true
+
+                LockScreenShortCut.SEND -> {
+                    bottomNavController.navigate(SendScreenRoute(address = "")) {
+                        popUpTo(TransactionsRoute) { inclusive = false }
+                        launchSingleTop = true
+                    }
                 }
             }
         }
@@ -173,7 +183,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                         intent.data = "package:${context.packageName}".toUri()
                         context.startActivity(intent)
                         showBatteryManagerDialog = false
-                    }
+                    },
                 ) {
                     Text(stringResource(R.string.enable))
                 }
@@ -182,40 +192,47 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                 TextButton(
                     onClick = {
                         showBatteryManagerDialog = false
-                    }
+                    },
                 ) {
                     Text(
                         stringResource(R.string.cancel),
-                        style = LocalTextStyle.current.copy(color = MaterialTheme.colorScheme.onSecondary)
+                        style = LocalTextStyle.current.copy(color = MaterialTheme.colorScheme.onSecondary),
                     )
                 }
             },
-            modifier = Modifier.border(
-                1.dp,
-                color = MaterialTheme.colorScheme.onBackground.copy(
-                    alpha = .2f
+            modifier =
+                Modifier.border(
+                    1.dp,
+                    color =
+                        MaterialTheme.colorScheme.onBackground.copy(
+                            alpha = .2f,
+                        ),
+                    shape = MaterialTheme.shapes.medium,
                 ),
-                shape = MaterialTheme.shapes.medium,
-            ),
             containerColor = MaterialTheme.colorScheme.secondary,
         )
     }
 
     SharedTransitionLayout {
         Scaffold(
-            contentWindowInsets = WindowInsets(
-                top = 0.dp, bottom = 0.dp
-            ), bottomBar = {
+            contentWindowInsets =
+                WindowInsets(
+                    top = 0.dp,
+                    bottom = 0.dp,
+                ),
+            bottomBar = {
                 AnimatedVisibility(
                     visible = showBottomNavigation,
-                    enter = slideInVertically(
-                        initialOffsetY = { it }, // Slide in from the bottom
-                        animationSpec = tween(durationMillis = 500)
-                    ),
-                    exit = slideOutVertically(
-                        targetOffsetY = { it }, // Slide out to the bottom
-                        animationSpec = tween(durationMillis = 500)
-                    )
+                    enter =
+                        slideInVertically(
+                            initialOffsetY = { it }, // Slide in from the bottom
+                            animationSpec = tween(durationMillis = 500),
+                        ),
+                    exit =
+                        slideOutVertically(
+                            targetOffsetY = { it }, // Slide out to the bottom
+                            animationSpec = tween(durationMillis = 500),
+                        ),
                 ) {
                     MainBottomNavigation(
                         currentRoute = currentRoute,
@@ -224,11 +241,11 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                                 popUpTo(bottomNavController.graph.startDestinationId)
                                 launchSingleTop = true
                             }
-                        }
+                        },
                     )
                 }
-
-            }) { paddingValues ->
+            },
+        ) { paddingValues ->
             Box(modifier = modifier.padding(0.dp)) {
                 NavHost(bottomNavController, startDestination = startDestination, exitTransition = {
                     fadeOut(animationSpec = tween(340))
@@ -243,14 +260,15 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                                 it.hash?.let { paymentId ->
                                     bottomNavController.navigate(
                                         TransactionDetailRoute(
-                                            transactionId = paymentId
-                                        )
+                                            transactionId = paymentId,
+                                        ),
                                     )
                                 }
                             },
                             navigateToShortCut = {
                                 when (it) {
                                     LockScreenShortCut.HOME -> {}
+
                                     LockScreenShortCut.RECEIVE -> {
                                         bottomNavController.navigate(ReceiveRoute)
                                     }
@@ -270,7 +288,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                                 bottomNavController.navigate(it)
                             },
                             sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedContentScope = this@composable
+                            animatedContentScope = this@composable,
                         )
                     }
                     composable<ReceiveRoute> {
@@ -278,10 +296,12 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             modifier = Modifier.padding(paddingValues),
                             onBackPress = {
                                 bottomNavController.popBackStack()
-                            }, navigateToSubAddresses = {
+                            },
+                            navigateToSubAddresses = {
                                 showBottomNavigation = false
                                 bottomNavController.navigate(SubAddressesRoute)
-                            })
+                            },
+                        )
                     }
                     composable<TransactionDetailRoute> { navBackStackEntry ->
                         val txDetailRoute = navBackStackEntry.toRoute<TransactionDetailRoute>()
@@ -301,15 +321,16 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             navigateToHome = {
                                 bottomNavController.popBackStack(
                                     route = TransactionsRoute,
-                                    inclusive = false
+                                    inclusive = false,
                                 )
                             },
                             navigateToReview = {
                                 bottomNavController.navigate(it)
                             },
-                            modifier = Modifier.padding(
-                                bottom = paddingValues.calculateBottomPadding()
-                            ),
+                            modifier =
+                                Modifier.padding(
+                                    bottom = paddingValues.calculateBottomPadding(),
+                                ),
                             onBackPress = {
                                 bottomNavController.popBackStack()
                             },
@@ -328,13 +349,13 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             navigateToHome = {
                                 bottomNavController.popBackStack(
                                     route = TransactionsRoute,
-                                    inclusive = false
+                                    inclusive = false,
                                 )
                             },
                             onFinished = {
                                 bottomNavController.popBackStack(
                                     route = TransactionsRoute,
-                                    inclusive = false
+                                    inclusive = false,
                                 )
                             },
                             onBackPressed = {
@@ -348,10 +369,11 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             onBackPress = {
                                 showBottomNavigation = true
                                 bottomNavController.popBackStack()
-                            }, navigateTo = {
+                            },
+                            navigateTo = {
                                 showBottomNavigation = false
                                 bottomNavController.navigate(it)
-                            }
+                            },
                         )
                     }
                     composable<AccountsRoute> {
@@ -360,7 +382,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             onBackPress = {
                                 showBottomNavigation = true
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<PayToManyRoute> {
@@ -373,7 +395,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             navigateToReview = {
                                 showBottomNavigation = false
                                 bottomNavController.navigate(it)
-                            }
+                            },
                         )
                     }
                     composable<SignVerifyRoute> {
@@ -382,7 +404,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             onBackPress = {
                                 showBottomNavigation = true
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<DecoySettingsRoute> {
@@ -391,7 +413,7 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             onBackPress = {
                                 showBottomNavigation = true
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<LwsSettingsRoute> {
@@ -400,28 +422,28 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             onBackPress = {
                                 showBottomNavigation = true
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<SettingsViewSeedRoute> {
                         SeedSettingsPage(
                             onBackPress = {
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<SettingsExportBackUp> {
                         ExportBackUp(
                             onBackPress = {
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<SettingsLogs> {
                         LogViewer(
                             onBackPress = {
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<CoinsScreenRoute> {
@@ -433,14 +455,14 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             navigateToSpend = {
                                 showBottomNavigation = true
                                 bottomNavController.navigate(it)
-                            }
+                            },
                         )
                     }
                     composable<ProxySettingsRoute> {
                         ProxySettings(
                             onBackPress = {
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<SecureWipeRoute> {
@@ -458,14 +480,14 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                                 // screen and onboarding; navigating to onboarding here would
                                 // invite a main wallet to overwrite a surviving decoy.
                                 (context as? io.anonero.ui.MainActivity)?.finishAffinity()
-                            }
+                            },
                         )
                     }
                     composable<SettingsNodeRoute> {
                         NodeSettings(
                             onBackPress = {
                                 bottomNavController.popBackStack()
-                            }
+                            },
                         )
                     }
                     composable<SubAddressesRoute> {
@@ -473,11 +495,12 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                             onBackPress = {
                                 showBottomNavigation = true
                                 bottomNavController.popBackStack()
-                            }, navigateToDetails = {
+                            },
+                            navigateToDetails = {
                                 bottomNavController.navigate(it)
                             },
                             sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedContentScope = this@composable
+                            animatedContentScope = this@composable,
                         )
                     }
                     composable<Subaddress> { backStackEntry ->
@@ -491,13 +514,13 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
                                 it.hash?.let { paymentId ->
                                     bottomNavController.navigate(
                                         TransactionDetailRoute(
-                                            transactionId = paymentId
-                                        )
+                                            transactionId = paymentId,
+                                        ),
                                     )
                                 }
                             },
                             sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedContentScope = this@composable
+                            animatedContentScope = this@composable,
                         )
                     }
                 }
@@ -505,7 +528,6 @@ fun HomeScreenComposable(modifier: Modifier = Modifier, mainNavController: NavHo
         }
     }
 }
-
 
 @Preview(device = "id:pixel_8")
 @Composable

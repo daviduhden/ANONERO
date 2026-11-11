@@ -50,12 +50,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.anonero.R
 
-
 @Composable
 fun SeedSetup(
     oNextPressed: () -> Unit = {},
     onBackPressed: () -> Unit = {},
-    seed: List<String> = emptyList()
+    seed: List<String> = emptyList(),
 ) {
     BackHandler(true) {
         onBackPressed.invoke()
@@ -63,10 +62,11 @@ fun SeedSetup(
 
     Scaffold { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -78,43 +78,46 @@ fun SeedSetup(
                 Image(
                     painter = painterResource(R.drawable.ic_anon),
                     contentDescription = stringResource(R.string.app_logo),
-                    modifier = Modifier
-                        .size(120.dp)
+                    modifier =
+                        Modifier
+                            .size(120.dp),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.polyseed_mnemonic),
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
             LazyVerticalGrid(
-                modifier = Modifier
-                    .weight(.8f)
-                    .padding(horizontal = 16.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 34.dp),
+                modifier =
+                    Modifier
+                        .weight(.8f)
+                        .padding(horizontal = 16.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 34.dp),
                 columns = GridCells.Fixed(2),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(
-                    horizontal = 24.dp
-                )
+                contentPadding =
+                    PaddingValues(
+                        horizontal = 24.dp,
+                    ),
             ) {
                 items(seed.size) { index ->
                     Box(
-                        modifier = Modifier
-                            .width(60.dp)
-                            .padding(start = 24.dp)
-                            .align(Alignment.CenterHorizontally)
+                        modifier =
+                            Modifier
+                                .width(60.dp)
+                                .padding(start = 24.dp)
+                                .align(Alignment.CenterHorizontally),
                     ) {
                         Text(
                             text = "${index + 1}. ${seed[index]}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            textAlign = TextAlign.Start
+                            textAlign = TextAlign.Start,
                         )
                     }
-
                 }
             }
 
@@ -122,12 +125,13 @@ fun SeedSetup(
                 onClick = {
                     oNextPressed()
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 12.dp
-                    ),
-                               ) {
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 12.dp,
+                        ),
+            ) {
                 Text(stringResource(R.string.next))
             }
         }

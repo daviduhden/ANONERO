@@ -16,7 +16,10 @@ interface WalletListener {
      * @param txId transaction id, when wallet2 provides one.
      * @param amount amount in atomic units.
      */
-    fun moneySpent(txId: String?, amount: Long)
+    fun moneySpent(
+        txId: String?,
+        amount: Long,
+    )
 
     /**
      * Called by wallet2 when an incoming transaction is detected.
@@ -24,7 +27,10 @@ interface WalletListener {
      * @param txId transaction id, when wallet2 provides one.
      * @param amount amount in atomic units.
      */
-    fun moneyReceived(txId: String?, amount: Long)
+    fun moneyReceived(
+        txId: String?,
+        amount: Long,
+    )
 
     /**
      * Called when a payment is first seen in the transaction pool.
@@ -32,7 +38,10 @@ interface WalletListener {
      * @param txId transaction id.
      * @param amount amount in atomic units.
      */
-    fun unconfirmedMoneyReceived(txId: String?, amount: Long)
+    fun unconfirmedMoneyReceived(
+        txId: String?,
+        amount: Long,
+    )
 
     /**
      * Called when wallet2 observes a new block.

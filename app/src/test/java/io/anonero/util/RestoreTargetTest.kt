@@ -18,19 +18,23 @@
 
 package io.anonero.util
 
-import java.io.File
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.nio.file.Files
 
 class RestoreTargetTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private fun requireEmpty(directory: File, secret: Boolean = false, credentials: Boolean = false) {
+    private fun requireEmpty(
+        directory: File,
+        secret: Boolean = false,
+        credentials: Boolean = false,
+    ) {
         RestoreTarget.requireEmpty(directory, "anon", secret, credentials)
     }
 

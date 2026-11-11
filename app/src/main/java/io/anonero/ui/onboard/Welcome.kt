@@ -67,7 +67,6 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import io.anonero.AnonConfig
 import io.anonero.R
 
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingWelcome(
@@ -79,49 +78,55 @@ fun OnboardingWelcome(
 ) {
     var restoreOptions by remember { mutableStateOf(false) }
 
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(
-        )
-    ) {
-        restoreOptions = false
-        if(it == null) {
-            return@rememberLauncherForActivityResult
+    val launcher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+        ) {
+            restoreOptions = false
+            if (it == null) {
+                return@rememberLauncherForActivityResult
+            }
+            onRestoreClick(it.toString())
         }
-        onRestoreClick(it.toString())
-    }
 
     fun chooseFile() {
         launcher.launch(arrayOf("*/*"))
     }
 
-    if (restoreOptions)
+    if (restoreOptions) {
         AlertDialog(
             {
                 restoreOptions = false
-            }, {
+            },
+            {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
                     modifier = Modifier.width(220.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
                         ),
                     onClick = {
                         restoreOptions = false
                         onRestoreClick(null)
-                    }) { Text(stringResource(R.string.restore_from_seed)) }
-            }, Modifier
+                    },
+                ) { Text(stringResource(R.string.restore_from_seed)) }
+            },
+            Modifier
                 .border(
                     1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
-                    ),
+                    color =
+                        MaterialTheme.colorScheme.onBackground.copy(
+                            alpha = .2f,
+                        ),
                     shape = MaterialTheme.shapes.medium,
-                ), {
+                ),
+            {
                 Button(
                     onClick = {
                         chooseFile()
@@ -129,98 +134,107 @@ fun OnboardingWelcome(
                     },
                     modifier = Modifier.width(220.dp),
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.restore_from_backup),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
-            }, containerColor = MaterialTheme.colorScheme.secondary,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-
+            },
+            containerColor = MaterialTheme.colorScheme.secondary,
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
                 ),
             text = {
                 Text(
                     text = stringResource(R.string.restore_options),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 18.sp,
-                        textAlign = TextAlign.Center,
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center,
+                        ),
                 )
-            }
+            },
         )
+    }
 
     Scaffold { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(16.dp)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             Spacer(Modifier.size(24.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(
                     painter = painterResource(R.drawable.ic_anon),
                     contentDescription = stringResource(R.string.app_logo),
-                    modifier = Modifier
-                        .combinedClickable(
-                            onClick = {},
-                            onLongClick = {
-                                onLogsScreen()
-                            }
-                        )
-                        .size(120.dp)
+                    modifier =
+                        Modifier
+                            .combinedClickable(
+                                onClick = {},
+                                onLongClick = {
+                                    onLogsScreen()
+                                },
+                            ).size(120.dp),
                 )
             }
             Column(
-                modifier = Modifier
-                    .fillMaxHeight(0.5f)
-                    .weight(1.2f),
+                modifier =
+                    Modifier
+                        .fillMaxHeight(0.5f)
+                        .weight(1.2f),
                 verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Bottom),
             ) {
-                if (!AnonConfig.viewOnly)
+                if (!AnonConfig.viewOnly) {
                     AnonOutlineButton(
                         onClick = onCreateClick,
-                        modifier = Modifier.width(220.dp)
+                        modifier = Modifier.width(220.dp),
                     ) {
                         Text(stringResource(R.string.create_wallet))
                     }
+                }
                 AnonOutlineButton(
                     onClick = {
                         if (AnonConfig.viewOnly) {
                             onRestoreFromKeys()
                         } else {
-                            restoreOptions = true;
+                            restoreOptions = true
                         }
                     },
-                    modifier = Modifier.width(220.dp)
+                    modifier = Modifier.width(220.dp),
                 ) {
                     Text(stringResource(R.string.restore_wallet), color = MaterialTheme.colorScheme.primary)
                 }
                 IconButton(
                     onClick = onProxySettings,
-                    modifier = Modifier.width(200.dp)
+                    modifier = Modifier.width(200.dp),
                 ) {
                     Row {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = stringResource(R.string.proxy),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(stringResource(R.string.proxy), color = MaterialTheme.colorScheme.primary)
@@ -228,11 +242,9 @@ fun OnboardingWelcome(
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }
-
         }
     }
 }
-
 
 @Preview(heightDp = 640, widthDp = 380)
 @Composable

@@ -22,5 +22,5 @@ enum class EnumTorState {
     STARTING,
     ON,
     STOPPING,
-    OFF
+    OFF,
 }

@@ -33,8 +33,8 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
-
 
 private const val TAG = "TorService"
 
@@ -59,21 +58,27 @@ private const val TAG = "TorService"
  * Tor actions run in [scope] with a SupervisorJob and are logged rather than crashing
  * the app when Android or an update stops the daemon mid-action.
  */
-class TorService(prefs: SharedPreferences) {
-
+class TorService(
+    prefs: SharedPreferences,
+) {
     // A Tor action throws when the daemon dies or is stopped mid-action (the app being
     // killed for an update, Android reclaiming the process). Log it instead of crashing:
     // the UI already shows Tor as not connected.
-    val scope = CoroutineScope(SupervisorJob() + CoroutineExceptionHandler { _, e ->
-        Timber.tag(TAG).w(e, "Tor action failed")
-    })
+    val scope =
+        CoroutineScope(
+            SupervisorJob() +
+                CoroutineExceptionHandler { _, e ->
+                    Timber.tag(TAG).w(e, "Tor action failed")
+                },
+        )
 
     private val _socksState = MutableStateFlow<IPSocketAddress?>(null)
 
     private val _torLogs =
         MutableSharedFlow<String>(
-            replay = 20, onBufferOverflow = BufferOverflow.DROP_OLDEST,
-            extraBufferCapacity = 50
+            replay = 20,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+            extraBufferCapacity = 50,
         )
 
     // set by start()/restart(), cleared by stop()/dispose(): Tor is supposed to be running
@@ -83,43 +88,45 @@ class TorService(prefs: SharedPreferences) {
     val socksFlow: StateFlow<IPSocketAddress?> get() = _socksState.asStateFlow()
     val torLogs: Flow<String> get() = _torLogs.asSharedFlow()
 
-    val runtime: TorRuntime = TorRuntime.Builder(environment = AnonConfig.getTorConfig(scope)) {
+    val runtime: TorRuntime =
+        TorRuntime.Builder(environment = AnonConfig.getTorConfig(scope)) {
 
-        TorEvent.entries().forEach { event ->
-            if (event == TorEvent.ERR)
+            TorEvent.entries().forEach { event ->
+                if (event == TorEvent.ERR) {
+                    observerStatic(event, OnEvent.Executor.Immediate) { data ->
+                        _torLogs.tryEmit(data)
+                    }
+                }
+            }
+            RuntimeEvent.entries().forEach { event ->
                 observerStatic(event, OnEvent.Executor.Immediate) { data ->
-                    _torLogs.tryEmit(data)
-                }
-        }
-        RuntimeEvent.entries().forEach { event ->
-            observerStatic(event, OnEvent.Executor.Immediate) { data ->
-                _torLogs.tryEmit(data.toString())
-            }
-        }
-        observerStatic(RuntimeEvent.STATE) { state ->
-            // the daemon went down without stop() -- killed, or a start that failed: drop the
-            // dead port and start again; the new port reaches the wallet through socksFlow
-            if (state.daemon.isOff && wanted) {
-                _socksState.value = null
-                scope.launch {
-                    delay(10_000)
-                    if (wanted) runtime.startDaemonAsync()
+                    _torLogs.tryEmit(data.toString())
                 }
             }
-        }
-        observerStatic(RuntimeEvent.LISTENERS) {
-            val socketAddr = it.socks.firstOrNull()
-            if (socketAddr != null && wanted) {
-                _socksState.value = socketAddr
+            observerStatic(RuntimeEvent.STATE) { state ->
+                // the daemon went down without stop() -- killed, or a start that failed: drop the
+                // dead port and start again; the new port reaches the wallet through socksFlow
+                if (state.daemon.isOff && wanted) {
+                    _socksState.value = null
+                    scope.launch {
+                        delay(10_000)
+                        if (wanted) runtime.startDaemonAsync()
+                    }
+                }
             }
+            observerStatic(RuntimeEvent.LISTENERS) {
+                val socketAddr = it.socks.firstOrNull()
+                if (socketAddr != null && wanted) {
+                    _socksState.value = socketAddr
+                }
+            }
+            config { _ ->
+                TorOption.SocksPort.configure { auto() }
+            }
+            required(TorEvent.ERR)
+            required(TorEvent.WARN)
+            required(TorEvent.INFO)
         }
-        config { _ ->
-            TorOption.SocksPort.configure { auto() }
-        }
-        required(TorEvent.ERR)
-        required(TorEvent.WARN)
-        required(TorEvent.INFO)
-    }
 
     fun start() {
         wanted = true
@@ -136,7 +143,6 @@ class TorService(prefs: SharedPreferences) {
         }
     }
 
-
     fun restart() {
         wanted = true
         _socksState.value = null
@@ -148,13 +154,14 @@ class TorService(prefs: SharedPreferences) {
     fun dispose() {
         wanted = false
         _socksState.value = null
-        scope.launch {
-            runtime.stopDaemonAsync()
-        }.invokeOnCompletion {
-            it?.let {
-                Timber.tag(TAG).i("Tor dispose exception: ${it.message}")
+        scope
+            .launch {
+                runtime.stopDaemonAsync()
+            }.invokeOnCompletion {
+                it?.let {
+                    Timber.tag(TAG).i("Tor dispose exception: ${it.message}")
+                }
+                scope.cancel()
             }
-            scope.cancel()
-        }
     }
 }

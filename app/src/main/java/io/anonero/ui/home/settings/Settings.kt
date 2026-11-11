@@ -35,12 +35,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,32 +75,32 @@ import io.anonero.BuildConfig
 import io.anonero.R
 import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
+import io.anonero.ui.components.SettingsActionItem
+import io.anonero.ui.components.SettingsSectionHeader
+import io.anonero.ui.components.SettingsSwitchItem
 import io.anonero.ui.home.LockScreen
 import io.anonero.ui.home.LockScreenMode
-import io.anonero.ui.home.graph.routes.ProxySettingsRoute
-import io.anonero.ui.home.graph.routes.SecureWipeRoute
 import io.anonero.ui.home.graph.routes.AccountsRoute
 import io.anonero.ui.home.graph.routes.DecoySettingsRoute
 import io.anonero.ui.home.graph.routes.LwsSettingsRoute
-import io.anonero.ui.home.graph.routes.SignVerifyRoute
+import io.anonero.ui.home.graph.routes.ProxySettingsRoute
+import io.anonero.ui.home.graph.routes.SecureWipeRoute
 import io.anonero.ui.home.graph.routes.SettingsExportBackUp
 import io.anonero.ui.home.graph.routes.SettingsLogs
 import io.anonero.ui.home.graph.routes.SettingsNodeRoute
 import io.anonero.ui.home.graph.routes.SettingsViewSeedRoute
+import io.anonero.ui.home.graph.routes.SignVerifyRoute
 import io.anonero.ui.onboard.PinSetup
-import io.anonero.ui.components.SettingsActionItem
-import io.anonero.ui.components.SettingsSectionHeader
-import io.anonero.ui.components.SettingsSwitchItem
 import io.anonero.ui.theme.ThemeMode
 import io.anonero.ui.theme.ThemeStore
 import io.anonero.util.AppLanguage
 import io.anonero.util.LocaleController
+import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
 import io.anonero.util.StealthMode
-import io.anonero.util.WalletSession
-import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WalletKey
+import io.anonero.util.WalletSession
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import timber.log.Timber
@@ -116,7 +116,6 @@ fun SettingsPage(
     onBackPress: () -> Unit = {},
     navigateTo: (param: Any) -> Unit = {},
 ) {
-
     val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val toastState = rememberToasterState()
     var showLockScreen by remember { mutableStateOf(false) }
@@ -148,38 +147,42 @@ fun SettingsPage(
 
     if (showLockScreen && !locked) {
         Dialog(
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = true,
-                dismissOnBackPress = true,
-                decorFitsSystemWindows = false,
-                securePolicy = SecureFlagPolicy.SecureOn
-            ),
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true,
+                    decorFitsSystemWindows = false,
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                ),
             onDismissRequest = {
                 showLockScreen = false
-            }) {
+            },
+        ) {
             LockScreen(
                 mode = LockScreenMode.VERYFY_PIN,
                 modifier = Modifier.fillMaxHeight(0.95f),
                 onUnLocked = { _, shortCut ->
                     showLockScreen = false
                     newPinDialog = true
-                }
+                },
             )
         }
     }
     if (newPinDialog && !locked) {
         Dialog(
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = true,
-                dismissOnBackPress = true,
-                decorFitsSystemWindows = false,
-                securePolicy = SecureFlagPolicy.SecureOn
-            ),
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true,
+                    decorFitsSystemWindows = false,
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                ),
             onDismissRequest = {
                 newPinDialog = false
-            }) {
+            },
+        ) {
             PinSetup(
                 changePin = true,
                 onNext = {
@@ -189,9 +192,11 @@ fun SettingsPage(
                         // A wallet whose migration has not happened yet is still encrypted
                         // with the PIN itself: re-key it first, or the next open with the
                         // new PIN fails and the user is locked out.
-                        val duressHash = prefs.getString(
-                            io.anonero.util.PREFS_DURESS_PIN_HASH, ""
-                        )
+                        val duressHash =
+                            prefs.getString(
+                                io.anonero.util.PREFS_DURESS_PIN_HASH,
+                                "",
+                            )
                         if (!WalletSession.isDecoy && !duressHash.isNullOrEmpty() &&
                             PinHash.matches(it, duressHash)
                         ) {
@@ -203,16 +208,23 @@ fun SettingsPage(
                             throw Exception("The duress PIN must differ from the normal PIN")
                         }
                         val context = AnonConfig.context!!
-                        val walletName = io.anonero.util.WalletProfileStore.activeWalletName(context)
+                        val walletName =
+                            io.anonero.util.WalletProfileStore
+                                .activeWalletName(context)
                         if (!WalletKey.exists(context, walletName)) {
-                            val wallet = WalletManager.instance?.wallet
-                                ?: throw Exception("wallet not open")
+                            val wallet =
+                                WalletManager.instance?.wallet
+                                    ?: throw Exception("wallet not open")
                             if (!wallet.setPassword(it)) {
                                 throw Exception("setPassword failed: ${wallet.status.errorString}")
                             }
                         }
                         prefs.edit(commit = true) {
-                            putString(io.anonero.util.WalletProfileStore.activePinHashKey(), PinHash.hash(it))
+                            putString(
+                                io.anonero.util.WalletProfileStore
+                                    .activePinHashKey(),
+                                PinHash.hash(it),
+                            )
                         }
                         toastState.show(pinChangedMessage, type = ToastType.Success)
                     } catch (e: Exception) {
@@ -221,7 +233,7 @@ fun SettingsPage(
                     } finally {
                         newPinDialog = false
                     }
-                }
+                },
             )
         }
     }
@@ -235,20 +247,20 @@ fun SettingsPage(
                     ThemeMode.entries.forEach { mode ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    ThemeStore.set(prefs, mode)
-                                    showThemeDialog = false
-                                }
-                                .padding(vertical = 8.dp)
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        ThemeStore.set(prefs, mode)
+                                        showThemeDialog = false
+                                    }.padding(vertical = 8.dp),
                         ) {
                             RadioButton(
                                 selected = themeMode == mode,
                                 onClick = {
                                     ThemeStore.set(prefs, mode)
                                     showThemeDialog = false
-                                }
+                                },
                             )
                             Text(themeLabel(mode))
                         }
@@ -259,7 +271,7 @@ fun SettingsPage(
                 TextButton(onClick = { showThemeDialog = false }) {
                     Text(stringResource(R.string.close))
                 }
-            }
+            },
         )
     }
 
@@ -272,15 +284,15 @@ fun SettingsPage(
                     AppLanguage.entries.forEach { option ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    showLanguageDialog = false
-                                    if (activity != null && option != language) {
-                                        LocaleController.setLanguage(activity, prefs, option)
-                                    }
-                                }
-                                .padding(vertical = 8.dp)
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showLanguageDialog = false
+                                        if (activity != null && option != language) {
+                                            LocaleController.setLanguage(activity, prefs, option)
+                                        }
+                                    }.padding(vertical = 8.dp),
                         ) {
                             RadioButton(
                                 selected = language == option,
@@ -289,7 +301,7 @@ fun SettingsPage(
                                     if (activity != null && option != language) {
                                         LocaleController.setLanguage(activity, prefs, option)
                                     }
-                                }
+                                },
                             )
                             Text(stringResource(option.labelRes))
                         }
@@ -300,7 +312,7 @@ fun SettingsPage(
                 TextButton(onClick = { showLanguageDialog = false }) {
                     Text(stringResource(R.string.close))
                 }
-            }
+            },
         )
     }
 
@@ -308,41 +320,42 @@ fun SettingsPage(
         state = toastState,
         maxVisibleToasts = 2,
         alignment = Alignment.TopCenter,
-        darkTheme = true
+        darkTheme = true,
     )
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 title = {
                     Text("")
-                }
+                },
             )
-        }
+        },
     ) {
-        val settingsMenuHeaderStyle = MaterialTheme.typography.titleLarge.copy(
-            color = MaterialTheme.colorScheme.primary
-        )
+        val settingsMenuHeaderStyle =
+            MaterialTheme.typography.titleLarge.copy(
+                color = MaterialTheme.colorScheme.primary,
+            )
 
         Box(
-            modifier = Modifier
-                .padding(it)
-                .fillMaxSize()
+            modifier =
+                Modifier
+                    .padding(it)
+                    .fillMaxSize(),
         ) {
-            Column(
-
-            ) {
+            Column {
                 LazyColumn(
-                    modifier = Modifier
-                        .padding(
-                            horizontal = 12.dp
-                        )
+                    modifier =
+                        Modifier
+                            .padding(
+                                horizontal = 12.dp,
+                            ),
                 ) {
                     item {
                         SettingsSectionHeader(stringResource(R.string.settings_appearance_privacy))
@@ -356,7 +369,7 @@ fun SettingsPage(
                                 stealthEnabled = enabled
                                 StealthMode.setEnabled(prefs, enabled)
                                 if (enabled) walletState.setHideAmounts(true)
-                            }
+                            },
                         )
                     }
                     item {
@@ -367,59 +380,67 @@ fun SettingsPage(
                             onCheckedChange = { enabled ->
                                 stealthAutoLock = enabled
                                 StealthMode.setAutoLock(prefs, enabled)
-                            }
+                            },
                         )
                     }
                     item {
                         SettingsActionItem(
                             title = stringResource(R.string.theme),
                             supporting = themeLabel(themeMode),
-                            onClick = { showThemeDialog = true }
+                            onClick = { showThemeDialog = true },
                         )
                     }
                     item {
                         SettingsActionItem(
                             title = stringResource(R.string.language),
                             supporting = stringResource(language.labelRes),
-                            onClick = { showLanguageDialog = true }
+                            onClick = { showLanguageDialog = true },
                         )
                     }
-                    if (!offline) item {
-                        Text(
-                            stringResource(R.string.settings_connection),
-                            style = settingsMenuHeaderStyle,
-                            modifier = Modifier.padding(
-                                vertical = 12.dp,
-                                horizontal = 8.dp
+                    if (!offline) {
+                        item {
+                            Text(
+                                stringResource(R.string.settings_connection),
+                                style = settingsMenuHeaderStyle,
+                                modifier =
+                                    Modifier.padding(
+                                        vertical = 12.dp,
+                                        horizontal = 8.dp,
+                                    ),
                             )
-                        )
+                        }
                     }
-                    if (!offline) item {
-                        HorizontalDivider(
-                            thickness = 2.5.dp
-                        )
-                        SettingsMenuItem(
-                            title = stringResource(R.string.settings_node_settings),
-                            onClick = {
-                                navigateTo(SettingsNodeRoute)
+                    if (!offline) {
+                        item {
+                            HorizontalDivider(
+                                thickness = 2.5.dp,
+                            )
+                            SettingsMenuItem(
+                                title = stringResource(R.string.settings_node_settings),
+                                onClick = {
+                                    navigateTo(SettingsNodeRoute)
+                                },
+                            )
+                            HorizontalDivider(
+                                thickness = 2.5.dp,
+                            )
+                        }
+                    }
+                    if (!offline) {
+                        item {
+                            SettingsMenuItem(title = stringResource(R.string.settings_proxy_settings), onClick = {
+                                navigateTo(ProxySettingsRoute)
                             })
-                        HorizontalDivider(
-                            thickness = 2.5.dp
-                        )
-                    }
-                    if (!offline) item {
-                        SettingsMenuItem(title = stringResource(R.string.settings_proxy_settings), onClick = {
-                            navigateTo(ProxySettingsRoute)
-                        })
-                        HorizontalDivider(
-                            thickness = 2.5.dp
-                        )
+                            HorizontalDivider(
+                                thickness = 2.5.dp,
+                            )
+                        }
                     }
                     item {
                         SettingsActionItem(
                             title = stringResource(R.string.lws_settings_title),
                             supporting = stringResource(R.string.lws_settings_supporting),
-                            onClick = { navigateTo(LwsSettingsRoute) }
+                            onClick = { navigateTo(LwsSettingsRoute) },
                         )
                         HorizontalDivider(thickness = 2.5.dp)
                     }
@@ -427,17 +448,18 @@ fun SettingsPage(
                         Text(
                             stringResource(R.string.settings_security),
                             style = settingsMenuHeaderStyle,
-                            modifier = Modifier.padding(
-                                vertical = 12.dp,
-                                horizontal = 8.dp
-                            )
+                            modifier =
+                                Modifier.padding(
+                                    vertical = 12.dp,
+                                    horizontal = 8.dp,
+                                ),
                         )
                     }
                     item {
                         SettingsActionItem(
                             title = stringResource(R.string.accounts_settings_title),
                             supporting = stringResource(R.string.accounts_settings_supporting),
-                            onClick = { navigateTo(AccountsRoute) }
+                            onClick = { navigateTo(AccountsRoute) },
                         )
                         HorizontalDivider(thickness = 2.5.dp)
                     }
@@ -445,84 +467,93 @@ fun SettingsPage(
                         SettingsActionItem(
                             title = stringResource(R.string.sign_verify_settings_title),
                             supporting = stringResource(R.string.sign_verify_settings_supporting),
-                            onClick = { navigateTo(SignVerifyRoute) }
+                            onClick = { navigateTo(SignVerifyRoute) },
                         )
                         HorizontalDivider(thickness = 2.5.dp)
                     }
-                    if (!AnonConfig.viewOnly)
+                    if (!AnonConfig.viewOnly) {
                         item {
                             SettingsMenuItem(title = stringResource(R.string.settings_seed), onClick = {
                                 navigateTo(SettingsViewSeedRoute)
                             })
                             HorizontalDivider(
-                                thickness = 2.5.dp
+                                thickness = 2.5.dp,
                             )
                         }
+                    }
                     item {
                         SettingsMenuItem(title = stringResource(R.string.settings_change_pin), onClick = {
                             showLockScreen = true
                         })
                         HorizontalDivider(
-                            thickness = 2.5.dp
+                            thickness = 2.5.dp,
                         )
                     }
-                    if (!WalletSession.isDecoy) item {
-                        SettingsMenuItem(title = stringResource(R.string.settings_export_backup), onClick = {
-                            navigateTo(SettingsExportBackUp)
-                        })
-                        HorizontalDivider(
-                            thickness = 2.5.dp
-                        )
+                    if (!WalletSession.isDecoy) {
+                        item {
+                            SettingsMenuItem(title = stringResource(R.string.settings_export_backup), onClick = {
+                                navigateTo(SettingsExportBackUp)
+                            })
+                            HorizontalDivider(
+                                thickness = 2.5.dp,
+                            )
+                        }
                     }
-                    if (!WalletSession.isDecoy && !AnonConfig.viewOnly) item {
-                        SettingsActionItem(
-                            title = stringResource(R.string.decoy_settings_title),
-                            supporting = stringResource(R.string.decoy_settings_supporting),
-                            onClick = { navigateTo(DecoySettingsRoute) }
-                        )
-                        HorizontalDivider(thickness = 2.5.dp)
+                    if (!WalletSession.isDecoy && !AnonConfig.viewOnly) {
+                        item {
+                            SettingsActionItem(
+                                title = stringResource(R.string.decoy_settings_title),
+                                supporting = stringResource(R.string.decoy_settings_supporting),
+                                onClick = { navigateTo(DecoySettingsRoute) },
+                            )
+                            HorizontalDivider(thickness = 2.5.dp)
+                        }
                     }
                     item {
                         SettingsMenuItem(
                             title = stringResource(R.string.settings_secure_wipe),
                             onClick = {
                                 navigateTo(SecureWipeRoute)
-                            })
+                            },
+                        )
                         HorizontalDivider(
-                            thickness = 2.5.dp
+                            thickness = 2.5.dp,
                         )
                     }
                 }
             }
             Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(12.dp)
-                    .padding(bottom = 64.dp)
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(12.dp)
+                        .padding(bottom = 64.dp),
             ) {
                 Text(
                     stringResource(R.string.settings_app_version, stringResource(R.string.app_name), BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        color = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = 0.6f,
+                    style =
+                        MaterialTheme.typography.labelLarge.copy(
+                            color =
+                                MaterialTheme.colorScheme.onBackground.copy(
+                                    alpha = 0.6f,
+                                ),
+                            fontSize = 12.sp,
                         ),
-                        fontSize = 12.sp
-                    ),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.clickable { navigateTo(SettingsLogs) }
+                    modifier = Modifier.clickable { navigateTo(SettingsLogs) },
                 )
             }
         }
     }
 }
 
-
 @Composable
-private fun themeLabel(mode: ThemeMode): String = when (mode) {
-    ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
-    ThemeMode.LIGHT -> stringResource(R.string.theme_light)
-    ThemeMode.DARK -> stringResource(R.string.theme_dark)
-}
+private fun themeLabel(mode: ThemeMode): String =
+    when (mode) {
+        ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+        ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+        ThemeMode.DARK -> stringResource(R.string.theme_dark)
+    }
 
 @Composable
 fun SettingsMenuItem(
@@ -533,21 +564,22 @@ fun SettingsMenuItem(
     val settingsMenuStyle = MaterialTheme.typography.titleMedium.copy()
 
     ListItem(
-        modifier = Modifier
-            .padding(horizontal = 4.dp)
-            .clickable(
-                onClick = onClick,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple()
-            ),
+        modifier =
+            Modifier
+                .padding(horizontal = 4.dp)
+                .clickable(
+                    onClick = onClick,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(),
+                ),
         headlineContent = {
             Text(
-                title, style = settingsMenuStyle,
+                title,
+                style = settingsMenuStyle,
             )
-        }
+        },
     )
 }
-
 
 @Preview(device = "id:pixel_5")
 @Composable

@@ -18,6 +18,8 @@
 
 package io.anonero.ui.onboard.graph
 
+import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.material3.AlertDialog
@@ -44,16 +46,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.dialog
 import androidx.navigation.compose.navigation
 import androidx.navigation.toRoute
-import android.content.Context
-import androidx.activity.compose.BackHandler
 import io.anonero.AnonConfig
-import io.anonero.model.node.NodeFields
 import io.anonero.R
+import io.anonero.model.node.NodeFields
 import io.anonero.services.AnonWalletHandler
 import io.anonero.services.WalletState
 import io.anonero.services.startAnonService
-import io.anonero.util.RestoreTargetNotEmptyException
-import io.anonero.util.WalletSession
 import io.anonero.ui.home.graph.routes.Home
 import io.anonero.ui.home.settings.LogViewer
 import io.anonero.ui.home.settings.ProxySettings
@@ -68,6 +66,8 @@ import io.anonero.ui.onboard.SetupNodeComposable
 import io.anonero.ui.onboard.SetupPassphrase
 import io.anonero.ui.onboard.restore.RestorePreview
 import io.anonero.ui.onboard.viewonly.RestoreFromKeys
+import io.anonero.util.RestoreTargetNotEmptyException
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -76,7 +76,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import timber.log.Timber
-
 
 @Serializable
 data object LandingScreenRoute
@@ -94,7 +93,9 @@ data object OnboardPassPhraseScreen
 data object OnboardLogsScreen
 
 @Serializable
-data class OnboardLoading(val message: String)
+data class OnboardLoading(
+    val message: String,
+)
 
 @Serializable
 data object OnboardSeedScreen
@@ -112,12 +113,15 @@ data object OnboardRestoreScreen
 data object OnboardRestoreNodeScreen
 
 @Serializable
-data class OnboardRestorePreviewScreen(val backUpPath: String)
+data class OnboardRestorePreviewScreen(
+    val backUpPath: String,
+)
 
 @Serializable
 data object OnboardImportKeysScreen
 
-//onboarding
+// onboarding
+
 /**
  * Navigation graph for first-run setup, seed restore, backup restore, and view-only key
  * import.
@@ -128,19 +132,17 @@ data object OnboardImportKeysScreen
  */
 fun NavGraphBuilder.onboardingGraph(
     navController: NavHostController,
-    onboardViewModel: OnboardViewModel
+    onboardViewModel: OnboardViewModel,
 ) {
-
-
     navigation<LandingScreenRoute>(
         startDestination = OnboardingWelcomeScreen,
     ) {
-
         dialog<OnboardLoading>(
-            dialogProperties = DialogProperties(
-                dismissOnBackPress = false,
-                dismissOnClickOutside = false,
-            ),
+            dialogProperties =
+                DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                ),
         ) {
             OnboardLoadingComposable(loadingState = it.toRoute())
         }
@@ -166,7 +168,7 @@ fun NavGraphBuilder.onboardingGraph(
                 },
                 onLogsScreen = {
                     navController.navigate(OnboardLogsScreen)
-                }
+                },
             )
         }
         composable<OnboardingProxyScreen> {
@@ -187,7 +189,7 @@ fun NavGraphBuilder.onboardingGraph(
                     } else {
                         navController.navigate(OnboardPassPhraseScreen)
                     }
-                }
+                },
             )
         }
         composable<OnboardRestoreScreen> {
@@ -200,7 +202,7 @@ fun NavGraphBuilder.onboardingGraph(
                     onboardViewModel.setRestorePayload(it)
                     navController
                         .navigate(OnboardNodeSetupScreen)
-                }
+                },
             )
         }
         composable<OnboardRestorePreviewScreen> { navBackStackEntry ->
@@ -225,23 +227,23 @@ fun NavGraphBuilder.onboardingGraph(
                     runCatching { startAnonService(context) }
                         .onFailure { Timber.tag("OnboardingGraph").e(it, "wallet service did not start") }
                     val prefs = AnonConfig.context?.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
-                    //a backup of an offline signer has no node
+                    // a backup of an offline signer has no node
                     if (prefs?.getString(NodeFields.RPC_HOST.value, "").isNullOrEmpty()) {
                         navController.navigate(OnboardRestoreNodeScreen)
                     } else {
                         navController.navigate(
-                            Home
+                            Home,
                         ) {
                             popUpTo(LandingScreenRoute)
                         }
                     }
-                }
+                },
             )
         }
         composable<OnboardRestoreNodeScreen> {
             val toHome = {
                 navController.navigate(
-                    Home
+                    Home,
                 ) {
                     popUpTo(LandingScreenRoute)
                 }
@@ -249,7 +251,7 @@ fun NavGraphBuilder.onboardingGraph(
             BackHandler { toHome() }
             SetupNodeComposable(
                 onBackPressed = toHome,
-                oNextPressed = toHome
+                oNextPressed = toHome,
             )
         }
         composable<OnboardPassPhraseScreen> {
@@ -260,15 +262,15 @@ fun NavGraphBuilder.onboardingGraph(
                 oNextPressed = {
                     onboardViewModel.setPassPhrase(it)
                     navController.navigate(OnboardPinScreen)
-                }
+                },
             )
         }
 
-        composable<OnboardLogsScreen>() {
+        composable<OnboardLogsScreen> {
             LogViewer(
                 onBackPress = {
                     navController.navigateUp()
-                }
+                },
             )
         }
 
@@ -289,7 +291,7 @@ fun NavGraphBuilder.onboardingGraph(
                     showErrorMessage = null
                     navController.popBackStack()
                     navController.navigate(OnboardLogsScreen)
-                }
+                },
             )
             PinSetup(
                 onNext = { pin ->
@@ -328,37 +330,44 @@ fun NavGraphBuilder.onboardingGraph(
                             throw cancelled
                         } catch (failure: Exception) {
                             navController.popBackStack()
-                            showErrorMessage = resources.getString(
-                                if (failure is RestoreTargetNotEmptyException) R.string.wallet_target_not_empty
-                                else if (onboardViewModel.getMode() == Mode.RESTORE) R.string.restore_failed
-                                else R.string.unable_to_create_wallet
-                            )
+                            showErrorMessage =
+                                resources.getString(
+                                    if (failure is RestoreTargetNotEmptyException) {
+                                        R.string.wallet_target_not_empty
+                                    } else if (onboardViewModel.getMode() == Mode.RESTORE) {
+                                        R.string.restore_failed
+                                    } else {
+                                        R.string.unable_to_create_wallet
+                                    },
+                                )
                         }
                     }
-                }
+                },
             )
         }
         composable<OnboardSeedScreen> {
             val seed by produceState(initialValue = emptyList<String>()) {
-                value = withContext(Dispatchers.IO) {
-                    onboardViewModel.getSeed()
-                        .trim()
-                        .split(Regex("\\s+"))
-                        .filter { it.isNotEmpty() }
-                }
+                value =
+                    withContext(Dispatchers.IO) {
+                        onboardViewModel
+                            .getSeed()
+                            .trim()
+                            .split(Regex("\\s+"))
+                            .filter { it.isNotEmpty() }
+                    }
             }
             SeedSetup(
                 seed = seed,
                 oNextPressed = {
                     navController.navigate(
-                        Home
+                        Home,
                     ) {
                         popUpTo(LandingScreenRoute)
                     }
                 },
                 // The wallet already exists. Do not navigate back to the PIN screen or
                 // reload the seed from a saved-state route; require the explicit Next.
-                onBackPressed = { }
+                onBackPressed = { },
             )
         }
         composable<OnboardImportKeysScreen> {
@@ -369,19 +378,18 @@ fun NavGraphBuilder.onboardingGraph(
                 },
                 onBackPressed = {
                     navController.navigateUp()
-                }
+                },
             )
         }
     }
 }
-
 
 @Composable
 fun OnboardErrorDialog(
     showErrorMessage: String?,
     isRestoreMode: Boolean,
     onClose: () -> Unit,
-    onShowLogs: () -> Unit
+    onShowLogs: () -> Unit,
 ) {
     if (showErrorMessage != null) {
         AlertDialog(
@@ -389,62 +397,74 @@ fun OnboardErrorDialog(
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    onClick = onClose
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    onClick = onClose,
                 ) { Text(stringResource(R.string.close)) }
             },
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = .2f),
-                    shape = MaterialTheme.shapes.medium,
-                ),
+            modifier =
+                Modifier
+                    .border(
+                        1.dp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = .2f),
+                        shape = MaterialTheme.shapes.medium,
+                    ),
             dismissButton = {
                 Button(
                     onClick = onShowLogs,
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.logs),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                            ),
                     )
                 }
             },
             containerColor = MaterialTheme.colorScheme.secondary,
             title = {
                 Text(
-                    text = stringResource(
-                        R.string.wallet,
-                        stringResource(R.string.unable_to),
-                        if (isRestoreMode) stringResource(
-                            R.string.restore
-                        ) else stringResource(R.string.create)
-                    ),
+                    text =
+                        stringResource(
+                            R.string.wallet,
+                            stringResource(R.string.unable_to),
+                            if (isRestoreMode) {
+                                stringResource(
+                                    R.string.restore,
+                                )
+                            } else {
+                                stringResource(R.string.create)
+                            },
+                        ),
                 )
             },
             text = {
                 Text(
                     text = showErrorMessage,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            color = MaterialTheme.colorScheme.error,
+                        ),
                 )
-            }
+            },
         )
     }
 }

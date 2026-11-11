@@ -18,7 +18,6 @@
 
 package io.anonero.model
 
-
 /**
  * Atomic-unit balance split between spendable and locked outputs.
  *
@@ -26,8 +25,10 @@ package io.anonero.model
  * coinbase outputs or time-locked outputs), not outputs frozen by the user. Use
  * `Wallet`/`Coins` for freeze state. Amounts are atomic units (`1 XMR = 10^12`).
  */
-class BalanceInfo(val rawUnlocked: Long, val rawLocked: Long) {
-
+class BalanceInfo(
+    val rawUnlocked: Long,
+    val rawLocked: Long,
+) {
     val isUnlockedBalanceZero: Boolean
         get() = rawUnlocked == 0L
     val isLockedBalanceZero: Boolean

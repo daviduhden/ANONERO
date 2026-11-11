@@ -60,7 +60,7 @@ fun QrCodeView(
             modifier = Modifier.fillMaxSize(),
             colors = colors,
             dotShape = dotShape,
-            encoder = encoder
+            encoder = encoder,
         )
         if (overlayContent != null) {
             Box(modifier = Modifier.fillMaxSize(fraction = 0.25f)) {
@@ -85,7 +85,7 @@ fun QrCodeView(
     modifier: Modifier = Modifier,
     colors: QrCodeColors = QrCodeColors.default(),
     dotShape: DotShape = DotShape.Square,
-    encoder: QrEncoder = ZxingQrEncoder()
+    encoder: QrEncoder = ZxingQrEncoder(),
 ) {
     val encodedData = remember(data, encoder) { encoder.encode(data) }
 
@@ -96,19 +96,25 @@ fun QrCodeView(
                 for (y in 0 until matrix.height) {
                     if (matrix.get(x, y) != 1.toByte() || isFinderCell(x, y, matrix.width)) continue
                     when (dotShape) {
-                        DotShape.Square -> drawRect(
-                            color = colors.foreground,
-                            topLeft = Offset(x * cellSize, y * cellSize),
-                            size = Size(cellSize, cellSize)
-                        )
+                        DotShape.Square -> {
+                            drawRect(
+                                color = colors.foreground,
+                                topLeft = Offset(x * cellSize, y * cellSize),
+                                size = Size(cellSize, cellSize),
+                            )
+                        }
 
-                        DotShape.Circle -> drawCircle(
-                            color = colors.foreground,
-                            center = Offset(
-                                x * cellSize + cellSize / 2, y * cellSize + cellSize / 2
-                            ),
-                            radius = cellSize / 2
-                        )
+                        DotShape.Circle -> {
+                            drawCircle(
+                                color = colors.foreground,
+                                center =
+                                    Offset(
+                                        x * cellSize + cellSize / 2,
+                                        y * cellSize + cellSize / 2,
+                                    ),
+                                radius = cellSize / 2,
+                            )
+                        }
                     }
                 }
             }
@@ -123,10 +129,11 @@ fun QrCodeViewPreview() {
     QrCodeView(
         "test",
         modifier = Modifier.size(400.dp),
-        colors = QrCodeColors(
-            background = Color.White,
-            foreground = Color.Black
-        ),
+        colors =
+            QrCodeColors(
+                background = Color.White,
+                foreground = Color.Black,
+            ),
         dotShape = DotShape.Square,
     )
 }

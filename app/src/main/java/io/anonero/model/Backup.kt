@@ -35,8 +35,9 @@ object VersionAsIntSerializer : KSerializer<Int> {
         PrimitiveSerialDescriptor("Version", PrimitiveKind.INT)
 
     override fun deserialize(decoder: Decoder): Int {
-        val jsonPrimitive = decoder as? kotlinx.serialization.json.JsonDecoder
-            ?: error("This serializer only works with JSON")
+        val jsonPrimitive =
+            decoder as? kotlinx.serialization.json.JsonDecoder
+                ?: error("This serializer only works with JSON")
 
         val element = jsonPrimitive.decodeJsonElement()
         return when (element) {
@@ -48,11 +49,16 @@ object VersionAsIntSerializer : KSerializer<Int> {
                 }
             }
 
-            else -> 0
+            else -> {
+                0
+            }
         }
     }
 
-    override fun serialize(encoder: Encoder, value: Int) {
+    override fun serialize(
+        encoder: Encoder,
+        value: Int,
+    ) {
         encoder.encodeInt(value) // always write as int
     }
 }
@@ -66,7 +72,7 @@ object VersionAsIntSerializer : KSerializer<Int> {
 data class BackupPayload(
     val backup: Backup,
     @Serializable(with = VersionAsIntSerializer::class)
-    val version: Int
+    val version: Int,
 )
 
 @Serializable
@@ -76,7 +82,7 @@ data class NodeBackup(
     val networkType: String,
     val password: String,
     val rpcPort: Int,
-    val username: String
+    val username: String,
 )
 
 @Serializable
@@ -84,14 +90,13 @@ data class Backup(
     val meta: BackupMeta,
     val node: NodeBackup,
     val nodes: List<Node> = emptyList(),
-    val wallet: WalletBackup
+    val wallet: WalletBackup,
 )
-
 
 @Serializable
 data class BackupMeta(
     val network: String,
-    val timestamp: Long
+    val timestamp: Long,
 )
 
 /**
@@ -112,5 +117,5 @@ data class WalletBackup(
     val restoreHeight: Long?,
     val primaryAddress: String = "",
     val seed: String?,
-    val neroPayload: NeroKeyPayload? = null
+    val neroPayload: NeroKeyPayload? = null,
 )

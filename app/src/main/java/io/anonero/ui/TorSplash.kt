@@ -59,11 +59,10 @@ import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WALLET_USE_TOR
 import io.anonero.util.WalletProfileStore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
-
 
 @Composable
 fun TorSplash(
@@ -71,7 +70,6 @@ fun TorSplash(
     enableTor: Boolean,
     content: @Composable () -> Unit = {},
 ) {
-
     var anonPrefs: SharedPreferences = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val context = LocalContext.current
     var walletExist by remember {
@@ -84,24 +82,27 @@ fun TorSplash(
     var hasNetWork by remember { mutableStateOf(false) }
 
     val progressAnim by animateFloatAsState(
-        targetValue = if (socks != null) .98f else 0.4f, label = "progressAnim"
+        targetValue = if (socks != null) .98f else 0.4f,
+        label = "progressAnim",
     )
 
-    if(walletExist){
+    if (walletExist) {
         LaunchedEffect(key1 = walletExist, socks) {
-            //if user disabled tor and uses manual proxy, skip tor splash
+            // if user disabled tor and uses manual proxy, skip tor splash
             hasNetWork = isNetworkConnected(context)
             if (enableTor.not()) {
                 return@LaunchedEffect
             }
             scope.launch(Dispatchers.IO) {
                 walletExist = WalletProfileStore.anyWalletExists(context, anonPrefs)
-                //if user disabled tor and uses manual proxy, skip tor splash
+                // if user disabled tor and uses manual proxy, skip tor splash
                 if (!anonPrefs.getBoolean(WALLET_USE_TOR, true)) {
                     isAppReady = true
                 } else {
-                    if ((socks != null)) scope.launch(Dispatchers.IO) {
-                        isAppReady = true
+                    if ((socks != null)) {
+                        scope.launch(Dispatchers.IO) {
+                            isAppReady = true
+                        }
                     }
                 }
             }
@@ -115,13 +116,13 @@ fun TorSplash(
         }
     }
 
-    //no need to show tor splash if user disabled tor
-    //if there is no wallet file, skip tor splash
+    // no need to show tor splash if user disabled tor
+    // if there is no wallet file, skip tor splash
     val lwsEnabled = anonPrefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false)
     if (!enableTor || !walletExist || !hasNetWork || !anonPrefs.getBoolean(WALLET_USE_TOR, true) ||
         (!lwsEnabled && anonPrefs.getString(NodeFields.RPC_HOST.value, "").isNullOrEmpty())
     ) {
-        return content();
+        return content()
     }
     AnimatedContent(targetState = isAppReady) {
         if (it) {
@@ -130,35 +131,39 @@ fun TorSplash(
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-
                 Image(
                     painter = painterResource(id = R.drawable.ic_anon),
                     contentDescription = stringResource(R.string.app_logo),
-                    modifier = Modifier.size(120.dp)
+                    modifier = Modifier.size(120.dp),
                 )
                 Column(
-                    modifier = Modifier.padding(
-                        horizontal = 16.dp, vertical = 16.dp
-                    ),
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 16.dp,
+                            vertical = 16.dp,
+                        ),
                     verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     LinearProgressIndicator(
                         progress = { progressAnim },
-                        modifier = Modifier
-                            .fillMaxWidth(0.6f)
-                            .padding(
-                                horizontal = 16.dp, vertical = 16.dp
-                            ),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.6f)
+                                .padding(
+                                    horizontal = 16.dp,
+                                    vertical = 16.dp,
+                                ),
                         strokeCap = StrokeCap.Round,
                         color = Color.White,
                         drawStopIndicator = {},
-                        trackColor = Color.White.copy(alpha = 0.2f)
+                        trackColor = Color.White.copy(alpha = 0.2f),
                     )
                     Text(
-                        text = stringResource(R.string.initializing_tor), color = Color.White
+                        text = stringResource(R.string.initializing_tor),
+                        color = Color.White,
                     )
                 }
             }
@@ -172,6 +177,6 @@ fun isNetworkConnected(context: Context): Boolean {
     val network = connectivityManager.activeNetwork ?: return false
     val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
     return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
 }

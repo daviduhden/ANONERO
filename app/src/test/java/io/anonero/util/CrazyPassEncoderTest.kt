@@ -24,13 +24,12 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class CrazyPassEncoderTest {
-
     @Test
     fun `encode preserves legacy alphabet padding and grouping`() {
         val encoded = CrazyPassEncoder.encode(ByteArray(32))
         assertEquals(
             "2222 2222 2222 2222 2222 2222 2222 2222 2222 2222 2222 2222 2222",
-            encoded
+            encoded,
         )
         assertEquals(52, encoded.replace(" ", "").length)
         assertEquals(13, encoded.split(" ").size)
@@ -41,7 +40,7 @@ class CrazyPassEncoderTest {
         val bytes = ByteArray(32) { it.toByte() }
         assertEquals(
             "ZJ9U 3GE5 UA8J KDS4 P278 3B64 JS5W J8J3 DJ4L 26W2 8A3A J3A2 3222",
-            CrazyPassEncoder.encode(bytes)
+            CrazyPassEncoder.encode(bytes),
         )
     }
 

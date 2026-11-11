@@ -46,7 +46,6 @@ import javax.crypto.spec.SecretKeySpec
  * use them for new data.
  */
 object EncryptUtil {
-
     const val DEFAULT_ITR = 11000
     const val SALT_PREFIX = "Salted__"
     const val BUFFER_SIZE = 4096
@@ -63,18 +62,21 @@ object EncryptUtil {
     private const val V2_IV_BYTES = 12
     private const val V2_TAG_BITS = 128
 
-    private fun v2Key(passphrase: String, salt: ByteArray): SecretKeySpec =
+    private fun v2Key(
+        passphrase: String,
+        salt: ByteArray,
+    ): SecretKeySpec =
         SecretKeySpec(
-            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            SecretKeyFactory
+                .getInstance("PBKDF2WithHmacSHA256")
                 .generateSecret(PBEKeySpec(passphrase.toCharArray(), salt, V2_ITERATIONS, 256))
                 .encoded,
             "AES",
         )
 
-
     fun encrypt(
         password: String,
-        toEncrypt: String
+        toEncrypt: String,
     ): String {
         val salt = SecureRandom().generateSeed(8)
         // Derive 48 byte key
@@ -93,15 +95,15 @@ object EncryptUtil {
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
         val cipherText = cipher.doFinal(toEncrypt.toByteArray())
-        return Base64.encode(SALT_PREFIX.toByteArray() + salt + cipherText)
+        return Base64
+            .encode(SALT_PREFIX.toByteArray() + salt + cipherText)
             .decodeToString()
             .replace("(.{64})".toRegex(), "$1\n")
-
     }
 
     fun decrypt(
         password: String,
-        toDecrypt: String
+        toDecrypt: String,
     ): String {
         val encryptedBytes = Base64.decode(toDecrypt.lines().joinToString(""))
         val salt = encryptedBytes.copyOfRange(8, 16)
@@ -134,11 +136,14 @@ object EncryptUtil {
         }
         val plaintext = decrypted.copyOfRange(0, decrypted.size - padding)
         return plaintext.toString(Charsets.UTF_8)
-
     }
 
-    /* Writes a v2 backup: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext+tag. */
-    fun encryptFile(key: String, inputFile: File, outputFile: File) {
+    // Writes a v2 backup: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext+tag.
+    fun encryptFile(
+        key: String,
+        inputFile: File,
+        outputFile: File,
+    ) {
         val salt = ByteArray(V2_SALT_BYTES).also { SecureRandom().nextBytes(it) }
         val iv = ByteArray(V2_IV_BYTES).also { SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -160,7 +165,11 @@ object EncryptUtil {
      * wrong passphrase, fails the GCM tag check and throws instead of yielding garbage
      * -- or worse, plausible garbage. v1 files restore exactly as they always did.
      */
-    fun decryptFile(key: String, inputFile: File, outputFile: File) {
+    fun decryptFile(
+        key: String,
+        inputFile: File,
+        outputFile: File,
+    ) {
         val magic = ByteArray(V2_MAGIC.length)
         FileInputStream(inputFile).use { input ->
             if (!readFully(input, magic)) throw IllegalArgumentException("Backup header is truncated")
@@ -169,7 +178,10 @@ object EncryptUtil {
         decryptFileV1(key, inputFile, outputFile)
     }
 
-    private fun readFully(input: java.io.InputStream, buffer: ByteArray): Boolean {
+    private fun readFully(
+        input: java.io.InputStream,
+        buffer: ByteArray,
+    ): Boolean {
         var offset = 0
         while (offset < buffer.size) {
             val read = input.read(buffer, offset, buffer.size - offset)
@@ -179,7 +191,10 @@ object EncryptUtil {
         return true
     }
 
-    private fun skipFully(input: java.io.InputStream, count: Long) {
+    private fun skipFully(
+        input: java.io.InputStream,
+        count: Long,
+    ) {
         var remaining = count
         while (remaining > 0) {
             val skipped = input.skip(remaining)
@@ -192,7 +207,11 @@ object EncryptUtil {
         }
     }
 
-    private fun decryptFileV2(key: String, inputFile: File, outputFile: File) {
+    private fun decryptFileV2(
+        key: String,
+        inputFile: File,
+        outputFile: File,
+    ) {
         FileInputStream(inputFile).use { input ->
             skipFully(input, V2_MAGIC.length.toLong())
             val salt = ByteArray(V2_SALT_BYTES)
@@ -208,14 +227,18 @@ object EncryptUtil {
         }
     }
 
-    private fun decryptFileV1(key: String, inputFile: File, outputFile: File) {
+    private fun decryptFileV1(
+        key: String,
+        inputFile: File,
+        outputFile: File,
+    ) {
         FileInputStream(inputFile).use { fis ->
             val prefix = ByteArray(16)
             if (!readFully(fis, prefix)) throw IllegalArgumentException("Backup header is truncated")
             if (!prefix.copyOfRange(0, 8).contentEquals(SALT_PREFIX.toByteArray())) {
                 throw IllegalArgumentException("Unknown backup format")
             }
-            //Extract salt from the input file, 0-8 is the salt prefix, 8-16 is the salt
+            // Extract salt from the input file, 0-8 is the salt prefix, 8-16 is the salt
             val salt = prefix.copyOfRange(8, 16)
             var keySpec: SecretKeySpec?
             var ivSpec: IvParameterSpec?
@@ -237,5 +260,4 @@ object EncryptUtil {
             }
         }
     }
-
 }

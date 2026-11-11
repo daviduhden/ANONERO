@@ -7,8 +7,13 @@ package io.anonero.model
  * [toString] is the persisted/display name used by node settings; [toStringForBackUp]
  * preserves the historical `NetworkType_*` spelling used inside encrypted backups.
  */
-enum class NetworkType(val value: Int) {
-    NetworkType_Mainnet(0), NetworkType_Testnet(1), NetworkType_Stagenet(2);
+enum class NetworkType(
+    val value: Int,
+) {
+    NetworkType_Mainnet(0),
+    NetworkType_Testnet(1),
+    NetworkType_Stagenet(2),
+    ;
 
     companion object {
         fun fromInteger(n: Int): NetworkType? {
@@ -21,20 +26,17 @@ enum class NetworkType(val value: Int) {
         }
     }
 
-    override fun toString(): String {
-        return when (this) {
+    override fun toString(): String =
+        when (this) {
             NetworkType_Mainnet -> "mainnet"
             NetworkType_Testnet -> "testnet"
             NetworkType_Stagenet -> "stagenet"
         }
-    }
 
-
-    fun toStringForBackUp(): String {
-        return when (this) {
+    fun toStringForBackUp(): String =
+        when (this) {
             NetworkType_Mainnet -> "NetworkType_Mainnet"
             NetworkType_Testnet -> "NetworkType_Testnet"
             NetworkType_Stagenet -> "NetworkType_Stagenet"
         }
-    }
 }

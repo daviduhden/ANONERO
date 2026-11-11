@@ -27,11 +27,11 @@ import kotlinx.coroutines.flow.StateFlow
 enum class ThemeMode {
     DARK,
     LIGHT,
-    SYSTEM;
+    SYSTEM,
+    ;
 
     companion object {
-        fun fromStored(value: String?): ThemeMode =
-            entries.firstOrNull { it.name == value } ?: DARK
+        fun fromStored(value: String?): ThemeMode = entries.firstOrNull { it.name == value } ?: DARK
     }
 }
 
@@ -47,7 +47,10 @@ object ThemeStore {
         _mode.value = ThemeMode.fromStored(prefs.getString(PREFS_THEME_MODE, null))
     }
 
-    fun set(prefs: SharedPreferences, mode: ThemeMode) {
+    fun set(
+        prefs: SharedPreferences,
+        mode: ThemeMode,
+    ) {
         _mode.value = mode
         prefs.edit { putString(PREFS_THEME_MODE, mode.name) }
     }

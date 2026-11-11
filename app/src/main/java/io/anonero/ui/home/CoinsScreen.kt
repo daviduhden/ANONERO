@@ -76,9 +76,9 @@ import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
 import io.anonero.ui.home.graph.routes.SendScreenRoute
 import io.anonero.util.Formats
-import org.koin.java.KoinJavaComponent.inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.koin.java.KoinJavaComponent.inject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,29 +95,29 @@ fun CoinsScreen(
         mutableStateOf<Set<String>>(selected)
     }
     val connectionStatus by walletState.walletConnectionStatus.asLiveData().observeAsState(
-        Wallet.ConnectionStatus.ConnectionStatus_Disconnected
+        Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
     )
     val loading by walletState.isLoading.asLiveData().observeAsState(false)
     val hideAmounts by walletState.hideAmountsFlow.collectAsState(false)
     val nodeConnected = connectionStatus == Wallet.ConnectionStatus.ConnectionStatus_Connected
 
-
-    var message: String? = null;
+    var message: String? = null
     if (loading) {
         message = stringResource(R.string.wallet_loading)
     } else if (!nodeConnected) {
         message = stringResource(R.string.node_disconnected)
-    } else if(coins.isEmpty()) {
+    } else if (coins.isEmpty()) {
         message = stringResource(R.string.no_coins_available)
     }
 
     fun selectCoin(coin: CoinsInfo) {
         if (coin.frozen || coin.spent) return
-        selectedCoins = if (selectedCoins.contains(coin.pub_key)) {
-            selectedCoins - coin.pub_key
-        } else {
-            selectedCoins + coin.pub_key
-        }
+        selectedCoins =
+            if (selectedCoins.contains(coin.pub_key)) {
+                selectedCoins - coin.pub_key
+            } else {
+                selectedCoins + coin.pub_key
+            }
     }
 
     Scaffold(
@@ -125,42 +125,46 @@ fun CoinsScreen(
         floatingActionButtonPosition = FabPosition.Center,
         floatingActionButton = {
             AnimatedVisibility(
-                modifier = Modifier
-                    .padding(
-                        horizontal = 8.dp,
-                        vertical = 8.dp
-                    ),
+                modifier =
+                    Modifier
+                        .padding(
+                            horizontal = 8.dp,
+                            vertical = 8.dp,
+                        ),
                 visible = selectedCoins.isNotEmpty(),
-                enter = slideInVertically(
-                    initialOffsetY = { it }, // Slide in from the bottom
-                    animationSpec = tween(durationMillis = 220)
-                ),
-                exit = slideOutVertically(
-                    targetOffsetY = { it }, // Slide out to the bottom
-                    animationSpec = tween(durationMillis = 220)
-                )
+                enter =
+                    slideInVertically(
+                        initialOffsetY = { it }, // Slide in from the bottom
+                        animationSpec = tween(durationMillis = 220),
+                    ),
+                exit =
+                    slideOutVertically(
+                        targetOffsetY = { it }, // Slide out to the bottom
+                        animationSpec = tween(durationMillis = 220),
+                    ),
             ) {
                 OutlinedButton(
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        contentColor = MaterialTheme.colorScheme.onBackground
-                    ),
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                            contentColor = MaterialTheme.colorScheme.onBackground,
+                        ),
                     onClick = {
                         navigateToSpend(
                             SendScreenRoute(
                                 coins = selectedCoins.toList(),
-                                address = ""
-                            )
+                                address = "",
+                            ),
                         )
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 12.dp
-                        ),
-
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = 12.dp,
+                            ),
                     shape = MaterialTheme.shapes.medium,
-                    contentPadding = PaddingValues(12.dp)
+                    contentPadding = PaddingValues(12.dp),
                 ) {
                     Text(if (selectedCoins.isNotEmpty()) stringResource(R.string.confirm) else stringResource(R.string.spend))
                 }
@@ -173,55 +177,65 @@ fun CoinsScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
             )
-        }) {
-        LazyColumn(modifier = Modifier.padding(it).padding(
-            bottom = 44.dp
-        )) {
+        },
+    ) {
+        LazyColumn(
+            modifier =
+                Modifier.padding(it).padding(
+                    bottom = 44.dp,
+                ),
+        ) {
             item {
                 WalletProgressIndicator()
                 Text(
                     stringResource(R.string.frozen_outputs_note),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             items(coins.size) { index ->
                 val coin = coins[index]
                 ListItem(
-                    modifier = Modifier
-                        .padding(
-                            horizontal = 4.dp,
-                            vertical = 6.dp
-                        )
-                        .clickable {
-                            selectCoin(coin)
-                        },
+                    modifier =
+                        Modifier
+                            .padding(
+                                horizontal = 4.dp,
+                                vertical = 6.dp,
+                            ).clickable {
+                                selectCoin(coin)
+                            },
                     headlineContent = {
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                stringResource(R.string.output_number, index + 1), color = MaterialTheme.colorScheme.primary,
+                                stringResource(R.string.output_number, index + 1),
+                                color = MaterialTheme.colorScheme.primary,
                             )
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    if (hideAmounts) Formats.maskAmount(coin.amount)
-                                    else Formats.getDisplayAmount(coin.amount),
+                                    if (hideAmounts) {
+                                        Formats.maskAmount(coin.amount)
+                                    } else {
+                                        Formats.getDisplayAmount(coin.amount)
+                                    },
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
                                 )
-                                if (coin.frozen) Text(
-                                    stringResource(R.string.frozen),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                                if (coin.frozen) {
+                                    Text(
+                                        stringResource(R.string.frozen),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                }
                             }
                         }
                     },
@@ -231,57 +245,70 @@ fun CoinsScreen(
                                 coin.pub_key,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp,
-                                textAlign = TextAlign.Justify
+                                textAlign = TextAlign.Justify,
                             )
                         }
                     },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
-                                colors = IconButtonDefaults.iconButtonColors(
-                                    contentColor = if (coin.frozen) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.primary
-                                ),
+                                colors =
+                                    IconButtonDefaults.iconButtonColors(
+                                        contentColor =
+                                            if (coin.frozen) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            },
+                                    ),
                                 onClick = {
                                     scope.launch(Dispatchers.IO) {
                                         walletState.setOutputFrozen(coin.pub_key, !coin.frozen)
                                     }
-                                }
+                                },
                             ) {
                                 Icon(
                                     if (coin.frozen) Icons.Default.Lock else Icons.Default.LockOpen,
-                                    contentDescription = if (coin.frozen) stringResource(R.string.thaw_output) else stringResource(R.string.freeze_output)
+                                    contentDescription =
+                                        if (coin.frozen) {
+                                            stringResource(
+                                                R.string.thaw_output,
+                                            )
+                                        } else {
+                                            stringResource(R.string.freeze_output)
+                                        },
                                 )
                             }
                             Checkbox(
                                 checked = selectedCoins.contains(coin.pub_key),
                                 enabled = !coin.frozen && !coin.spent,
-                                onCheckedChange = { selectCoin(coin) }
+                                onCheckedChange = { selectCoin(coin) },
                             )
                         }
-                    }
+                    },
                 )
             }
             if (message != null) {
                 item {
                     Box(
-                        modifier = Modifier
-                            .height(280.dp)
-                            .fillMaxWidth()
+                        modifier =
+                            Modifier
+                                .height(280.dp)
+                                .fillMaxWidth(),
                     ) {
                         Text(
                             message,
-                            modifier = Modifier
-                                .padding(
-                                    horizontal = 16.dp,
-                                    vertical = 8.dp
-                                )
-                                .align(
-                                    Alignment.Center
-                                ),
+                            modifier =
+                                Modifier
+                                    .padding(
+                                        horizontal = 16.dp,
+                                        vertical = 8.dp,
+                                    ).align(
+                                        Alignment.Center,
+                                    ),
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                         )
                     }
                 }

@@ -64,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.node.Node
@@ -73,8 +74,6 @@ import io.anonero.store.NodesRepository
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.koin.compose.koinInject
-import androidx.core.net.toUri
-
 
 @Composable
 fun SetupNodeComposable(
@@ -98,39 +97,40 @@ fun SetupNodeComposable(
         rpcPassPhrase = prefs.getString(NodeFields.RPC_PASSWORD.value, "") ?: ""
         val rpcPort = prefs.getInt(NodeFields.RPC_PORT.value, Node.defaultRpcPort)
         if (rpcHost.isNotEmpty()) {
-            rpcHost = "${rpcHost}:${rpcPort}"
+            rpcHost = "$rpcHost:$rpcPort"
         }
     }
-
 
     val labelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
     Scaffold { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 IconButton(
-                    modifier = Modifier
-                        .size(24.dp),
+                    modifier =
+                        Modifier
+                            .size(24.dp),
                     onClick = {
                         onBackPressed()
-                    }
+                    },
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -138,30 +138,32 @@ fun SetupNodeComposable(
                 Image(
                     painter = painterResource(R.drawable.ic_anon),
                     contentDescription = stringResource(R.string.app_logo),
-                    modifier = Modifier
-                        .size(120.dp)
+                    modifier =
+                        Modifier
+                            .size(120.dp),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.node_connection),
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
             Column(
-                modifier = Modifier
-                    .weight(.8f)
-                    .padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier =
+                    Modifier
+                        .weight(.8f)
+                        .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-
                 ListItem(
                     headlineContent = {
                         Text(
-                            text = stringResource(R.string.node)
-                                .replaceFirstChar { it.titlecase() },
+                            text =
+                                stringResource(R.string.node)
+                                    .replaceFirstChar { it.titlecase() },
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -171,19 +173,21 @@ fun SetupNodeComposable(
                             onValueChange = {
                                 rpcHost = it
                             },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Next,
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Next,
+                                ),
                             isError = error.isNotEmpty(),
                             placeholder = {
                                 Text(
                                     text = stringResource(R.string.onion_address_example),
-                                    color = labelColor
+                                    color = labelColor,
                                 )
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusable()
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusable(),
                         )
                     },
                 )
@@ -193,7 +197,7 @@ fun SetupNodeComposable(
                         Text(
                             text = stringResource(R.string.username),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -203,18 +207,18 @@ fun SetupNodeComposable(
                             placeholder = {
                                 Text(
                                     text = stringResource(R.string.optional),
-                                    color = labelColor
+                                    color = labelColor,
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Next,
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Next,
+                                ),
                             onValueChange = {
                                 rpcUsername = it
                             },
-
-                            )
+                        )
                     },
                 )
                 ListItem(
@@ -222,7 +226,7 @@ fun SetupNodeComposable(
                         Text(
                             text = stringResource(R.string.password),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -232,16 +236,17 @@ fun SetupNodeComposable(
                             onValueChange = {
                                 rpcPassPhrase = it
                             },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done,
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Done,
+                                ),
                             placeholder = {
                                 Text(
                                     text = stringResource(R.string.optional),
-                                    color = labelColor
+                                    color = labelColor,
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     },
                 )
@@ -251,47 +256,50 @@ fun SetupNodeComposable(
                 onClick = {
                     scope.launch {
                         error = ""
-                        val prefs = localContext.getSharedPreferences(
-                            AnonConfig.PREFS,
-                            Context.MODE_PRIVATE
-                        )
+                        val prefs =
+                            localContext.getSharedPreferences(
+                                AnonConfig.PREFS,
+                                Context.MODE_PRIVATE,
+                            )
                         val editor = prefs.edit()
                         try {
                             if (rpcHost.isNotEmpty()) {
                                 val cleanURL = rpcHost.trim().lowercase()
-                                val urlForParsing = if (cleanURL.startsWith("http")) {
-                                    cleanURL
-                                } else {
-                                    if (cleanURL.startsWith("https")) {
+                                val urlForParsing =
+                                    if (cleanURL.startsWith("http")) {
                                         cleanURL
                                     } else {
-                                        "http://$cleanURL"
+                                        if (cleanURL.startsWith("https")) {
+                                            cleanURL
+                                        } else {
+                                            "http://$cleanURL"
+                                        }
                                     }
-                                }
                                 val validatedUrl = urlForParsing.toUri()
                                 if (validatedUrl.host == null) {
                                     error = resources.getString(R.string.invalid_url)
                                 }
-                                val nodeJson = JSONObject()
-                                    .apply {
-                                        put(NodeFields.RPC_HOST.value, validatedUrl.host)
-                                        put(
-                                            NodeFields.RPC_PORT.value,
-                                            if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port
-                                        )
-                                        put(NodeFields.RPC_USERNAME.value, rpcUsername)
-                                        put(NodeFields.RPC_PASSWORD.value, rpcPassPhrase)
-                                        put(
-                                            NodeFields.RPC_NETWORK.value,
-                                            AnonConfig.getNetworkType().toString()
-                                        )
-                                        put(NodeFields.NODE_NAME.value, "anon")
-                                    }
+                                val nodeJson =
+                                    JSONObject()
+                                        .apply {
+                                            put(NodeFields.RPC_HOST.value, validatedUrl.host)
+                                            put(
+                                                NodeFields.RPC_PORT.value,
+                                                if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
+                                            )
+                                            put(NodeFields.RPC_USERNAME.value, rpcUsername)
+                                            put(NodeFields.RPC_PASSWORD.value, rpcPassPhrase)
+                                            put(
+                                                NodeFields.RPC_NETWORK.value,
+                                                AnonConfig.getNetworkType().toString(),
+                                            )
+                                            put(NodeFields.NODE_NAME.value, "anon")
+                                        }
 
                                 editor.putString(NodeFields.RPC_HOST.value, validatedUrl.host)
                                 editor.putInt(
                                     NodeFields.RPC_PORT.value,
-                                    if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port
+                                    if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
                                 )
                                 editor.putString(NodeFields.RPC_USERNAME.value, rpcUsername)
                                 editor.putString(NodeFields.RPC_PASSWORD.value, rpcPassPhrase)
@@ -304,16 +312,15 @@ fun SetupNodeComposable(
                             oNextPressed()
                         } catch (_: Exception) {
                         }
-
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 12.dp
-                    ),
-
-                ) {
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 12.dp,
+                        ),
+            ) {
                 Text(stringResource(R.string.next))
             }
         }

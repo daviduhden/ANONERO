@@ -89,7 +89,6 @@ import java.io.File
 import java.util.Date
 import java.util.Locale
 
-
 @Serializable
 data class SpendQRExchangeParam(
     val exportType: ExportType,
@@ -107,7 +106,6 @@ enum class ExportType {
 private const val TAG = "SpendQRExchange"
 
 class QRExchangeScreenViewModel : ViewModel() {
-
     private val _ur = MutableLiveData<UR?>()
     private val _exportFile = MutableLiveData<File?>()
     val ur: LiveData<UR?> = _ur
@@ -150,17 +148,18 @@ class QRExchangeScreenViewModel : ViewModel() {
                     }
                 }
             }
-
         }
     }
 
-    fun setUR(file: File, type: String) {
+    fun setUR(
+        file: File,
+        type: String,
+    ) {
         val content = file.readBytes()
         val ur = UR.fromBytes(type, content)
         _ur.postValue(ur)
         _exportFile.postValue(file)
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,7 +171,6 @@ fun QRExchangeScreen(
     onBackPressed: () -> Unit = {},
     onNavigateToHome: () -> Unit,
 ) {
-
     val viewModel = viewModel<QRExchangeScreenViewModel>()
     val ur by viewModel.ur.observeAsState(null)
     val exportFile by viewModel.exportFile.observeAsState(null)
@@ -180,41 +178,48 @@ fun QRExchangeScreen(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
 
-    val titleStyle = MaterialTheme.typography.bodyLarge.copy(
-        color = MaterialTheme.colorScheme.primary,
-        fontSize = 20.sp
-    )
+    val titleStyle =
+        MaterialTheme.typography.bodyLarge.copy(
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 20.sp,
+        )
 
     LaunchedEffect(true) {
         viewModel.processExportType(params.exportType)
     }
 
-    //write the export to the place picked in the system save dialog
-    val saveExport = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        val file = exportFile
-        if (uri != null && file != null) {
-            scope.launch(Dispatchers.IO) {
-                val saved = try {
-                    context.contentResolver.openOutputStream(uri)?.use { out ->
-                        file.inputStream().use { it.copyTo(out) }
-                    } != null
-                } catch (e: Exception) {
-                    Timber.tag(TAG).e(e)
-                    false
-                }
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        if (saved) resources.getString(R.string.file_saved)
-                        else resources.getString(R.string.could_not_save_file),
-                        Toast.LENGTH_SHORT
-                    ).show()
+    // write the export to the place picked in the system save dialog
+    val saveExport =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/octet-stream"),
+        ) { uri ->
+            val file = exportFile
+            if (uri != null && file != null) {
+                scope.launch(Dispatchers.IO) {
+                    val saved =
+                        try {
+                            context.contentResolver.openOutputStream(uri)?.use { out ->
+                                file.inputStream().use { it.copyTo(out) }
+                            } != null
+                        } catch (e: Exception) {
+                            Timber.tag(TAG).e(e)
+                            false
+                        }
+                    withContext(Dispatchers.Main) {
+                        Toast
+                            .makeText(
+                                context,
+                                if (saved) {
+                                    resources.getString(R.string.file_saved)
+                                } else {
+                                    resources.getString(R.string.could_not_save_file)
+                                },
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
                 }
             }
         }
-    }
 
     BackHandler {
         onBackPressed()
@@ -223,15 +228,16 @@ fun QRExchangeScreen(
     ModalBottomSheet(
         scrimColor = MaterialTheme.colorScheme.background,
         contentColor = Color.Transparent,
-        sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true
-        ),
+        sheetState =
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+            ),
         contentWindowInsets = {
             WindowInsets(
                 left = 0.dp,
                 top = 0.dp,
                 right = 0.dp,
-                bottom = 0.dp
+                bottom = 0.dp,
             )
         },
         shape = MaterialTheme.shapes.large,
@@ -240,7 +246,7 @@ fun QRExchangeScreen(
         },
         onDismissRequest = {
             onBackPressed.invoke()
-        }
+        },
     ) {
         Scaffold(
             modifier = modifier,
@@ -253,21 +259,21 @@ fun QRExchangeScreen(
                         IconButton(
                             onClick = {
                                 onBackPressed.invoke()
-                            }
+                            },
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     },
                     actions = {
-
-                    }
+                    },
                 )
-            }
+            },
         ) {
             Box(
-                modifier = Modifier
-                    .padding(it)
-                    .padding(bottom = 0.dp)
+                modifier =
+                    Modifier
+                        .padding(it)
+                        .padding(bottom = 0.dp),
             ) {
                 Column(
                     modifier =
@@ -275,87 +281,98 @@ fun QRExchangeScreen(
                             .align(Alignment.Center)
                             .fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column {
                         Text(
                             text = params.title,
                             style = titleStyle,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
                         )
                         if (ur != null) {
                             AnimatedQrCode(
                                 Ur = ur!!,
-                                modifier = Modifier
-                                    .size(300.dp)
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(8.dp),
+                                modifier =
+                                    Modifier
+                                        .size(300.dp)
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(8.dp),
                                 fps = 15,
                             )
                         } else {
                             CircularProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
-                                color = MaterialTheme.colorScheme.primary
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
                         TextButton(
                             onClick = {
                                 exportFile?.let {
-                                    val sdf = SimpleDateFormat(
-                                        "dd_MM_yyyy' 'HH_mm_a",
-                                        Locale.getDefault()
-                                    )
+                                    val sdf =
+                                        SimpleDateFormat(
+                                            "dd_MM_yyyy' 'HH_mm_a",
+                                            Locale.getDefault(),
+                                        )
                                     saveExport.launch("${sdf.format(Date())}_${it.name}")
                                 }
                             },
-                            modifier = Modifier
-                                .padding(top = 8.dp)
-                                .align(Alignment.CenterHorizontally)
+                            modifier =
+                                Modifier
+                                    .padding(top = 8.dp)
+                                    .align(Alignment.CenterHorizontally),
                         ) {
                             Text(stringResource(R.string.export_as_file))
                         }
                     }
-                    if (params.ctaText.isNotBlank())
+                    if (params.ctaText.isNotBlank()) {
                         Button(
                             shape = MaterialTheme.shapes.small,
-                            border = BorderStroke(
-                                1.dp,
-                                color = MaterialTheme.colorScheme.onSecondary
-                            ),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.background,
-                            ),
-                            contentPadding = PaddingValues(
-                                all = 12.dp
-                            ),
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    color = MaterialTheme.colorScheme.onSecondary,
+                                ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                ),
+                            contentPadding =
+                                PaddingValues(
+                                    all = 12.dp,
+                                ),
                             modifier = Modifier.fillMaxWidth(0.85f),
                             onClick = {
-                                if(params.exportType == ExportType.SIGNED_TX) {
+                                if (params.exportType == ExportType.SIGNED_TX) {
                                     onNavigateToHome()
-                                }else{
+                                } else {
                                     onCtaCalled.invoke()
                                 }
-                            }) {
+                            },
+                        ) {
                             Text(
-                                params.ctaText, style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onBackground.copy(
-                                        alpha = 0.8f
-                                    )
-                                )
+                                params.ctaText,
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        color =
+                                            MaterialTheme.colorScheme.onBackground.copy(
+                                                alpha = 0.8f,
+                                            ),
+                                    ),
                             )
                         }
+                    }
                 }
-
             }
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -367,9 +384,10 @@ fun QRExchangeDialog(
     onCtaCalled: () -> Unit,
     navigateToHome: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+        )
 
     if (show) {
         ModalBottomSheet(
@@ -383,20 +401,20 @@ fun QRExchangeDialog(
                     left = 0.dp,
                     top = 0.dp,
                     right = 0.dp,
-                    bottom = 0.dp
+                    bottom = 0.dp,
                 )
             },
             shape = MaterialTheme.shapes.large,
             dragHandle = {
                 Box(modifier = Modifier.height(0.dp))
             },
-            properties = ModalBottomSheetProperties(
-                shouldDismissOnBackPress = true,
-            )
+            properties =
+                ModalBottomSheetProperties(
+                    shouldDismissOnBackPress = true,
+                ),
         ) {
-
             Box(Modifier.padding(0.dp)) {
-                if (params != null)
+                if (params != null) {
                     QRExchangeScreen(
                         params = params,
                         onBackPressed = onDismiss,
@@ -404,11 +422,11 @@ fun QRExchangeDialog(
                         modifier = Modifier.fillMaxSize(),
                         onNavigateToHome = {
                             navigateToHome.invoke()
-                        }
+                        },
                     )
+                }
             }
         }
-
     }
 }
 

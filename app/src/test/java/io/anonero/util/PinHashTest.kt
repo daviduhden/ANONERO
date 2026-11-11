@@ -24,7 +24,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PinHashTest {
-
     @Test
     fun `a hashed pin verifies and a wrong one does not`() {
         val stored = PinHash.hash("1234")

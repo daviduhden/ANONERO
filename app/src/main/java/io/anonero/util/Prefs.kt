@@ -18,7 +18,6 @@
 
 package io.anonero.util
 
-
 /*
  * Keys stored in the `AnonConfig.PREFS` file (actual name `anonPref`).
  *
@@ -29,7 +28,6 @@ package io.anonero.util
  * migration; these names are part of the on-device format.
  */
 const val WALLET_PREFERENCES = "walletPref" // Koin qualifier; the file is AnonConfig.PREFS
-
 
 const val PREFS_PASSPHRASE_HASH = "passPhraseHash"
 

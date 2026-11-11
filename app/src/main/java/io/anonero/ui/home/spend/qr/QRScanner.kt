@@ -65,18 +65,17 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 
-
 private const val TAG = "QRScanner"
 
 enum class ImportEvents {
     IMPORT_OUTPUTS,
     IMPORT_KEY_IMAGES,
     IMPORT_UNSIGNED_TX,
-    IMPORT_SIGNED_TX
+    IMPORT_SIGNED_TX,
 }
 
 class QRScannerVM : ViewModel() {
-    suspend  fun  processUrCode(urResult: URDecoder.Result): Result<ImportEvents> {
+    suspend fun processUrCode(urResult: URDecoder.Result): Result<ImportEvents> {
         if (urResult.type == ResultType.SUCCESS) {
             var destinationFile: File? = null
             val ur = urResult.ur
@@ -107,32 +106,32 @@ class QRScannerVM : ViewModel() {
             }
             destinationFile?.writeBytes(ur.toBytes())
             if (destinationFile != null) {
-                val wallet = WalletManager.instance?.wallet;
+                val wallet = WalletManager.instance?.wallet
                 if (wallet == null) {
                     Timber.tag(TAG).e("wallet is null")
                     return Result.failure(
-                        Exception(AnonConfig.context?.getString(R.string.wallet_not_open))
+                        Exception(AnonConfig.context?.getString(R.string.wallet_not_open)),
                     )
                 }
-                val filePath = destinationFile.path;
+                val filePath = destinationFile.path
                 when (AnonUrRegistryTypes.fromUrTag(ur)) {
                     AnonUrRegistryTypes.XMR_OUTPUT -> {
                         _currentImportState.postValue(AnonUrRegistryTypes.XMR_OUTPUT)
                         try {
-                            _loaderState.postValue(true);
-                            val status = wallet.importOutputs(filePath);
-                            _loaderState.postValue(false);
+                            _loaderState.postValue(true)
+                            val status = wallet.importOutputs(filePath)
+                            _loaderState.postValue(false)
                             if (status?.lowercase() == "imported") {
                                 Timber.tag(TAG).i("Imported outputs")
-                                //save the imported outputs
+                                // save the imported outputs
                                 wallet.store()
                                 return Result.success(ImportEvents.IMPORT_OUTPUTS)
                             } else {
                                 Timber.tag(TAG).e("Failed to import outputs: %s", status)
                                 return Result.failure(
                                     Exception(
-                                        AnonConfig.context?.getString(R.string.import_outputs_failed)
-                                    )
+                                        AnonConfig.context?.getString(R.string.import_outputs_failed),
+                                    ),
                                 )
                             }
                         } catch (error: Exception) {
@@ -143,10 +142,10 @@ class QRScannerVM : ViewModel() {
                     }
 
                     AnonUrRegistryTypes.XMR_KEY_IMAGE -> {
-                        _loaderState.postValue(true);
+                        _loaderState.postValue(true)
                         _currentImportState.postValue(AnonUrRegistryTypes.XMR_KEY_IMAGE)
                         try {
-                            val status = wallet.importKeyImages(filePath);
+                            val status = wallet.importKeyImages(filePath)
                             delay(1_520)
                             Timber.tag(TAG).i("Import key images status $status")
                             if (status?.lowercase() == "imported") {
@@ -155,24 +154,24 @@ class QRScannerVM : ViewModel() {
                                 Timber.tag(TAG).e("Failed to import key images: %s", status)
                                 return Result.failure(
                                     Exception(
-                                        AnonConfig.context?.getString(R.string.import_key_images_failed)
-                                    )
+                                        AnonConfig.context?.getString(R.string.import_key_images_failed),
+                                    ),
                                 )
                             }
                         } finally {
-                            _loaderState.postValue(false);
+                            _loaderState.postValue(false)
                             _currentImportState.postValue(null)
                         }
                     }
 
                     AnonUrRegistryTypes.XMR_TX_UNSIGNED -> {
                         _currentImportState.postValue(AnonUrRegistryTypes.XMR_TX_UNSIGNED)
-                        _loaderState.postValue(true);
+                        _loaderState.postValue(true)
                         try {
                             val unsignedTransaction =
                                 wallet.loadUnsignedTransaction(filePath)
                             if (unsignedTransaction != null && unsignedTransaction.status == UnsignedTransaction.Status.Status_Ok) {
-                                //reject a set that is not exactly one tx
+                                // reject a set that is not exactly one tx
                                 val count = unsignedTransaction.txCount
                                 if (count != 1L) {
                                     Timber.tag(TAG).e("Unsigned transaction set has %d transactions", count)
@@ -180,9 +179,9 @@ class QRScannerVM : ViewModel() {
                                         Exception(
                                             AnonConfig.context?.getString(
                                                 R.string.unsigned_tx_count_invalid,
-                                                count
-                                            )
-                                        )
+                                                count,
+                                            ),
+                                        ),
                                     )
                                 }
                                 return Result.success(ImportEvents.IMPORT_UNSIGNED_TX)
@@ -190,35 +189,34 @@ class QRScannerVM : ViewModel() {
                                 Timber.tag(TAG).e("Failed to import unsigned transaction")
                                 return Result.failure(
                                     Exception(
-                                        AnonConfig.context?.getString(R.string.import_unsigned_failed)
-                                    )
+                                        AnonConfig.context?.getString(R.string.import_unsigned_failed),
+                                    ),
                                 )
                             }
                         } finally {
-                            _loaderState.postValue(false);
+                            _loaderState.postValue(false)
                             _currentImportState.postValue(null)
                         }
                     }
 
                     AnonUrRegistryTypes.XMR_TX_SIGNED -> {
-                        _currentImportState.postValue(null);
+                        _currentImportState.postValue(null)
                         return Result.success(ImportEvents.IMPORT_SIGNED_TX)
                     }
 
                     null -> {
                         Timber.tag(TAG).e("Unknown UR type")
                         return Result.failure(
-                            Exception(AnonConfig.context?.getString(R.string.invalid_qr_code))
+                            Exception(AnonConfig.context?.getString(R.string.invalid_qr_code)),
                         )
                     }
                 }
             }
         }
         return Result.failure(
-            Exception(AnonConfig.context?.getString(R.string.invalid_qr_code))
+            Exception(AnonConfig.context?.getString(R.string.invalid_qr_code)),
         )
     }
-
 
     var _currentImportState: MutableLiveData<AnonUrRegistryTypes?> = MutableLiveData(null)
     var _loaderState: MutableLiveData<Boolean> = MutableLiveData(false)
@@ -242,9 +240,10 @@ fun URQRScanner(
     val qrScannerVM = viewModel<QRScannerVM>()
     val loaderState by qrScannerVM.loaderState.observeAsState(false)
     var detectedUR by remember { mutableStateOf<String?>(null) }
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+        )
 
     LaunchedEffect(showScanner) {
         if (showScanner) {
@@ -263,12 +262,13 @@ fun URQRScanner(
                     left = 0.dp,
                     top = 0.dp,
                     right = 0.dp,
-                    bottom = 0.dp
+                    bottom = 0.dp,
                 )
             },
-            properties = ModalBottomSheetProperties(
-                shouldDismissOnBackPress = loaderState == false,
-            ),
+            properties =
+                ModalBottomSheetProperties(
+                    shouldDismissOnBackPress = loaderState == false,
+                ),
             shape = MaterialTheme.shapes.large,
             dragHandle = {
                 Box(modifier = Modifier.height(0.dp))
@@ -279,7 +279,7 @@ fun URQRScanner(
                     onDismiss.invoke()
                     qrScannerVM.reset()
                 }
-            }
+            },
         ) {
             if (loaderState == false) {
                 io.anonero.ui.components.scanner.QRScanner(
@@ -292,7 +292,7 @@ fun URQRScanner(
                         qrScannerVM.reset()
                     },
                     onUrRusult = {
-                        detectedUR = it.ur.type;
+                        detectedUR = it.ur.type
                         qrScannerVM.viewModelScope.launch(Dispatchers.IO) {
                             val result = qrScannerVM.processUrCode(it)
                             withContext(Dispatchers.Main) {
@@ -300,41 +300,43 @@ fun URQRScanner(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                val message = when (detectedUR) {
-                    AnonUrRegistryTypes.XMR_OUTPUT.type -> stringResource(R.string.importing_outputs)
-                    AnonUrRegistryTypes.XMR_KEY_IMAGE.type -> stringResource(R.string.importing_key_images)
-                    AnonUrRegistryTypes.XMR_TX_SIGNED.type -> stringResource(R.string.importing_signed_transaction)
-                    AnonUrRegistryTypes.XMR_TX_UNSIGNED.type -> stringResource(R.string.importing_unsigned_transaction)
-                    else -> ""
-                }
+                val message =
+                    when (detectedUR) {
+                        AnonUrRegistryTypes.XMR_OUTPUT.type -> stringResource(R.string.importing_outputs)
+                        AnonUrRegistryTypes.XMR_KEY_IMAGE.type -> stringResource(R.string.importing_key_images)
+                        AnonUrRegistryTypes.XMR_TX_SIGNED.type -> stringResource(R.string.importing_signed_transaction)
+                        AnonUrRegistryTypes.XMR_TX_UNSIGNED.type -> stringResource(R.string.importing_unsigned_transaction)
+                        else -> ""
+                    }
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(220.dp),
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                         Text(
                             message,
                             textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                color = Color.White
-                            )
+                            style =
+                                MaterialTheme.typography.labelMedium.copy(
+                                    color = Color.White,
+                                ),
                         )
                     }
                 }
             }
-
         }
     }
 }

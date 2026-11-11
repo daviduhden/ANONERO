@@ -23,7 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MoneroAmountTest {
-
     @Test
     fun `exact decimal strings convert to atomic units`() {
         assertEquals(1_000_000_000_000L, MoneroAmount.parseExact("1"))
@@ -64,8 +63,13 @@ class MoneroAmountTest {
         assertEquals("1", MoneroAmount.format(1_000_000_000_000L))
         assertEquals("0.000000000001", MoneroAmount.format(1L))
         assertEquals("12.345678901234", MoneroAmount.format(12_345_678_901_234L))
-        for (value in listOf(1L, 999_999_999_999L, 1_000_000_000_000L,
-            12_345_678_901_234L, Long.MAX_VALUE / 2)) {
+        for (value in listOf(
+            1L,
+            999_999_999_999L,
+            1_000_000_000_000L,
+            12_345_678_901_234L,
+            Long.MAX_VALUE / 2,
+        )) {
             assertEquals(value, MoneroAmount.parseExact(MoneroAmount.format(value)))
         }
     }

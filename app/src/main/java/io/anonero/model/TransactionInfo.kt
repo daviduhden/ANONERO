@@ -18,7 +18,9 @@ import kotlinx.serialization.Serializable
  * not display positions.
  */
 @Serializable
-class TransactionInfo : Parcelable, Comparable<TransactionInfo> {
+class TransactionInfo :
+    Parcelable,
+    Comparable<TransactionInfo> {
     var direction: Direction
     var isPending: Boolean
     var isFailed: Boolean
@@ -49,7 +51,7 @@ class TransactionInfo : Parcelable, Comparable<TransactionInfo> {
         addressIndex: Int,
         confirmations: Long,
         subaddressLabel: String?,
-        transfers: List<Transfer>?
+        transfers: List<Transfer>?,
     ) {
         this.direction = Direction.entries.toTypedArray()[direction]
         this.isPending = isPending
@@ -81,34 +83,41 @@ class TransactionInfo : Parcelable, Comparable<TransactionInfo> {
         addressIndex = `in`.readInt()
         confirmations = `in`.readLong()
         subaddressLabel = `in`.readString()
-        transfers = transfers?.toMutableList()?.also { transfersList ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                `in`.readList(transfersList, Transfer::class.java.classLoader, Transfer::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                `in`.readList(transfersList, Transfer::class.java.classLoader)
+        transfers =
+            transfers?.toMutableList()?.also { transfersList ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    `in`.readList(transfersList, Transfer::class.java.classLoader, Transfer::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    `in`.readList(transfersList, Transfer::class.java.classLoader)
+                }
             }
-        }
         notes = `in`.readString()
     }
 
     val isConfirmed: Boolean
         get() = confirmations >= CONFIRMATION
     val displayLabel: String?
-        get() = if (subaddressLabel?.isEmpty() == true || Subaddress.DEFAULT_LABEL_FORMATTER.matcher(
-                subaddressLabel.toString()
-            ).matches()
-        ) "#$addressIndex" else subaddressLabel
+        get() =
+            if (subaddressLabel?.isEmpty() == true ||
+                Subaddress.DEFAULT_LABEL_FORMATTER
+                    .matcher(
+                        subaddressLabel.toString(),
+                    ).matches()
+            ) {
+                "#$addressIndex"
+            } else {
+                subaddressLabel
+            }
 
-    override fun toString(): String {
-        return "$direction@$blockheight $amount"
-    }
+    override fun toString(): String = "$direction@$blockheight $amount"
 
-    fun getListKey(): String {
-        return this.hash ?: "${timestamp}:${direction.value}:${amount}"
-    }
+    fun getListKey(): String = this.hash ?: "$timestamp:${direction.value}:$amount"
 
-    override fun writeToParcel(out: Parcel, flags: Int) {
+    override fun writeToParcel(
+        out: Parcel,
+        flags: Int,
+    ) {
         out.writeInt(direction.value)
         out.writeByte((if (isPending) 1 else 0).toByte())
         out.writeByte((if (isFailed) 1 else 0).toByte())
@@ -128,9 +137,7 @@ class TransactionInfo : Parcelable, Comparable<TransactionInfo> {
         out.writeString(notes)
     }
 
-    override fun describeContents(): Int {
-        return 0
-    }
+    override fun describeContents(): Int = 0
 
     override fun compareTo(other: TransactionInfo): Int {
         val b1 = timestamp
@@ -144,16 +151,19 @@ class TransactionInfo : Parcelable, Comparable<TransactionInfo> {
         }
     }
 
-    enum class Direction(val value: Int) {
-        Direction_In(0), Direction_Out(1);
+    enum class Direction(
+        val value: Int,
+    ) {
+        Direction_In(0),
+        Direction_Out(1),
+        ;
 
         companion object {
-            fun fromInteger(n: Int): Direction {
-                return when (n) {
+            fun fromInteger(n: Int): Direction =
+                when (n) {
                     0 -> Direction_In
                     else -> Direction_Out
                 }
-            }
         }
     }
 
@@ -161,14 +171,11 @@ class TransactionInfo : Parcelable, Comparable<TransactionInfo> {
         const val CONFIRMATION = 10 // blocks
 
         @JvmField
-        val CREATOR: Creator<TransactionInfo> = object : Creator<TransactionInfo> {
-            override fun createFromParcel(`in`: Parcel): TransactionInfo {
-                return TransactionInfo(`in`)
-            }
+        val CREATOR: Creator<TransactionInfo> =
+            object : Creator<TransactionInfo> {
+                override fun createFromParcel(`in`: Parcel): TransactionInfo = TransactionInfo(`in`)
 
-            override fun newArray(size: Int): Array<TransactionInfo?> {
-                return arrayOfNulls(size)
+                override fun newArray(size: Int): Array<TransactionInfo?> = arrayOfNulls(size)
             }
-        }
     }
 }

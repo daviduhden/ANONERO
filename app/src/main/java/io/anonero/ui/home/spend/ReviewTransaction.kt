@@ -100,7 +100,7 @@ enum class BroadcastState {
     STAGING,
     IN_PROGRESS,
     SUCCESS,
-    ERROR
+    ERROR,
 }
 
 data class ReviewModel(
@@ -109,9 +109,9 @@ data class ReviewModel(
     val fee: Long,
     val total: Long,
     val txId: String,
-    /* Rows parsed from wallet2's confirmation sentence; imported unsigned sets only. */
+    // Rows parsed from wallet2's confirmation sentence; imported unsigned sets only.
     val summary: SigningSummary? = null,
-    /* The raw sentence, shown only when it could not be parsed into rows. */
+    // The raw sentence, shown only when it could not be parsed into rows.
     val confirmationMessage: String? = null,
 )
 
@@ -131,7 +131,9 @@ private const val TAG = "ReviewTransaction"
  * not navigate back to a prefilled send form after a broadcast.
  */
 class ReviewTransactionViewModel : ViewModel() {
-    private val broadcastInProgress = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val broadcastInProgress =
+        java.util.concurrent.atomic
+            .AtomicBoolean(false)
     private val reviewModel = MutableLiveData<ReviewModel?>(null)
     private val broadcastingTx = MutableLiveData(BroadcastState.STAGING)
     private var _broadcastError: Exception? = null
@@ -140,63 +142,62 @@ class ReviewTransactionViewModel : ViewModel() {
     val getBroadcastingTxState get() = broadcastingTx
     val reviewModelLive: LiveData<ReviewModel?> get() = reviewModel
 
-    var pendingTransaction: PendingTransaction? = null;
-    var unsignedTransaction: UnsignedTransaction? = null;
+    var pendingTransaction: PendingTransaction? = null
+    var unsignedTransaction: UnsignedTransaction? = null
 
-    public fun isUnsignedTransaction(): Boolean {
-        return unsignedTransaction != null
-    }
+    public fun isUnsignedTransaction(): Boolean = unsignedTransaction != null
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-        val wallet = WalletManager.instance?.wallet;
-        val pendingTransaction = wallet?.getPendingTx()
-        val unsignedTransaction = wallet?.getUnsginedTx()
+            val wallet = WalletManager.instance?.wallet
+            val pendingTransaction = wallet?.getPendingTx()
+            val unsignedTransaction = wallet?.getUnsginedTx()
 
-        if (unsignedTransaction != null) {
-            this@ReviewTransactionViewModel.unsignedTransaction = unsignedTransaction
-            // Rows come from wallet2's own summary of the outputs sign() will construct,
-            // never from the set's advisory destination list. If the sentence cannot be
-            // parsed it is shown raw; the advisory getters are not a fallback.
-            val message = unsignedTransaction.confirmationMessage
-            val summary = SigningSummary.parse(message)
-            reviewModel.postValue(
-                ReviewModel(
-                    address = summary?.destinations?.firstOrNull()?.address ?: "",
-                    amount = summary?.amount ?: 0L,
-                    fee = summary?.fee ?: 0L,
-                    total = summary?.let { it.amount + it.fee } ?: 0L,
-                    txId = unsignedTransaction.firstTxId,
-                    summary = summary,
-                    confirmationMessage = if (summary == null) message else null,
-                )
-            )
-        } else if (pendingTransaction != null) {
-            val txId = pendingTransaction.getFirstTxIdJ()
-            // A multi-destination set can be valid before wallet2 assigns the first txid;
-            // the amount/fee are still authoritative, and the reviewed destinations come
-            // from the navigation route. Do not blank the review screen in that case.
-            if (txId != null || pendingTransaction.getAmount() > 0L) {
-                this@ReviewTransactionViewModel.pendingTransaction = pendingTransaction
+            if (unsignedTransaction != null) {
+                this@ReviewTransactionViewModel.unsignedTransaction = unsignedTransaction
+                // Rows come from wallet2's own summary of the outputs sign() will construct,
+                // never from the set's advisory destination list. If the sentence cannot be
+                // parsed it is shown raw; the advisory getters are not a fallback.
+                val message = unsignedTransaction.confirmationMessage
+                val summary = SigningSummary.parse(message)
                 reviewModel.postValue(
                     ReviewModel(
-                        address = null,
-                        amount = pendingTransaction.getAmount(),
-                        fee = pendingTransaction.getFee(),
-                        total = pendingTransaction.getFee() + pendingTransaction.getAmount(),
-                        txId = txId ?: ""
-                    )
+                        address = summary?.destinations?.firstOrNull()?.address ?: "",
+                        amount = summary?.amount ?: 0L,
+                        fee = summary?.fee ?: 0L,
+                        total = summary?.let { it.amount + it.fee } ?: 0L,
+                        txId = unsignedTransaction.firstTxId,
+                        summary = summary,
+                        confirmationMessage = if (summary == null) message else null,
+                    ),
                 )
-            } else {
-                Timber.tag(TAG).e("Pending transaction has no txId")
+            } else if (pendingTransaction != null) {
+                val txId = pendingTransaction.getFirstTxIdJ()
+                // A multi-destination set can be valid before wallet2 assigns the first txid;
+                // the amount/fee are still authoritative, and the reviewed destinations come
+                // from the navigation route. Do not blank the review screen in that case.
+                if (txId != null || pendingTransaction.getAmount() > 0L) {
+                    this@ReviewTransactionViewModel.pendingTransaction = pendingTransaction
+                    reviewModel.postValue(
+                        ReviewModel(
+                            address = null,
+                            amount = pendingTransaction.getAmount(),
+                            fee = pendingTransaction.getFee(),
+                            total = pendingTransaction.getFee() + pendingTransaction.getAmount(),
+                            txId = txId ?: "",
+                        ),
+                    )
+                } else {
+                    Timber.tag(TAG).e("Pending transaction has no txId")
+                }
             }
-        }
         }
     }
 
     fun broadCast(): Job? {
         if (broadcastingTx.value == BroadcastState.SUCCESS ||
-            broadcastingTx.value == BroadcastState.IN_PROGRESS) {
+            broadcastingTx.value == BroadcastState.IN_PROGRESS
+        ) {
             return null
         }
         // LiveData.postValue is asynchronous; an AtomicBoolean is the authoritative guard
@@ -204,10 +205,11 @@ class ReviewTransactionViewModel : ViewModel() {
         if (!broadcastInProgress.compareAndSet(false, true)) {
             return null
         }
-        val signedTxFile = File(
-            AnonConfig.context?.cacheDir,
-            AnonConfig.IMPORT_SIGNED_TX_FILE
-        );
+        val signedTxFile =
+            File(
+                AnonConfig.context?.cacheDir,
+                AnonConfig.IMPORT_SIGNED_TX_FILE,
+            )
         _broadcastError = null
         broadcastingTx.postValue(BroadcastState.IN_PROGRESS)
 
@@ -219,8 +221,9 @@ class ReviewTransactionViewModel : ViewModel() {
                     throw Exception("Wallet is unavailable")
                 }
                 if (!AnonConfig.viewOnly) {
-                    val tx = pendingTransaction
-                        ?: throw IllegalStateException("No pending transaction to broadcast")
+                    val tx =
+                        pendingTransaction
+                            ?: throw IllegalStateException("No pending transaction to broadcast")
                     if (!wallet.send(tx)) {
                         throw Exception("Failed to send transaction")
                     }
@@ -281,7 +284,6 @@ fun ReviewTransactionScreen(
     navigateToHome: () -> Unit = {},
     onBackPressed: () -> Unit = {},
 ) {
-
     var qrScannerParam by remember { mutableStateOf<SpendQRExchangeParam?>(null) }
     val viewModel = viewModel<ReviewTransactionViewModel>()
     val reviewModel by viewModel.reviewModelLive.observeAsState()
@@ -292,22 +294,24 @@ fun ReviewTransactionScreen(
     var signing by remember { mutableStateOf(false) }
     var readyToBroadcast by remember { mutableStateOf(!AnonConfig.viewOnly) }
 
-    val titleStyle = MaterialTheme.typography.bodyLarge.copy(
-        color = MaterialTheme.colorScheme.primary,
-        fontSize = 20.sp
-    )
-    val subTitleStyle = MaterialTheme.typography.bodyMedium.copy(
-        color = MaterialTheme.colorScheme.onBackground,
-        fontSize = 14.sp
-    )
+    val titleStyle =
+        MaterialTheme.typography.bodyLarge.copy(
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 20.sp,
+        )
+    val subTitleStyle =
+        MaterialTheme.typography.bodyMedium.copy(
+            color = MaterialTheme.colorScheme.onBackground,
+            fontSize = 14.sp,
+        )
 
     // After a broadcast, back must leave the flow: popping to Send showed the filled-in
     // form again, one tap from sending the same payment twice. Mid-broadcast it waits.
     val leave = {
         when (broadcastState) {
-            BroadcastState.SUCCESS     -> onFinished()
+            BroadcastState.SUCCESS -> onFinished()
             BroadcastState.IN_PROGRESS -> Unit
-            else                       -> onBackPressed()
+            else -> onBackPressed()
         }
     }
     BackHandler { leave() }
@@ -329,14 +333,13 @@ fun ReviewTransactionScreen(
                     navigateToHome.invoke()
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
     }
 
-    if (showScanner)
+    if (showScanner) {
         URQRScanner(
             onQRCodeScanned = {
-
             },
             onDismiss = {
                 showScanner = false
@@ -344,48 +347,44 @@ fun ReviewTransactionScreen(
             onURResult = {
                 when (it.getOrNull()) {
                     ImportEvents.IMPORT_OUTPUTS -> {
-
                     }
 
                     ImportEvents.IMPORT_KEY_IMAGES -> {
-
                     }
 
                     ImportEvents.IMPORT_UNSIGNED_TX -> {
-
                     }
 
                     ImportEvents.IMPORT_SIGNED_TX -> {
-                        qrScannerParam = null;
+                        qrScannerParam = null
                         readyToBroadcast = true
                     }
 
                     null -> {
-
                     }
                 }
                 showScanner = false
             },
-            showScanner = showScanner
+            showScanner = showScanner,
         )
-
-    val context = LocalContext.current;
-    val resources = LocalResources.current;
-    val ctaText = if (AnonConfig.viewOnly) {
-        if (!viewModel.isUnsignedTransaction() && !readyToBroadcast) {
-            stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
-        } else {
-            stringResource(R.string.broadcast_tx)
-        }
-    } else {
-        if (viewModel.isUnsignedTransaction()) {
-           stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
-        } else {
-            stringResource(R.string.broadcast_tx)
-        }
     }
 
-
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val ctaText =
+        if (AnonConfig.viewOnly) {
+            if (!viewModel.isUnsignedTransaction() && !readyToBroadcast) {
+                stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
+            } else {
+                stringResource(R.string.broadcast_tx)
+            }
+        } else {
+            if (viewModel.isUnsignedTransaction()) {
+                stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
+            } else {
+                stringResource(R.string.broadcast_tx)
+            }
+        }
 
     Scaffold(
         modifier = modifier,
@@ -396,57 +395,58 @@ fun ReviewTransactionScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = { leave() }
+                        onClick = { leave() },
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 actions = {
-
-                }
+                },
             )
-        }
+        },
     ) {
         Box(
-            modifier = Modifier
-                .padding(it)
-                .padding(bottom = 0.dp)
+            modifier =
+                Modifier
+                    .padding(it)
+                    .padding(bottom = 0.dp),
         ) {
             if (reviewModel != null) {
                 AnimatedVisibility(
                     visible = broadcastState == BroadcastState.ERROR,
                     enter = fadeIn(),
-                    exit = fadeOut()
+                    exit = fadeOut(),
                 ) {
                     Column(
                         Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
                             stringResource(R.string.broadcast_failed_generic),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = DangerColor
-                            ),
-                            textAlign = TextAlign.Center
+                            style =
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    color = DangerColor,
+                                ),
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
                 AnimatedVisibility(
                     visible = broadcastState == BroadcastState.SUCCESS,
                     enter = fadeIn(),
-                    exit = fadeOut()
+                    exit = fadeOut(),
                 ) {
                     Column(
                         Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
                             tint = SuccessColor,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(44.dp),
                         )
                         Text(stringResource(R.string.success))
                     }
@@ -454,46 +454,45 @@ fun ReviewTransactionScreen(
                 AnimatedVisibility(
                     visible = broadcastState == BroadcastState.IN_PROGRESS,
                     enter = fadeIn(),
-                    exit = fadeOut()
+                    exit = fadeOut(),
                 ) {
-
                     Column(
                         Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-
                         Box(
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.ic_anon),
                                 contentDescription = stringResource(R.string.app_logo),
-                                modifier = Modifier
-                                    .size(110.dp)
+                                modifier =
+                                    Modifier
+                                        .size(110.dp),
                             )
                             CircularProgressIndicator(
                                 modifier = Modifier.size(300.dp),
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.dp,
                             )
                         }
                         Text(
                             stringResource(R.string.broadcast_in_progress),
-                            modifier = Modifier.padding(top = 12.dp)
+                            modifier = Modifier.padding(top = 12.dp),
                         )
                     }
-
                 }
                 AnimatedVisibility(
                     visible = broadcastState == BroadcastState.STAGING,
                     enter = fadeIn(),
-                    exit = fadeOut()
+                    exit = fadeOut(),
                 ) {
                     Column(
                         verticalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp),
                     ) {
                         LazyColumn {
                             val summary = reviewModel!!.summary
@@ -504,7 +503,7 @@ fun ReviewTransactionScreen(
                                 item {
                                     ListItem(
                                         headlineContent = { Text(stringResource(R.string.what_will_be_signed), style = titleStyle) },
-                                        supportingContent = { Text(rawSummary, style = subTitleStyle) }
+                                        supportingContent = { Text(rawSummary, style = subTitleStyle) },
                                     )
                                 }
                             } else {
@@ -521,9 +520,9 @@ fun ReviewTransactionScreen(
                                                         stringResource(
                                                             R.string.address_index_of_count,
                                                             index + 1,
-                                                            reviewParams.addresses.size
+                                                            reviewParams.addresses.size,
                                                         ),
-                                                        style = titleStyle
+                                                        style = titleStyle,
                                                     )
                                                 },
                                                 supportingContent = {
@@ -531,12 +530,12 @@ fun ReviewTransactionScreen(
                                                         Text(address, style = subTitleStyle)
                                                         Text(
                                                             Formats.getExactDisplayAmount(
-                                                                reviewParams.amounts.getOrElse(index) { 0L }
+                                                                reviewParams.amounts.getOrElse(index) { 0L },
                                                             ),
-                                                            style = subTitleStyle
+                                                            style = subTitleStyle,
                                                         )
                                                     }
-                                                }
+                                                },
                                             )
                                         }
                                     }
@@ -547,18 +546,24 @@ fun ReviewTransactionScreen(
                                             ListItem(
                                                 headlineContent = {
                                                     Text(
-                                                        if (destinations.size == 1) stringResource(R.string.address)
-                                                        else "${stringResource(R.string.address)} ${index + 1} of ${destinations.size}",
-                                                        style = titleStyle
+                                                        if (destinations.size == 1) {
+                                                            stringResource(R.string.address)
+                                                        } else {
+                                                            "${stringResource(R.string.address)} ${index + 1} of ${destinations.size}"
+                                                        },
+                                                        style = titleStyle,
                                                     )
                                                 },
                                                 supportingContent = {
                                                     Text(
-                                                        if (destinations.size == 1) destination.address
-                                                        else "${destination.address}\n${Formats.getExactDisplayAmount(destination.amount)}",
-                                                        style = subTitleStyle
+                                                        if (destinations.size == 1) {
+                                                            destination.address
+                                                        } else {
+                                                            "${destination.address}\n${Formats.getExactDisplayAmount(destination.amount)}"
+                                                        },
+                                                        style = subTitleStyle,
                                                     )
-                                                }
+                                                },
                                             )
                                         }
                                     }
@@ -569,9 +574,9 @@ fun ReviewTransactionScreen(
                                             supportingContent = {
                                                 Text(
                                                     reviewModel!!.address ?: reviewParams.toAddress,
-                                                    style = subTitleStyle
+                                                    style = subTitleStyle,
                                                 )
-                                            }
+                                            },
                                         )
                                     }
                                 }
@@ -581,25 +586,24 @@ fun ReviewTransactionScreen(
                                         supportingContent = {
                                             Text(
                                                 Formats.getExactDisplayAmount(
-                                                    reviewModel!!.amount
+                                                    reviewModel!!.amount,
                                                 ),
-                                                style = subTitleStyle
+                                                style = subTitleStyle,
                                             )
-                                        }
+                                        },
                                     )
                                 }
                                 item {
-
                                     ListItem(
                                         headlineContent = { Text(stringResource(R.string.fee), style = titleStyle) },
                                         supportingContent = {
                                             Text(
                                                 Formats.getExactDisplayAmount(
-                                                    reviewModel!!.fee
+                                                    reviewModel!!.fee,
                                                 ),
-                                                style = subTitleStyle
+                                                style = subTitleStyle,
                                             )
-                                        }
+                                        },
                                     )
                                 }
                                 item {
@@ -608,99 +612,112 @@ fun ReviewTransactionScreen(
                                         supportingContent = {
                                             Text(
                                                 Formats.getExactDisplayAmount(
-                                                    reviewModel!!.total
+                                                    reviewModel!!.total,
                                                 ),
                                                 textAlign = TextAlign.Center,
                                                 style = MaterialTheme.typography.titleLarge,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(
-                                                        vertical = 24.dp
-                                                    )
+                                                modifier =
+                                                    Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            vertical = 24.dp,
+                                                        ),
                                             )
-                                        }
+                                        },
                                     )
                                 }
                             }
                         }
                         AnonOutlineButton(
                             onClick = {
-
                                 if (viewModel.isUnsignedTransaction()) {
                                     if (signing) return@AnonOutlineButton
                                     signing = true
-                                    scope.launch {
-                                        val signedTransaction = File(
-                                            AnonConfig.context?.cacheDir,
-                                            AnonConfig.EXPORT_SIGNED_TX_FILE
-                                        )
-                                        Timber.tag(TAG)
-                                            .i("Signing reviewed transaction set to ${signedTransaction.path}")
-                                        // sign the object that was reviewed, not a re-read of the
-                                        // file; ring signatures are CPU-heavy, so off the main thread
-                                        val tx = viewModel.unsignedTransaction
-                                        val signed = try {
-                                            withContext(Dispatchers.Default) {
-                                                val ok = tx?.sign(signedTransaction.absolutePath) == true
-                                                //save the wallet after signing
-                                                if (ok) WalletManager.instance?.wallet?.store()
-                                                ok
-                                            }
-                                        } finally {
-                                            // always release the button, or a failed sign leaves
-                                            // it disabled with no way to retry
-                                            signing = false
-                                        }
-                                        if (signed) {
-                                            readyToBroadcast = true
-                                            Timber.tag(TAG)
-                                                .i(
-                                                    "Signed transaction written: exists ? ${signedTransaction.exists()} | " +
-                                                            " size: ${signedTransaction.length()}"
+                                    scope
+                                        .launch {
+                                            val signedTransaction =
+                                                File(
+                                                    AnonConfig.context?.cacheDir,
+                                                    AnonConfig.EXPORT_SIGNED_TX_FILE,
                                                 )
-                                            qrScannerParam = SpendQRExchangeParam(
-                                                exportType = ExportType.SIGNED_TX,
-                                                title = resources.getString(R.string.signed_tx),
-                                                ctaText = resources.getString(R.string.finish)    ,
-                                            )
-                                        } else {
-                                            readyToBroadcast = false
-                                            val reason = tx?.errorString?.takeIf { it.isNotBlank() }
-                                                ?: "unknown error"
-                                            Timber.tag(TAG).e("Signing failed: %s", reason)
-                                            //tell the user how to resync outputs
-                                            val hint = if (reason.contains("omit more outputs"))
-                                                "\n" + resources.getString(R.string.signing_hint_omit_outputs)
-                                            else ""
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                resources.getString(R.string.signing_failed) + hint,
-                                                android.widget.Toast.LENGTH_LONG,
-                                            ).show()
+                                            Timber
+                                                .tag(TAG)
+                                                .i("Signing reviewed transaction set to ${signedTransaction.path}")
+                                            // sign the object that was reviewed, not a re-read of the
+                                            // file; ring signatures are CPU-heavy, so off the main thread
+                                            val tx = viewModel.unsignedTransaction
+                                            val signed =
+                                                try {
+                                                    withContext(Dispatchers.Default) {
+                                                        val ok = tx?.sign(signedTransaction.absolutePath) == true
+                                                        // save the wallet after signing
+                                                        if (ok) WalletManager.instance?.wallet?.store()
+                                                        ok
+                                                    }
+                                                } finally {
+                                                    // always release the button, or a failed sign leaves
+                                                    // it disabled with no way to retry
+                                                    signing = false
+                                                }
+                                            if (signed) {
+                                                readyToBroadcast = true
+                                                Timber
+                                                    .tag(TAG)
+                                                    .i(
+                                                        "Signed transaction written: exists ? ${signedTransaction.exists()} | " +
+                                                            " size: ${signedTransaction.length()}",
+                                                    )
+                                                qrScannerParam =
+                                                    SpendQRExchangeParam(
+                                                        exportType = ExportType.SIGNED_TX,
+                                                        title = resources.getString(R.string.signed_tx),
+                                                        ctaText = resources.getString(R.string.finish),
+                                                    )
+                                            } else {
+                                                readyToBroadcast = false
+                                                val reason =
+                                                    tx?.errorString?.takeIf { it.isNotBlank() }
+                                                        ?: "unknown error"
+                                                Timber.tag(TAG).e("Signing failed: %s", reason)
+                                                // tell the user how to resync outputs
+                                                val hint =
+                                                    if (reason.contains("omit more outputs")) {
+                                                        "\n" + resources.getString(R.string.signing_hint_omit_outputs)
+                                                    } else {
+                                                        ""
+                                                    }
+                                                android.widget.Toast
+                                                    .makeText(
+                                                        context,
+                                                        resources.getString(R.string.signing_failed) + hint,
+                                                        android.widget.Toast.LENGTH_LONG,
+                                                    ).show()
+                                            }
+                                        }.invokeOnCompletion { error ->
+                                            if (error != null) {
+                                                Timber
+                                                    .tag(TAG)
+                                                    .i("Signing Unsigned Transaction failed: $error")
+                                            }
                                         }
-                                    }.invokeOnCompletion { error ->
-                                        if (error != null) {
-                                            Timber.tag(TAG)
-                                                .i("Signing Unsigned Transaction failed: $error")
-                                        }
-                                    }
                                 } else {
                                     if (AnonConfig.viewOnly && !readyToBroadcast) {
-                                        qrScannerParam = SpendQRExchangeParam(
-                                            exportType = ExportType.UN_SIGNED_TX,
-                                            title = resources.getString(R.string.unsigned_tx),
-                                            ctaText = resources.getString(R.string.scan_signed_tx),
-                                        )
+                                        qrScannerParam =
+                                            SpendQRExchangeParam(
+                                                exportType = ExportType.UN_SIGNED_TX,
+                                                title = resources.getString(R.string.unsigned_tx),
+                                                ctaText = resources.getString(R.string.scan_signed_tx),
+                                            )
                                     } else {
                                         viewModel.broadCast()?.invokeOnCompletion { error ->
                                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                                                 if (error == null) {
                                                     view.performHapticFeedback(
-                                                        HapticFeedbackConstants.CONFIRM
+                                                        HapticFeedbackConstants.CONFIRM,
                                                     )
                                                 } else {
                                                     view.performHapticFeedback(
-                                                        HapticFeedbackConstants.REJECT
+                                                        HapticFeedbackConstants.REJECT,
                                                     )
                                                 }
                                             }
@@ -708,13 +725,14 @@ fun ReviewTransactionScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(),
                         ) {
                             if (signing) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp
+                                    strokeWidth = 2.dp,
                                 )
                             } else {
                                 Text(ctaText)
@@ -726,7 +744,6 @@ fun ReviewTransactionScreen(
         }
     }
 }
-
 
 @Preview
 @Composable

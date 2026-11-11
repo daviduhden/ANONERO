@@ -27,22 +27,19 @@ class Transfer : Parcelable {
         address = `in`.readString()
     }
 
-    override fun writeToParcel(out: Parcel, flags: Int) {
+    override fun writeToParcel(
+        out: Parcel,
+        flags: Int,
+    ) {
         out.writeLong(amount)
         out.writeString(address)
     }
 
-    override fun describeContents(): Int {
-        return 0
-    }
+    override fun describeContents(): Int = 0
 
     companion object CREATOR : Creator<Transfer> {
-        override fun createFromParcel(parcel: Parcel): Transfer {
-            return Transfer(parcel)
-        }
+        override fun createFromParcel(parcel: Parcel): Transfer = Transfer(parcel)
 
-        override fun newArray(size: Int): Array<Transfer?> {
-            return arrayOfNulls(size)
-        }
+        override fun newArray(size: Int): Array<Transfer?> = arrayOfNulls(size)
     }
 }

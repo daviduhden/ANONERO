@@ -60,6 +60,7 @@ import androidx.core.content.edit
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.WalletManager
+import io.anonero.services.WalletState
 import io.anonero.ui.onboard.PinSetup
 import io.anonero.util.KeyStoreHelper
 import io.anonero.util.PREFS_DECOY_CONFIGURED
@@ -67,12 +68,11 @@ import io.anonero.util.PREFS_DECOY_PASSPHRASE_HASH
 import io.anonero.util.PREFS_DURESS_PIN_HASH
 import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
+import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
-import io.anonero.services.WalletState
-import io.anonero.util.WALLET_PREFERENCES
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,10 +82,14 @@ import timber.log.Timber
 
 private const val TAG = "DecoySettings"
 
-/* Localizable decoy failures. Internal wallet2 text is logged, never displayed. */
-private class DecoyException(val error: DecoyError) : Exception(error.name)
+// Localizable decoy failures. Internal wallet2 text is logged, never displayed.
+private class DecoyException(
+    val error: DecoyError,
+) : Exception(error.name)
 
-enum class DecoyError(@StringRes val messageRes: Int) {
+enum class DecoyError(
+    @StringRes val messageRes: Int,
+) {
     DURESS_PIN_DIFFERS(R.string.duress_pin_differs_normal),
     CONTEXT_UNAVAILABLE(R.string.app_context_unavailable),
     EXISTS(R.string.decoy_exists),
@@ -152,7 +156,7 @@ fun DecoySettingsScreen(
         Column(
             modifier = modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
         ) {
             Text(stringResource(R.string.decoy_not_available))
         }
@@ -163,7 +167,7 @@ fun DecoySettingsScreen(
         io.anonero.ui.home.LockScreen(
             mode = io.anonero.ui.home.LockScreenMode.VERYFY_PIN,
             modifier = modifier.fillMaxSize(),
-            onUnLocked = { _, _ -> unlocked = true }
+            onUnLocked = { _, _ -> unlocked = true },
         )
         return
     }
@@ -171,8 +175,14 @@ fun DecoySettingsScreen(
     if (seed != null) {
         io.anonero.ui.onboard.SeedSetup(
             seed = seed!!,
-            oNextPressed = { seed = null; configured = true },
-            onBackPressed = { seed = null; configured = true }
+            oNextPressed = {
+                seed = null
+                configured = true
+            },
+            onBackPressed = {
+                seed = null
+                configured = true
+            },
         )
         return
     }
@@ -180,12 +190,18 @@ fun DecoySettingsScreen(
     if (showDuressPin) {
         PinSetup(
             enterLabel = stringResource(R.string.enter_duress_pin),
-            onBackPress = { showDuressPin = false; showPassphrase = true; creating = false },
+            onBackPress = {
+                showDuressPin = false
+                showPassphrase = true
+                creating = false
+            },
             onNext = { pin ->
                 scope.launch(Dispatchers.IO) {
-                    val sameAsMain = PinHash.matches(
-                        pin, prefs.getString(PREFS_PIN_HASH, "")
-                    )
+                    val sameAsMain =
+                        PinHash.matches(
+                            pin,
+                            prefs.getString(PREFS_PIN_HASH, ""),
+                        )
                     withContext(Dispatchers.Main) {
                         if (sameAsMain) {
                             error = DecoyError.DURESS_PIN_DIFFERS
@@ -206,7 +222,7 @@ fun DecoySettingsScreen(
                         }
                     }
                 }
-            }
+            },
         )
         return
     }
@@ -217,9 +233,11 @@ fun DecoySettingsScreen(
             onBackPress = { showChangeDuress = false },
             onNext = { pin ->
                 scope.launch(Dispatchers.IO) {
-                    val sameAsMain = PinHash.matches(
-                        pin, prefs.getString(PREFS_PIN_HASH, "")
-                    )
+                    val sameAsMain =
+                        PinHash.matches(
+                            pin,
+                            prefs.getString(PREFS_PIN_HASH, ""),
+                        )
                     val newHash = if (sameAsMain) null else PinHash.hash(pin)
                     withContext(Dispatchers.Main) {
                         if (sameAsMain || newHash == null) {
@@ -232,7 +250,7 @@ fun DecoySettingsScreen(
                         }
                     }
                 }
-            }
+            },
         )
         return
     }
@@ -255,7 +273,7 @@ fun DecoySettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showRemoveConfirm = false }) { Text(stringResource(R.string.cancel)) }
-            }
+            },
         )
     }
 
@@ -268,33 +286,33 @@ fun DecoySettingsScreen(
                     IconButton(onClick = onBackPress) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Text(
                     stringResource(R.string.decoy_intro),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             item {
                 Text(
                     stringResource(R.string.decoy_limits),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
             if (creating) {
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                     ) {
                         CircularProgressIndicator()
                         Text(stringResource(R.string.creating_decoy_wallet), modifier = Modifier.padding(top = 12.dp))
@@ -303,7 +321,10 @@ fun DecoySettingsScreen(
             }
             if (!configured && !showPassphrase) {
                 item {
-                    AnonOutlineButton(onClick = { error = null; showPassphrase = true }) {
+                    AnonOutlineButton(onClick = {
+                        error = null
+                        showPassphrase = true
+                    }) {
                         Text(stringResource(R.string.setup_decoy_wallet))
                     }
                 }
@@ -312,7 +333,7 @@ fun DecoySettingsScreen(
                 item {
                     Text(
                         stringResource(R.string.decoy_passphrase_hint),
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 item {
@@ -322,7 +343,7 @@ fun DecoySettingsScreen(
                         label = { Text(stringResource(R.string.decoy_passphrase_min)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 item {
@@ -333,7 +354,7 @@ fun DecoySettingsScreen(
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         isError = confirmPassphrase.isNotEmpty() && confirmPassphrase != passphrase,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 item {
@@ -346,9 +367,11 @@ fun DecoySettingsScreen(
                                 return@AnonOutlineButton
                             }
                             scope.launch(Dispatchers.IO) {
-                                val mainPassHash = prefs.getString(
-                                    io.anonero.util.PREFS_PASSPHRASE_HASH, ""
-                                )
+                                val mainPassHash =
+                                    prefs.getString(
+                                        io.anonero.util.PREFS_PASSPHRASE_HASH,
+                                        "",
+                                    )
                                 val candidate = KeyStoreHelper.getCrazyPass(context, passphrase)
                                 withContext(Dispatchers.Main) {
                                     if (mainPassHash == candidate) {
@@ -359,7 +382,7 @@ fun DecoySettingsScreen(
                                     }
                                 }
                             }
-                        }
+                        },
                     ) { Text(stringResource(R.string.continue_action)) }
                 }
             }
@@ -368,11 +391,14 @@ fun DecoySettingsScreen(
                     Text(
                         stringResource(R.string.decoy_configured_help),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 item {
-                    AnonOutlineButton(onClick = { error = null; showChangeDuress = true }) {
+                    AnonOutlineButton(onClick = {
+                        error = null
+                        showChangeDuress = true
+                    }) {
                         Text(stringResource(R.string.change_duress_pin))
                     }
                 }
@@ -389,7 +415,7 @@ fun DecoySettingsScreen(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -419,13 +445,14 @@ private fun createDecoy(
         var created: io.anonero.model.Wallet? = null
         try {
             WalletKey.store(context, file.name, walletKey)
-            val wallet = WalletManager.instance?.createWalletUnmanaged(
-                aFile = file,
-                password = walletKey,
-                passphrase = passphrase,
-                language = "English",
-                height = 1,
-            ) ?: throw DecoyException(DecoyError.CREATION_FAILED)
+            val wallet =
+                WalletManager.instance?.createWalletUnmanaged(
+                    aFile = file,
+                    password = walletKey,
+                    passphrase = passphrase,
+                    language = "English",
+                    height = 1,
+                ) ?: throw DecoyException(DecoyError.CREATION_FAILED)
             created = wallet
             if (wallet.status.isOk != true) {
                 Timber.tag(TAG).e("decoy creation status: %s", wallet.status.errorString)
@@ -433,8 +460,9 @@ private fun createDecoy(
             }
             // A brand-new decoy has no history. Start scanning near the current tip so it
             // is usable quickly; the user can restore from the seed at an earlier height.
-            val chainHeight = runCatching { WalletManager.instance?.getBlockchainHeight() }
-                .getOrNull() ?: 0L
+            val chainHeight =
+                runCatching { WalletManager.instance?.getBlockchainHeight() }
+                    .getOrNull() ?: 0L
             if (chainHeight > 1L) wallet.setRestoreHeight(chainHeight)
             if (!wallet.store()) {
                 Timber.tag(TAG).e("decoy store failed: %s", wallet.status.errorString)
@@ -447,7 +475,7 @@ private fun createDecoy(
                 putString(PREFS_DURESS_PIN_HASH, PinHash.hash(duressPin))
                 putString(
                     PREFS_DECOY_PASSPHRASE_HASH,
-                    KeyStoreHelper.getCrazyPass(context, passphrase)
+                    KeyStoreHelper.getCrazyPass(context, passphrase),
                 )
                 putBoolean(PREFS_DECOY_CONFIGURED, true)
                 putLong(WalletProfileStore.restoreHeightKey(WalletProfile.DECOY), restoreHeight)

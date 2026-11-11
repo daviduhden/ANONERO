@@ -21,6 +21,7 @@ package io.anonero.ui.home.settings
 import AnonNeroTheme
 import AnonOutlineButton
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -70,12 +71,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.annotation.StringRes
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -122,7 +122,9 @@ import kotlin.time.Duration.Companion.seconds
 
 private const val TAG = "NodeSettings"
 
-enum class NodeValidationError(@StringRes val messageRes: Int) {
+enum class NodeValidationError(
+    @StringRes val messageRes: Int,
+) {
     EMPTY_URL(R.string.url_cannot_be_empty),
     INVALID_URL(R.string.invalid_url),
     LWS_ACTIVE(R.string.disable_lws_restart),
@@ -131,9 +133,8 @@ enum class NodeValidationError(@StringRes val messageRes: Int) {
 
 class NodeSettingsViewModel(
     private val prefs: SharedPreferences,
-    private val nodesRepository: NodesRepository
+    private val nodesRepository: NodesRepository,
 ) : ViewModel() {
-
     private val walletState: WalletState by inject(WalletState::class.java)
 
     private val torService: TorService by inject(TorService::class.java)
@@ -143,21 +144,21 @@ class NodeSettingsViewModel(
     private val daemonInfo = walletState.daemonInfo
     val nodes: StateFlow<List<Node>> = _nodes
 
-
-    val activeNode: StateFlow<Node?> = combine(nodes, daemonInfo) { nodeList, daemonInfo ->
-        if (daemonInfo?.daemon == null) {
-            return@combine null
-        }
-        val uri = "http://${daemonInfo.daemon}".toUri()
-        nodeList.find { node ->
-            node.host == uri.host &&
+    val activeNode: StateFlow<Node?> =
+        combine(nodes, daemonInfo) { nodeList, daemonInfo ->
+            if (daemonInfo?.daemon == null) {
+                return@combine null
+            }
+            val uri = "http://${daemonInfo.daemon}".toUri()
+            nodeList.find { node ->
+                node.host == uri.host &&
                     node.rpcPort == uri.port
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = null
-    )
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = null,
+        )
 
     init {
         // Observe items from the repository
@@ -168,51 +169,55 @@ class NodeSettingsViewModel(
         }
     }
 
-
     fun getCurrentDaemonLive() = walletState.daemonInfo.asLiveData()
 
     val connectionError: LiveData<NodeValidationError?> get() = uriValidationError
 
-    fun validate(rpcUrl: String, rpcUsername: String, rpcPassPhrase: String): Node? {
+    fun validate(
+        rpcUrl: String,
+        rpcUsername: String,
+        rpcPassPhrase: String,
+    ): Node? {
         uriValidationError.postValue(null)
-        if( rpcUrl.isBlank()) {
+        if (rpcUrl.isBlank()) {
             uriValidationError.postValue(NodeValidationError.EMPTY_URL)
             return null
         }
         try {
             val cleanURL = rpcUrl.trim().lowercase()
-            val urlForParsing = if (cleanURL.startsWith("http")) {
-                cleanURL
-            } else {
-                if (cleanURL.startsWith("https")) {
+            val urlForParsing =
+                if (cleanURL.startsWith("http")) {
                     cleanURL
                 } else {
-                    "http://$cleanURL"
+                    if (cleanURL.startsWith("https")) {
+                        cleanURL
+                    } else {
+                        "http://$cleanURL"
+                    }
                 }
-            }
             val validatedUrl = urlForParsing.toUri()
             if (validatedUrl.host == null) {
                 uriValidationError.postValue(NodeValidationError.INVALID_URL)
                 return null
             }
-            val nodeJson = JSONObject()
-                .apply {
-                    put(NodeFields.RPC_HOST.value, validatedUrl.host)
-                    put(
-                        NodeFields.RPC_PORT.value,
-                        if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port
-                    )
-                    put(NodeFields.RPC_USERNAME.value, rpcUsername)
-                    put(NodeFields.RPC_PASSWORD.value, rpcPassPhrase)
-                    put(
-                        NodeFields.RPC_NETWORK.value,
-                        AnonConfig.getNetworkType().toString()
-                    )
-                    put(NodeFields.NODE_NAME.value, "anon")
-                }
+            val nodeJson =
+                JSONObject()
+                    .apply {
+                        put(NodeFields.RPC_HOST.value, validatedUrl.host)
+                        put(
+                            NodeFields.RPC_PORT.value,
+                            if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
+                        )
+                        put(NodeFields.RPC_USERNAME.value, rpcUsername)
+                        put(NodeFields.RPC_PASSWORD.value, rpcPassPhrase)
+                        put(
+                            NodeFields.RPC_NETWORK.value,
+                            AnonConfig.getNetworkType().toString(),
+                        )
+                        put(NodeFields.NODE_NAME.value, "anon")
+                    }
 
             return Node.fromJson(nodeJson)
-
         } catch (_: Exception) {
             Timber.tag(TAG).w("Invalid node configuration")
             uriValidationError.postValue(NodeValidationError.INVALID_URL)
@@ -293,9 +298,7 @@ class NodeSettingsViewModel(
             nodesRepository.removeItemByNodeString(nodeString)
         }
     }
-
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -311,56 +314,59 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
     val context = LocalContext.current
     val resources = LocalResources.current
 
-    if (showNodeDetails)
+    if (showNodeDetails) {
         Dialog(
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = true,
-                dismissOnBackPress = true,
-                decorFitsSystemWindows = false,
-                securePolicy = SecureFlagPolicy.SecureOn,
-            ),
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true,
+                    decorFitsSystemWindows = false,
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                ),
             onDismissRequest = {
                 showNodeDetails = false
-            }
+            },
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
             ) {
                 Column {
                     TopAppBar(
                         title = {
-
                         },
                         navigationIcon = {
                             IconButton(
                                 onClick = {
                                     showNodeDetails = false
-                                }
+                                },
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                             }
-                        }
+                        },
                     )
                     NodeForm(
                         onBackPress = {
                             scope.launch {
                                 showNodeDetails = false
                             }
-                        }, onConnect = {
+                        },
+                        onConnect = {
                             nodeSettingsVM.addItem(it)
                             nodeSettingsVM.viewModelScope
                                 .launch {
                                     nodeSettingsVM.connect(it)
                                 }
-                        }, nodeSettingsVM
+                        },
+                        nodeSettingsVM,
                     )
                 }
             }
         }
-
+    }
 
     Scaffold(
         topBar = {
@@ -368,7 +374,7 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                 TopAppBar(
                     navigationIcon = {
                         IconButton(
-                            onClick = onBackPress
+                            onClick = onBackPress,
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
@@ -377,29 +383,32 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                         TextButton(
                             onClick = {
                                 showNodeDetails = true
-                            }
+                            },
                         ) { Text(stringResource(R.string.add_node)) }
                         IconButton(
-                            colors = IconButtonDefaults.iconButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onBackground
-                            ),
+                            colors =
+                                IconButtonDefaults.iconButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onBackground,
+                                ),
                             onClick = {
                                 showMenu = !showMenu
-                            }
+                            },
                         ) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
                             DropdownMenu(
                                 expanded = showMenu,
                                 containerColor = MaterialTheme.colorScheme.background,
-                                modifier = Modifier
-                                    .border(
-                                        1.dp,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(
-                                            alpha = .2f
+                                modifier =
+                                    Modifier
+                                        .border(
+                                            1.dp,
+                                            color =
+                                                MaterialTheme.colorScheme.onBackground.copy(
+                                                    alpha = .2f,
+                                                ),
+                                            shape = MaterialTheme.shapes.medium,
                                         ),
-                                        shape = MaterialTheme.shapes.medium,
-                                    ),
-                                onDismissRequest = { showMenu = false }
+                                onDismissRequest = { showMenu = false },
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.resync_blockchain)) },
@@ -411,7 +420,7 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                                                 toastState.show(
                                                     resources.getString(R.string.resync_failed),
                                                     type = ToastType.Warning,
-                                                    duration = 6.seconds
+                                                    duration = 6.seconds,
                                                 )
                                             }
                                         } else {
@@ -422,11 +431,10 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                                                 )
                                             }
                                         }
-                                    }
+                                    },
                                 )
                             }
                         }
-
                     },
                     title = {
                         Text(stringResource(R.string.nodes))
@@ -434,37 +442,40 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                 )
                 WalletProgressIndicator()
             }
-        }
+        },
     ) {
-
         LazyColumn(modifier = Modifier.padding(it)) {
-            if (activeNode != null)
+            if (activeNode != null) {
                 item(key = activeNode?.toNodeString() ?: "active") {
                     NodeListItem(
                         activeNode!!,
                         modifier = Modifier.animateItem(),
                         active = true,
-                        nodeSettingsVM = nodeSettingsVM)
+                        nodeSettingsVM = nodeSettingsVM,
+                    )
                 }
-            if (availableNodes.isNotEmpty())
+            }
+            if (availableNodes.isNotEmpty()) {
                 item(key = "header") {
                     Column(
-                        modifier = Modifier
-                            .padding(
-                                vertical = 12.dp,
-                                horizontal = 12.dp
-                            )
-                            .background(color = MaterialTheme.colorScheme.background)
+                        modifier =
+                            Modifier
+                                .padding(
+                                    vertical = 12.dp,
+                                    horizontal = 12.dp,
+                                ).background(color = MaterialTheme.colorScheme.background),
                     ) {
                         Text(stringResource(R.string.available_nodes), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.padding(4.dp))
                         HorizontalDivider()
                     }
                 }
-            if (availableNodes.isNotEmpty())
+            }
+            if (availableNodes.isNotEmpty()) {
                 items(
                     availableNodes.size,
-                    key = { i -> "${availableNodes[i].toNodeString()} :${i}" }) { index ->
+                    key = { i -> "${availableNodes[i].toNodeString()} :$i" },
+                ) { index ->
                     val node = availableNodes[index]
                     if (activeNode?.toNodeString() != node.toNodeString()) {
                         NodeListItem(
@@ -484,9 +495,11 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
                                         }
                                     }
                             },
-                            onRemove = { nodeSettingsVM.removeItem(node.toNodeString()) })
+                            onRemove = { nodeSettingsVM.removeItem(node.toNodeString()) },
+                        )
                     }
                 }
+            }
         }
     }
     Toaster(
@@ -495,9 +508,10 @@ fun NodeSettings(onBackPress: () -> Unit = {}) {
         alignment = Alignment.BottomCenter,
         darkTheme = true,
         richColors = true,
-        containerPadding = PaddingValues(
-            bottom = 64.dp,
-        ),
+        containerPadding =
+            PaddingValues(
+                bottom = 64.dp,
+            ),
     )
 }
 
@@ -514,62 +528,68 @@ fun NodeListItem(
     val daemonStatus by nodeSettingsVM.getCurrentDaemonLive().observeAsState(null)
 
     ListItem(
-        modifier = modifier
-            .padding(
-                vertical = 8.dp,
-                horizontal = 8.dp
-            )
-            .border(
-                1.dp,
-                color = MaterialTheme.colorScheme.onBackground.copy(
-                    alpha = .2f
-                ),
-                shape = MaterialTheme.shapes.medium,
-            )
-            .clickable(enabled = !active) {
-                menu = !menu
-            },
+        modifier =
+            modifier
+                .padding(
+                    vertical = 8.dp,
+                    horizontal = 8.dp,
+                ).border(
+                    1.dp,
+                    color =
+                        MaterialTheme.colorScheme.onBackground.copy(
+                            alpha = .2f,
+                        ),
+                    shape = MaterialTheme.shapes.medium,
+                ).clickable(enabled = !active) {
+                    menu = !menu
+                },
         headlineContent = {
             Text(
-                node.toNodeString(), style = MaterialTheme
-                    .typography.bodySmall
+                node.toNodeString(),
+                style =
+                    MaterialTheme
+                        .typography.bodySmall,
             )
         },
         supportingContent = {
-            if (active)
+            if (active) {
                 Text(
                     stringResource(R.string.daemon_height, daemonStatus?.daemonHeight?.toString() ?: ""),
-                    style = MaterialTheme
-                        .typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
+                    style =
+                        MaterialTheme
+                            .typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
+            }
         },
         trailingContent = {
             Row(
                 horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (active) {
                     DaemonStatus(daemonStatus?.connectionStatus)
                 } else {
                     Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(Color.Gray, shape = CircleShape)
+                        modifier =
+                            Modifier
+                                .size(12.dp)
+                                .background(Color.Gray, shape = CircleShape),
                     )
-
                 }
                 DropdownMenu(
                     expanded = menu,
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = .2f
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color =
+                                MaterialTheme.colorScheme.onBackground.copy(
+                                    alpha = .2f,
+                                ),
                         ),
-                    ),
                     containerColor = MaterialTheme.colorScheme.background,
-                    onDismissRequest = { menu = false }
+                    onDismissRequest = { menu = false },
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.connect)) },
@@ -588,7 +608,7 @@ fun NodeListItem(
                     )
                 }
             }
-        }
+        },
     )
 }
 
@@ -596,7 +616,7 @@ fun NodeListItem(
 fun NodeForm(
     onBackPress: () -> Unit = {},
     onConnect: (node: Node) -> Unit = {},
-    nodeSettingsVM: NodeSettingsViewModel
+    nodeSettingsVM: NodeSettingsViewModel,
 ) {
     val connectionError by nodeSettingsVM.connectionError.observeAsState(null)
     var rpcHost by remember { mutableStateOf("") }
@@ -604,19 +624,20 @@ fun NodeForm(
     var rpcPassPhrase by remember { mutableStateOf("") }
     val labelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background),
         verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
-            modifier = Modifier
-                .weight(8f)
-                .verticalScroll(
-                    rememberScrollState()
-                )
-            ,
+            modifier =
+                Modifier
+                    .weight(8f)
+                    .verticalScroll(
+                        rememberScrollState(),
+                    ),
             verticalArrangement = Arrangement.Top,
         ) {
             ListItem(
@@ -624,7 +645,7 @@ fun NodeForm(
                     Text(
                         text = stringResource(R.string.node_label),
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 4.dp)
+                        modifier = Modifier.padding(start = 4.dp),
                     )
                 },
                 supportingContent = {
@@ -634,18 +655,20 @@ fun NodeForm(
                         onValueChange = {
                             rpcHost = it
                         },
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Next,
-                        ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                            ),
                         placeholder = {
                             Text(
                                 text = stringResource(R.string.onion_address_example),
-                                color = labelColor
+                                color = labelColor,
                             )
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusable()
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusable(),
                     )
                 },
             )
@@ -654,7 +677,7 @@ fun NodeForm(
                     Text(
                         text = stringResource(R.string.username),
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 4.dp)
+                        modifier = Modifier.padding(start = 4.dp),
                     )
                 },
                 supportingContent = {
@@ -664,18 +687,18 @@ fun NodeForm(
                         placeholder = {
                             Text(
                                 text = stringResource(R.string.optional),
-                                color = labelColor
+                                color = labelColor,
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Next,
-                        ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                            ),
                         onValueChange = {
                             rpcUsername = it
                         },
-
-                        )
+                    )
                 },
             )
             ListItem(
@@ -683,7 +706,7 @@ fun NodeForm(
                     Text(
                         text = stringResource(R.string.password),
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 4.dp)
+                        modifier = Modifier.padding(start = 4.dp),
                     )
                 },
                 supportingContent = {
@@ -693,53 +716,56 @@ fun NodeForm(
                         onValueChange = {
                             rpcPassPhrase = it
                         },
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Done,
-                        ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = ImeAction.Done,
+                            ),
                         placeholder = {
                             Text(
                                 text = stringResource(R.string.optional),
-                                color = labelColor
+                                color = labelColor,
                             )
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 },
             )
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 connectionError?.let { validationError ->
                     Text(
                         stringResource(validationError.messageRes),
-                        modifier = Modifier.padding(
-                            vertical = 12.dp,
-                            horizontal = 8.dp
-                        ),
+                        modifier =
+                            Modifier.padding(
+                                vertical = 12.dp,
+                                horizontal = 8.dp,
+                            ),
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = DangerColor
-                        )
+                        style =
+                            MaterialTheme.typography.bodySmall.copy(
+                                color = DangerColor,
+                            ),
                     )
                 }
-
             }
         }
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1.5f)
-                .padding(bottom = 8.dp)
-            ,
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1.5f)
+                    .padding(bottom = 8.dp),
+            contentAlignment = Alignment.Center,
         ) {
             AnonOutlineButton(
-                modifier = Modifier
-                    .fillMaxWidth(
-                        .9f
-                    ),
+                modifier =
+                    Modifier
+                        .fillMaxWidth(
+                            .9f,
+                        ),
                 onClick = {
                     val node = nodeSettingsVM.validate(rpcHost, rpcUsername, rpcPassPhrase)
                     if (node != null) {
@@ -753,7 +779,6 @@ fun NodeForm(
         }
     }
 }
-
 
 @Preview(device = "id:pixel_5")
 @Composable

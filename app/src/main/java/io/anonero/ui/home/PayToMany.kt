@@ -20,8 +20,8 @@ package io.anonero.ui.home
 
 import AnonNeroTheme
 import AnonOutlineButton
-import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,8 +45,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,7 +90,9 @@ private const val TAG = "PayToMany"
  * Stable error identifiers so the UI can localize failures. The wallet2 error text is
  * still logged for diagnosis, but it is never shown to the user untranslated.
  */
-enum class PayToManyError(@StringRes val messageRes: Int) {
+enum class PayToManyError(
+    @StringRes val messageRes: Int,
+) {
     VIEW_ONLY(R.string.pay_to_many_view_only),
     WALLET_NOT_OPEN(R.string.wallet_not_open),
     NOT_CONNECTED(R.string.wallet_not_connected_to_node_please_check_network),
@@ -124,26 +126,29 @@ class PayToManyViewModel : ViewModel() {
                     _error.value = PayToManyError.VIEW_ONLY
                     return@withContext null
                 }
-                val wallet = WalletManager.instance?.wallet
-                    ?: run {
-                        _error.value = PayToManyError.WALLET_NOT_OPEN
-                        return@withContext null
-                    }
+                val wallet =
+                    WalletManager.instance?.wallet
+                        ?: run {
+                            _error.value = PayToManyError.WALLET_NOT_OPEN
+                            return@withContext null
+                        }
                 if (wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                     _error.value = PayToManyError.NOT_CONNECTED
                     return@withContext null
                 }
-                val pending = wallet.createTransactionMultDest(
-                    destinations = recipients.map { it.first },
-                    amounts = recipients.map { it.second },
-                )
+                val pending =
+                    wallet.createTransactionMultDest(
+                        destinations = recipients.map { it.first },
+                        amounts = recipients.map { it.second },
+                    )
                 if (!pending.getErrorString().isNullOrEmpty()) {
                     throw Exception(pending.getErrorString())
                 }
-                val unsignedFile = File(
-                    AnonConfig.context?.cacheDir,
-                    AnonConfig.EXPORT_UNSIGNED_TX_FILE
-                )
+                val unsignedFile =
+                    File(
+                        AnonConfig.context?.cacheDir,
+                        AnonConfig.EXPORT_UNSIGNED_TX_FILE,
+                    )
                 if (!pending.commit(unsignedFile.path, true)) {
                     Timber.tag(TAG).e("unsigned export failed: %s", pending.getErrorString())
                     _error.value = PayToManyError.EXPORT_FAILED
@@ -187,20 +192,23 @@ fun PayToManyScreen(
         initialValue = recipients.map { false },
         recipients.toList(),
     ) {
-        value = withContext(Dispatchers.IO) {
-            val wallet = WalletManager.instance?.wallet
-            recipients.map { recipient ->
-                recipient.address.isNotBlank() &&
-                    wallet?.validateAddress(recipient.address) == true
+        value =
+            withContext(Dispatchers.IO) {
+                val wallet = WalletManager.instance?.wallet
+                recipients.map { recipient ->
+                    recipient.address.isNotBlank() &&
+                        wallet?.validateAddress(recipient.address) == true
+                }
             }
-        }
     }
     val amountsValid = parsed.all { it != null && it > 0L }
-    val total: Long? = runCatching {
-        parsed.filterNotNull().fold(0L) { acc, value -> Math.addExact(acc, value) }
-    }.getOrNull()
-    val valid = recipients.isNotEmpty() && addressesValid.all { it } && amountsValid &&
-        total != null && total <= unlockedBalance
+    val total: Long? =
+        runCatching {
+            parsed.filterNotNull().fold(0L) { acc, value -> Math.addExact(acc, value) }
+        }.getOrNull()
+    val valid =
+        recipients.isNotEmpty() && addressesValid.all { it } && amountsValid &&
+            total != null && total <= unlockedBalance
 
     Scaffold(
         modifier = modifier,
@@ -211,26 +219,28 @@ fun PayToManyScreen(
                     IconButton(onClick = onBackPress) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Text(
                     stringResource(R.string.pay_to_many_description),
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (AnonConfig.viewOnly) Text(
-                    stringResource(R.string.pay_to_many_view_only),
-                    color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp)
                 )
+                if (AnonConfig.viewOnly) {
+                    Text(
+                        stringResource(R.string.pay_to_many_view_only),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
             items(recipients.size) { index ->
                 val recipient = recipients[index]
@@ -239,7 +249,7 @@ fun PayToManyScreen(
                         Text(
                             stringResource(R.string.pay_to_many_recipient, index + 1),
                             style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         if (recipients.size > 1) {
                             IconButton(onClick = { recipients.removeAt(index) }) {
@@ -261,7 +271,7 @@ fun PayToManyScreen(
                         },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     )
                     OutlinedTextField(
                         value = recipient.amount,
@@ -277,43 +287,49 @@ fun PayToManyScreen(
                         },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Decimal
-                        )
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Decimal,
+                            ),
                     )
                 }
             }
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(stringResource(R.string.total), style = MaterialTheme.typography.titleMedium)
                     Text(
                         Formats.getExactDisplayAmount(total ?: 0L),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
             item {
                 Text(
                     "${stringResource(R.string.available_balance)} ${
-                        if (hideAmounts) Formats.maskAmount(unlockedBalance)
-                        else Formats.getDisplayAmount(unlockedBalance)
+                        if (hideAmounts) {
+                            Formats.maskAmount(unlockedBalance)
+                        } else {
+                            Formats.getDisplayAmount(unlockedBalance)
+                        }
                     }",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                if (total != null && total > unlockedBalance) Text(
-                    stringResource(R.string.total_exceeds_balance),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+                if (total != null && total > unlockedBalance) {
+                    Text(
+                        stringResource(R.string.total_exceeds_balance),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             if (error != null) {
                 item {
@@ -322,7 +338,7 @@ fun PayToManyScreen(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -330,12 +346,12 @@ fun PayToManyScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
                         onClick = {
                             if (recipients.size < 16) recipients.add(RecipientInput())
-                        }
+                        },
                     ) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
                     }
@@ -348,9 +364,10 @@ fun PayToManyScreen(
                             if (parsedAmounts.size != recipients.size) {
                                 return@AnonOutlineButton
                             }
-                            val destinations = recipients.mapIndexed { i, r ->
-                                r.address to parsedAmounts[i]
-                            }
+                            val destinations =
+                                recipients.mapIndexed { i, r ->
+                                    r.address to parsedAmounts[i]
+                                }
                             submitted = true
                             scope.launch {
                                 val pending = viewModel.prepare(destinations)
@@ -360,12 +377,12 @@ fun PayToManyScreen(
                                         ReviewTransactionRoute(
                                             toAddress = "",
                                             addresses = destinations.map { it.first },
-                                            amounts = destinations.map { it.second }
-                                        )
+                                            amounts = destinations.map { it.second },
+                                        ),
                                     )
                                 }
                             }
-                        }
+                        },
                     ) {
                         if (preparing) {
                             CircularProgressIndicator(modifier = Modifier.width(24.dp))

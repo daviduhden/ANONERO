@@ -58,20 +58,19 @@ import io.anonero.ui.theme.ThemeMode
 import io.anonero.ui.theme.ThemeStore
 import io.anonero.util.LocaleController
 import io.anonero.util.StealthMode
-import io.anonero.util.WalletProfileStore
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WALLET_USE_TOR
+import io.anonero.util.WalletProfileStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.qualifier.named
 import timber.log.Timber
-
 
 private const val TAG = "MainActivity"
 
@@ -91,7 +90,6 @@ private const val TAG = "MainActivity"
  * survives configuration changes without closing the wallet.
  */
 class MainActivity : ComponentActivity() {
-
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
     private val walletState: WalletState by inject()
     private val torService: TorService by inject()
@@ -111,46 +109,61 @@ class MainActivity : ComponentActivity() {
         ThemeStore.load(anonPrefs)
         StealthMode.load(anonPrefs)
         if (StealthMode.isEnabled(anonPrefs)) walletState.setHideAmounts(true)
-        //a permission prompt does not count as leaving the app
-        ActivityCompat.setPermissionCompatDelegate(object : ActivityCompat.PermissionCompatDelegate {
-            override fun requestPermissions(activity: Activity, permissions: Array<String>, requestCode: Int): Boolean {
-                permissionPrompt = true
-                return false
-            }
+        // a permission prompt does not count as leaving the app
+        ActivityCompat.setPermissionCompatDelegate(
+            object : ActivityCompat.PermissionCompatDelegate {
+                override fun requestPermissions(
+                    activity: Activity,
+                    permissions: Array<String>,
+                    requestCode: Int,
+                ): Boolean {
+                    permissionPrompt = true
+                    return false
+                }
 
-            // The compat delegate has no Activity Result API equivalent.
-            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-            override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) = false
-        })
+                // The compat delegate has no Activity Result API equivalent.
+                @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+                override fun onActivityResult(
+                    activity: Activity,
+                    requestCode: Int,
+                    resultCode: Int,
+                    data: Intent?,
+                ) = false
+            },
+        )
         // Everything this window ever shows -- seed, balance, addresses, the signing
         // review -- otherwise lands in the recents thumbnail, which the system writes
         // to disk, and is capturable by any screen-capture-privileged app. One flag
         // closes all of it.
         window.setFlags(
             android.view.WindowManager.LayoutParams.FLAG_SECURE,
-            android.view.WindowManager.LayoutParams.FLAG_SECURE
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
         )
 
         val scrimColor = Color.Black.copy(alpha = 0.1f).toArgb()
-        val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-            Configuration.UI_MODE_NIGHT_YES
-        val lightBars = when (ThemeStore.mode.value) {
-            ThemeMode.LIGHT -> true
-            ThemeMode.SYSTEM -> !systemDark
-            ThemeMode.DARK -> false
-        }
+        val systemDark =
+            (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        val lightBars =
+            when (ThemeStore.mode.value) {
+                ThemeMode.LIGHT -> true
+                ThemeMode.SYSTEM -> !systemDark
+                ThemeMode.DARK -> false
+            }
         splashscreen.setKeepOnScreenCondition { isAppReady }
         enableEdgeToEdge(
-            statusBarStyle = if (lightBars) {
-                SystemBarStyle.light(android.graphics.Color.TRANSPARENT, scrimColor)
-            } else {
-                SystemBarStyle.dark(scrimColor)
-            },
-            navigationBarStyle = if (lightBars) {
-                SystemBarStyle.light(android.graphics.Color.TRANSPARENT, scrimColor)
-            } else {
-                SystemBarStyle.dark(scrimColor)
-            },
+            statusBarStyle =
+                if (lightBars) {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, scrimColor)
+                } else {
+                    SystemBarStyle.dark(scrimColor)
+                },
+            navigationBarStyle =
+                if (lightBars) {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, scrimColor)
+                } else {
+                    SystemBarStyle.dark(scrimColor)
+                },
         )
         setContent {
             val context = LocalContext.current
@@ -173,32 +186,42 @@ class MainActivity : ComponentActivity() {
                 AnonNeroTheme(mode = themeMode) {
                     val navController = rememberNavController()
                     DisposableEffect(navController) {
-                        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
-                            Timber.tag(TAG).d("destination changed to ${destination.route}")
-                        }
+                        val listener =
+                            NavController.OnDestinationChangedListener { _, destination, _ ->
+                                Timber.tag(TAG).d("destination changed to ${destination.route}")
+                            }
                         navController.addOnDestinationChangedListener(listener)
                         onDispose {
                             navController.removeOnDestinationChangedListener(listener)
                         }
                     }
                     val showLockScreen by walletState.backgroundSyncFlow.asLiveData().observeAsState(walletState.backgroundSync)
-                    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                    Box(
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .fillMaxSize(),
+                    ) {
                         NavHost(
-                            navController = navController, popExitTransition = {
-                            ExitTransition.None
-                        }, popEnterTransition = {
-                            EnterTransition.None
-                        }, startDestination = if (walletExist) Home else LandingScreenRoute
+                            navController = navController,
+                            popExitTransition = {
+                                ExitTransition.None
+                            },
+                            popEnterTransition = {
+                                EnterTransition.None
+                            },
+                            startDestination = if (walletExist) Home else LandingScreenRoute,
                         ) {
-                            //landing screen and onboarding screens
+                            // landing screen and onboarding screens
                             onboardingGraph(navController, onboardViewModel)
-                            //home bottom navigation
+                            // home bottom navigation
                             homeGraph(navController)
                         }
                         if (showLockScreen) {
                             LockScreen(
                                 mode = LockScreenMode.LOCK_SCREEN,
-                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                modifier =
+                                    androidx.compose.ui.Modifier
+                                        .fillMaxSize(),
                                 onUnLocked = { pin, shortCut ->
                                     // The lock screen stays up until wallet2 has actually left
                                     // background sync; hiding it first showed a wallet that
@@ -212,39 +235,41 @@ class MainActivity : ComponentActivity() {
                                         val exited = walletState.exitBackgroundSync(pin)
                                         withContext(Dispatchers.Main) {
                                             if (!exited) {
-                                                android.widget.Toast.makeText(
-                                                    this@MainActivity,
-                                                    getString(R.string.could_not_unlock_wallet),
-                                                    android.widget.Toast.LENGTH_LONG,
-                                                ).show()
+                                                android.widget.Toast
+                                                    .makeText(
+                                                        this@MainActivity,
+                                                        getString(R.string.could_not_unlock_wallet),
+                                                        android.widget.Toast.LENGTH_LONG,
+                                                    ).show()
                                             }
                                         }
                                     }
-                                }
+                                },
                             )
                         }
                     }
                 }
             }
         }
-
     }
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Intent(applicationContext, AnonNeroService::class.java).also {
-                it.action = "start"
-                ContextCompat.startForegroundService(applicationContext, it)
+    private val requestPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { isGranted ->
+            if (isGranted) {
+                Intent(applicationContext, AnonNeroService::class.java).also {
+                    it.action = "start"
+                    ContextCompat.startForegroundService(applicationContext, it)
+                }
             }
+            // handle and show dialog
         }
-        //handle and show dialog
-    }
 
     fun startNotificationService() {
         if (ContextCompat.checkSelfPermission(
-                this, Manifest.permission.POST_NOTIFICATIONS
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -259,7 +284,7 @@ class MainActivity : ComponentActivity() {
         stopService(Intent(applicationContext, AnonNeroService::class.java))
     }
 
-    //set while a permission prompt opened by the app is on screen
+    // set while a permission prompt opened by the app is on screen
     private var permissionPrompt = false
 
     override fun onUserLeaveHint() {
@@ -284,7 +309,11 @@ class MainActivity : ComponentActivity() {
 
     // Global permission-result hook used only to clear the prompt flag.
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         permissionPrompt = false
     }
@@ -292,7 +321,11 @@ class MainActivity : ComponentActivity() {
     // Intercepts every external activity start so a system screen is not treated as
     // leaving the app. The Activity Result API cannot provide a global override.
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+    override fun startActivityForResult(
+        intent: Intent,
+        requestCode: Int,
+        options: Bundle?,
+    ) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
         super.startActivityForResult(intent, requestCode, options)
     }
@@ -308,24 +341,25 @@ class MainActivity : ComponentActivity() {
         // off the main thread with a bounded wait; cancellation of the UI scope must not
         // cancel this job before it finishes.
         val closeScope = CoroutineScope(Dispatchers.IO)
-        closeScope.launch {
-            withTimeoutOrNull(5_000) {
-                WalletManager.instance?.wallet?.let {
-                    it.store()
-                    it.close()
+        closeScope
+            .launch {
+                withTimeoutOrNull(5_000) {
+                    WalletManager.instance?.wallet?.let {
+                        it.store()
+                        it.close()
+                    }
                 }
+            }.invokeOnCompletion { failure ->
+                if (failure != null) {
+                    Timber.tag(TAG).e(failure)
+                }
+                torService.dispose()
+                scope.cancel()
+                // the service is START_STICKY: left started, Android reads the kill below as a crash
+                // and restarts the app headless a second later, notification and Tor included
+                stopNotificationService()
+                Process.killProcess(Process.myPid())
             }
-        }.invokeOnCompletion { failure ->
-            if (failure != null) {
-                Timber.tag(TAG).e(failure)
-            }
-            torService.dispose()
-            scope.cancel()
-            // the service is START_STICKY: left started, Android reads the kill below as a crash
-            // and restarts the app headless a second later, notification and Tor included
-            stopNotificationService()
-            Process.killProcess(Process.myPid())
-        }
         super.onDestroy()
     }
 }

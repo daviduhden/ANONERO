@@ -75,12 +75,23 @@ import io.anonero.util.shake
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-
 const val BackSpaceKey = -2
 const val ConfirmKey = -3
-val keys = listOf(
-    1, 2, 3, 4, 5, 6, 7, 8, 9, BackSpaceKey, 0, ConfirmKey
-)
+val keys =
+    listOf(
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        BackSpaceKey,
+        0,
+        ConfirmKey,
+    )
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -99,37 +110,39 @@ fun PinSetup(
     var confirming by remember { mutableStateOf(false) }
     var pinNotMatch by remember { mutableStateOf(false) }
     val errorColor: Color by animateColorAsState(
-        if (pinNotMatch) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground, label = "error_anim"
+        if (pinNotMatch) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground,
+        label = "error_anim",
     )
     val errorShake = rememberShakeController()
     val context = rememberCoroutineScope()
 
     Scaffold { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .weight(.2f),
-                horizontalArrangement = Arrangement.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .weight(.2f),
+                horizontalArrangement = Arrangement.Center,
             ) {
-
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Image(
                         painter = painterResource(R.drawable.ic_anon),
                         contentDescription = stringResource(R.string.app_logo),
-                        modifier = Modifier
-                            .size(200.dp)
+                        modifier =
+                            Modifier
+                                .size(200.dp),
                     )
                     Spacer(modifier = Modifier.height(32.dp))
                 }
@@ -137,12 +150,23 @@ fun PinSetup(
             }
 
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(modifier = Modifier.padding(top = 24.dp))
-                Text(if (confirming) stringResource(R.string.confirm_pin) else enterLabel ?: if (changePin) stringResource(R.string.enter_new_pin) else stringResource(
-                    R.string.enter_pin
-                ))
+                Text(
+                    if (confirming) {
+                        stringResource(R.string.confirm_pin)
+                    } else {
+                        enterLabel
+                            ?: if (changePin) {
+                                stringResource(R.string.enter_new_pin)
+                            } else {
+                                stringResource(
+                                    R.string.enter_pin,
+                                )
+                            }
+                    },
+                )
                 Spacer(modifier = Modifier.padding(top = 12.dp))
                 Row(
                     Modifier
@@ -153,33 +177,33 @@ fun PinSetup(
                 ) {
                     currentPin.map {
                         Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .animateContentSize()
-                                .clip(RoundedCornerShape(50))
-                                .background(errorColor)
-                                .padding(horizontal = 24.dp)
+                            modifier =
+                                Modifier
+                                    .size(18.dp)
+                                    .animateContentSize()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(errorColor)
+                                    .padding(horizontal = 24.dp),
                         ) { }
                     }
                 }
-
             }
             Box(
-                modifier = Modifier
-                    .weight(.9f)
-                    .wrapContentHeight()
+                modifier =
+                    Modifier
+                        .weight(.9f)
+                        .wrapContentHeight(),
             ) {
-
                 LazyVerticalGrid(
-                    modifier = Modifier
-                        .padding(top = 34.dp)
-                        .padding(horizontal = 24.dp),
+                    modifier =
+                        Modifier
+                            .padding(top = 34.dp)
+                            .padding(horizontal = 24.dp),
                     columns = GridCells.Fixed(3),
                     verticalArrangement = Arrangement.Top,
                     horizontalArrangement = Arrangement.Center,
-                    contentPadding = PaddingValues(8.dp)
+                    contentPadding = PaddingValues(8.dp),
                 ) {
-
                     items(keys.size) { index ->
                         val key = keys[index]
                         if (currentPin.size == 0 && key == BackSpaceKey) {
@@ -189,77 +213,79 @@ fun PinSetup(
                             return@items
                         }
                         Column(
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(shape = CircleShape)
-                                .align(Alignment.Center)
-                                .combinedClickable(
-                                    onClick = {
-                                        if (key == BackSpaceKey && currentPin.isNotEmpty()) {
-                                            currentPin.removeAt(currentPin.size - 1)
-                                        } else if (key == ConfirmKey) {
-                                            if (confirming) {
-                                                if (currentPin.joinToString() == pinEntered.joinToString()) {
-                                                    onNext.invoke(currentPin.joinToString(separator = ""))
-                                                } else {
-                                                    errorShake.shake(
-                                                        ShakeConfig(
-                                                            6, translateX = 5f
+                            modifier =
+                                Modifier
+                                    .size(120.dp)
+                                    .clip(shape = CircleShape)
+                                    .align(Alignment.Center)
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (key == BackSpaceKey && currentPin.isNotEmpty()) {
+                                                currentPin.removeAt(currentPin.size - 1)
+                                            } else if (key == ConfirmKey) {
+                                                if (confirming) {
+                                                    if (currentPin.joinToString() == pinEntered.joinToString()) {
+                                                        onNext.invoke(currentPin.joinToString(separator = ""))
+                                                    } else {
+                                                        errorShake.shake(
+                                                            ShakeConfig(
+                                                                6,
+                                                                translateX = 5f,
+                                                            ),
                                                         )
-                                                    )
-                                                    context.launch {
-                                                        pinNotMatch = true
-                                                        repeat(6) {
-                                                            delay(50)
-                                                            view.performHapticFeedback(
-                                                                HapticFeedbackConstants.CONTEXT_CLICK
-                                                            )
+                                                        context.launch {
+                                                            pinNotMatch = true
+                                                            repeat(6) {
+                                                                delay(50)
+                                                                view.performHapticFeedback(
+                                                                    HapticFeedbackConstants.CONTEXT_CLICK,
+                                                                )
+                                                            }
+                                                            delay(100)
+                                                            pinNotMatch = false
                                                         }
-                                                        delay(100)
-                                                        pinNotMatch = false
                                                     }
+                                                } else {
+                                                    pinEntered.clear()
+                                                    pinEntered.addAll(currentPin)
+                                                    currentPin.clear()
+                                                    confirming = true
                                                 }
                                             } else {
-                                                pinEntered.clear()
-                                                pinEntered.addAll(currentPin)
-                                                currentPin.clear()
-                                                confirming = true
+                                                if (currentPin.size < 12) {
+                                                    currentPin.add(key)
+                                                }
                                             }
-                                        } else {
-                                            if (currentPin.size < 12) {
-                                                currentPin.add(key)
-                                            }
-                                        }
-                                        //update state
+                                            // update state
 
-                                        view.performHapticFeedback(
-                                            HapticFeedbackConstants.KEYBOARD_TAP
-                                        )
-                                    },
-                                    onLongClick = {
-                                        if (key == BackSpaceKey) {
-                                            currentPin.clear()
                                             view.performHapticFeedback(
-                                                HapticFeedbackConstants.LONG_PRESS
+                                                HapticFeedbackConstants.KEYBOARD_TAP,
                                             )
-                                        }
-
-                                    },
-                                ),
+                                        },
+                                        onLongClick = {
+                                            if (key == BackSpaceKey) {
+                                                currentPin.clear()
+                                                view.performHapticFeedback(
+                                                    HapticFeedbackConstants.LONG_PRESS,
+                                                )
+                                            }
+                                        },
+                                    ),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            verticalArrangement = Arrangement.Center,
                         ) {
                             if (key == -2 || key == -3) {
-
                                 return@items Icon(
                                     imageVector =
                                         if (key == -2) AnonIcons.Backspace else Icons.TwoTone.Check,
                                     tint = MaterialTheme.colorScheme.onBackground,
-                                    contentDescription = stringResource(
-                                        if (key == BackSpaceKey) R.string.clear else R.string.confirm
-                                    ),
-                                    modifier = Modifier
-                                        .size(28.dp)
+                                    contentDescription =
+                                        stringResource(
+                                            if (key == BackSpaceKey) R.string.clear else R.string.confirm,
+                                        ),
+                                    modifier =
+                                        Modifier
+                                            .size(28.dp),
                                 )
                             }
                             Text(
@@ -269,10 +295,8 @@ fun PinSetup(
                                 textAlign = TextAlign.Center,
                             )
                         }
-
                     }
                 }
-
             }
         }
     }
@@ -282,7 +306,6 @@ fun PinSetup(
 @Composable
 private fun SetupNodeComposablePreview() {
     AnonNeroTheme {
-        PinSetup(
-        )
+        PinSetup()
     }
 }

@@ -32,40 +32,40 @@ import io.anonero.model.Wallet
 import io.anonero.ui.theme.DangerColor
 import io.anonero.ui.theme.DarkOrange
 
-
 @Composable
-fun DaemonStatus(connectionStatus: Wallet.ConnectionStatus?, modifier: Modifier = Modifier) {
+fun DaemonStatus(
+    connectionStatus: Wallet.ConnectionStatus?,
+    modifier: Modifier = Modifier,
+) {
+    val color: Color =
+        when (connectionStatus) {
+            null -> {
+                DarkOrange
+            }
 
+            Wallet.ConnectionStatus.ConnectionStatus_Disconnected -> {
+                Color.Red
+            }
 
-    val color: Color = when (connectionStatus) {
-        null -> {
-            DarkOrange
+            Wallet.ConnectionStatus.ConnectionStatus_Connected -> {
+                Color.Green
+            }
+
+            Wallet.ConnectionStatus.ConnectionStatus_WrongVersion -> {
+                DangerColor
+            }
         }
-
-        Wallet.ConnectionStatus.ConnectionStatus_Disconnected -> {
-            Color.Red
-        }
-
-        Wallet.ConnectionStatus.ConnectionStatus_Connected -> {
-            Color.Green
-        }
-
-        Wallet.ConnectionStatus.ConnectionStatus_WrongVersion -> {
-            DangerColor
-        }
-
-    }
-
 
     val animatedColor by animateColorAsState(
         color,
-        label = "color"
+        label = "color",
     )
     Box(modifier = modifier) {
         Box(
-            modifier = Modifier
-                .size(12.dp)
-                .background(animatedColor, shape = CircleShape)
+            modifier =
+                Modifier
+                    .size(12.dp)
+                    .background(animatedColor, shape = CircleShape),
         )
     }
 }

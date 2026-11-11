@@ -22,7 +22,6 @@ import io.anonero.AnonConfig
 import kotlinx.serialization.Serializable
 import org.json.JSONObject
 
-
 /**
  * View-only key material used by the NERO flavor and by backups.
  *
@@ -35,19 +34,16 @@ class NeroKeyPayload(
     val primaryAddress: String,
     val privateViewKey: String,
     val restoreHeight: Long,
-    val version: Int
+    val version: Int,
 ) {
-
-    fun toJSONObject(): JSONObject {
-        return JSONObject()
+    fun toJSONObject(): JSONObject =
+        JSONObject()
             .apply {
                 put("primaryAddress", primaryAddress)
                 put("privateViewKey", privateViewKey)
                 put("restoreHeight", restoreHeight)
                 put("version", version)
             }
-    }
-
 
     companion object {
         fun fromWallet(wallet: Wallet): NeroKeyPayload {
@@ -59,9 +55,8 @@ class NeroKeyPayload(
                 primaryAddress,
                 privateViewKey,
                 restoreHeight,
-                version
+                version,
             )
         }
     }
-
 }

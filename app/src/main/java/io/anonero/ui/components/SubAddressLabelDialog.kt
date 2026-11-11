@@ -58,16 +58,18 @@ import io.anonero.util.shake
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-
 @Composable
-fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () -> Unit = {}) {
-
+fun SubAddressLabelDialog(
+    label: String,
+    onSave: (String) -> Unit,
+    onCancel: () -> Unit = {},
+) {
     var labelString by remember {
         mutableStateOf(
             TextFieldValue(
                 text = label,
-                selection = TextRange(label.length)
-            )
+                selection = TextRange(label.length),
+            ),
         )
     }
     val focusRequester = remember { FocusRequester() }
@@ -80,13 +82,14 @@ fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () 
             scope.launch {
                 errorShake.shake(
                     ShakeConfig(
-                        6, translateX = 5f
-                    )
+                        6,
+                        translateX = 5f,
+                    ),
                 )
                 repeat(6) {
                     delay(50)
                     view.performHapticFeedback(
-                        HapticFeedbackConstants.CONTEXT_CLICK
+                        HapticFeedbackConstants.CONTEXT_CLICK,
                     )
                 }
                 delay(100)
@@ -101,35 +104,40 @@ fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () 
     }
 
     AlertDialog(
-        modifier = Modifier
-            .shake(errorShake)
-            .border(
-                1.dp,
-                color = MaterialTheme.colorScheme.onBackground.copy(
-                    alpha = .2f
+        modifier =
+            Modifier
+                .shake(errorShake)
+                .border(
+                    1.dp,
+                    color =
+                        MaterialTheme.colorScheme.onBackground.copy(
+                            alpha = .2f,
+                        ),
+                    shape = MaterialTheme.shapes.medium,
                 ),
-                shape = MaterialTheme.shapes.medium,
-            ),
         containerColor = MaterialTheme.colorScheme.secondary,
-        properties = DialogProperties(
-            dismissOnBackPress = true
-        ),
+        properties =
+            DialogProperties(
+                dismissOnBackPress = true,
+            ),
         title = {
             Text(
                 text = stringResource(R.string.set_subaddress_label),
-                style = MaterialTheme.typography.titleSmall.copy(
-                    fontSize = 16.sp
-                )
+                style =
+                    MaterialTheme.typography.titleSmall.copy(
+                        fontSize = 16.sp,
+                    ),
             )
         },
         text = {
             OutlinedTextField(
                 value = labelString,
                 shape = MaterialTheme.shapes.small,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                ),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    ),
                 isError = labelString.text.isEmpty(),
                 supportingText = {
                     if (labelString.text.isEmpty()) {
@@ -137,20 +145,23 @@ fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () 
                     }
                 },
                 minLines = 1,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
-                    .padding(
-                        top = 8.dp
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .padding(
+                            top = 8.dp,
+                        ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        imeAction = ImeAction.Done,
                     ),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        saveLabel()
-                    }
-                ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            saveLabel()
+                        },
+                    ),
                 onValueChange = {
                     if (it.text.length <= 24) { // Limit to 10 characters
                         labelString = it
@@ -164,13 +175,14 @@ fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () 
         confirmButton = {
             Button(
                 shape = MaterialTheme.shapes.small,
-                border = BorderStroke(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground
-                ),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.onBackground,
-
+                border =
+                    BorderStroke(
+                        1.dp,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.onBackground,
                     ),
                 onClick = {
                     if (labelString.text.isEmpty()) {
@@ -178,7 +190,8 @@ fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () 
                     } else {
                         onSave(labelString.text)
                     }
-                }) { Text(stringResource(R.string.update)) }
+                },
+            ) { Text(stringResource(R.string.update)) }
         },
         dismissButton = {
             Button(
@@ -186,24 +199,27 @@ fun SubAddressLabelDialog(label: String, onSave: (String) -> Unit, onCancel: () 
                     onCancel()
                 },
                 shape = MaterialTheme.shapes.small,
-                border = BorderStroke(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onSecondary
-                ),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                )
+                border =
+                    BorderStroke(
+                        1.dp,
+                        color = MaterialTheme.colorScheme.onSecondary,
+                    ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
             ) {
                 Text(
                     stringResource(R.string.dismiss),
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = 0.8f
-                        )
-                    )
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            color =
+                                MaterialTheme.colorScheme.onBackground.copy(
+                                    alpha = 0.8f,
+                                ),
+                        ),
                 )
             }
-        }
+        },
     )
-
 }

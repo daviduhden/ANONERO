@@ -36,33 +36,36 @@ private const val FINDER_SQUARE_DOT_SIZE = 7
 internal fun DrawScope.drawFinderSquares(
     cellSize: Float,
     colors: QrCodeColors = QrCodeColors(Color.White, Color.Black),
-    dotShape: DotShape = DotShape.Square
+    dotShape: DotShape = DotShape.Square,
 ) {
     drawFinderSquare(cellSize, Offset(0f, 0f), colors, dotShape)
     drawFinderSquare(
         cellSize,
         Offset(size.width - FINDER_SQUARE_DOT_SIZE * cellSize, 0f),
         colors,
-        dotShape
+        dotShape,
     )
     drawFinderSquare(
         cellSize,
         Offset(0f, size.width - FINDER_SQUARE_DOT_SIZE * cellSize),
         colors,
-        dotShape
+        dotShape,
     )
 }
 
-internal fun isFinderCell(x: Int, y: Int, gridSize: Int) =
-    (x < FINDER_SQUARE_DOT_SIZE && y < FINDER_SQUARE_DOT_SIZE) ||
-            (x < FINDER_SQUARE_DOT_SIZE && y > gridSize - 1 - FINDER_SQUARE_DOT_SIZE) ||
-            (x > gridSize - 1 - FINDER_SQUARE_DOT_SIZE && y < FINDER_SQUARE_DOT_SIZE)
+internal fun isFinderCell(
+    x: Int,
+    y: Int,
+    gridSize: Int,
+) = (x < FINDER_SQUARE_DOT_SIZE && y < FINDER_SQUARE_DOT_SIZE) ||
+    (x < FINDER_SQUARE_DOT_SIZE && y > gridSize - 1 - FINDER_SQUARE_DOT_SIZE) ||
+    (x > gridSize - 1 - FINDER_SQUARE_DOT_SIZE && y < FINDER_SQUARE_DOT_SIZE)
 
 private fun DrawScope.drawFinderSquare(
     cellSize: Float,
     topLeft: Offset,
     colors: QrCodeColors = QrCodeColors(Color.White, Color.Black),
-    dotShape: DotShape = DotShape.Square
+    dotShape: DotShape = DotShape.Square,
 ) {
     when (dotShape) {
         DotShape.Square -> {
@@ -74,10 +77,11 @@ private fun DrawScope.drawFinderSquare(
             drawRect(
                 color = colors.background,
                 topLeft = topLeft + Offset(cellSize, cellSize),
-                size = Size(
-                    cellSize * (FINDER_SQUARE_DOT_SIZE - 2),
-                    cellSize * (FINDER_SQUARE_DOT_SIZE - 2)
-                ),
+                size =
+                    Size(
+                        cellSize * (FINDER_SQUARE_DOT_SIZE - 2),
+                        cellSize * (FINDER_SQUARE_DOT_SIZE - 2),
+                    ),
             )
         }
 
@@ -86,26 +90,28 @@ private fun DrawScope.drawFinderSquare(
                 color = colors.foreground,
                 topLeft = topLeft,
                 size = Size(cellSize * FINDER_SQUARE_DOT_SIZE, cellSize * FINDER_SQUARE_DOT_SIZE),
-                cornerRadius = CornerRadius(cellSize * 2)
+                cornerRadius = CornerRadius(cellSize * 2),
             )
             drawRoundRect(
                 color = colors.background,
                 topLeft = topLeft + Offset(cellSize, cellSize),
-                size = Size(
-                    cellSize * (FINDER_SQUARE_DOT_SIZE - 2),
-                    cellSize * (FINDER_SQUARE_DOT_SIZE - 2)
-                ),
-                cornerRadius = CornerRadius(cellSize)
+                size =
+                    Size(
+                        cellSize * (FINDER_SQUARE_DOT_SIZE - 2),
+                        cellSize * (FINDER_SQUARE_DOT_SIZE - 2),
+                    ),
+                cornerRadius = CornerRadius(cellSize),
             )
         }
     }
     drawRect(
         color = colors.foreground,
         topLeft = topLeft + Offset(cellSize * 2, cellSize * 2),
-        size = Size(
-            cellSize * (FINDER_SQUARE_DOT_SIZE - 4),
-            cellSize * (FINDER_SQUARE_DOT_SIZE - 4)
-        ),
+        size =
+            Size(
+                cellSize * (FINDER_SQUARE_DOT_SIZE - 4),
+                cellSize * (FINDER_SQUARE_DOT_SIZE - 4),
+            ),
     )
 }
 
@@ -113,9 +119,10 @@ private fun DrawScope.drawFinderSquare(
 @Composable
 fun FinderSquaresPreview() {
     Canvas(
-        modifier = Modifier
-            .size(300.dp)
-            .background(Color.White)
+        modifier =
+            Modifier
+                .size(300.dp)
+                .background(Color.White),
     ) {
         drawFinderSquares(cellSize = 10f)
     }
@@ -125,9 +132,10 @@ fun FinderSquaresPreview() {
 @Composable
 fun FinderSquaresRoundedPreview() {
     Canvas(
-        modifier = Modifier
-            .size(300.dp)
-            .background(Color.White)
+        modifier =
+            Modifier
+                .size(300.dp)
+                .background(Color.White),
     ) {
         drawFinderSquares(cellSize = 10f, dotShape = DotShape.Circle)
     }

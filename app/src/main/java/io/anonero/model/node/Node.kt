@@ -31,19 +31,19 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.UnknownHostException
 
-
-enum class NodeFields(val value: String) {
+enum class NodeFields(
+    val value: String,
+) {
     RPC_HOST("host"),
     RPC_PORT("rpcPort"),
     RPC_USERNAME("username"),
     RPC_PASSWORD("passphrase"),
     RPC_NETWORK("network"),
     NODE_TRUSTED("trusted"),
-    NODE_NAME("name");
+    NODE_NAME("name"),
+    ;
 
-    override fun toString(): String {
-        return value
-    }
+    override fun toString(): String = value
 }
 
 /**
@@ -86,11 +86,12 @@ open class Node {
                     a[0].split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
                 require(userPassword.size == 2) { "User:Password invalid" }
                 this.username = userPassword[0]
-                this.password = if (this.username.isNotEmpty()) {
-                    userPassword[1]
-                } else {
-                    ""
-                }
+                this.password =
+                    if (this.username.isNotEmpty()) {
+                        userPassword[1]
+                    } else {
+                        ""
+                    }
                 daemonAddress = a[1]
             }
 
@@ -108,17 +109,17 @@ open class Node {
         require(!(da.size > 2 || da.isEmpty())) { "Too many ':' or too few" }
         val host = da[0]
 
-
-        this.networkType = if (daParts.size == 1) {
-            NetworkType.NetworkType_Mainnet
-        } else {
-            when (daParts[1]) {
-                MAINNET -> NetworkType.NetworkType_Mainnet
-                STAGENET -> NetworkType.NetworkType_Stagenet
-                TESTNET -> NetworkType.NetworkType_Testnet
-                else -> AnonConfig.getNetworkType()
+        this.networkType =
+            if (daParts.size == 1) {
+                NetworkType.NetworkType_Mainnet
+            } else {
+                when (daParts[1]) {
+                    MAINNET -> NetworkType.NetworkType_Mainnet
+                    STAGENET -> NetworkType.NetworkType_Stagenet
+                    TESTNET -> NetworkType.NetworkType_Testnet
+                    else -> AnonConfig.getNetworkType()
+                }
             }
-        }
 
 //        require(networkType == WalletManager.instance?.networkType) { "wrong net: $networkType" }
         var name: String? = host
@@ -130,15 +131,16 @@ open class Node {
             }
         }
         this.name = name
-        val port: Int = if (da.size == 2) {
-            try {
-                da[1].toInt()
-            } catch (ex: NumberFormatException) {
-                throw IllegalArgumentException("Port not numeric")
+        val port: Int =
+            if (da.size == 2) {
+                try {
+                    da[1].toInt()
+                } catch (ex: NumberFormatException) {
+                    throw IllegalArgumentException("Port not numeric")
+                }
+            } else {
+                defaultRpcPort
             }
-        } else {
-            defaultRpcPort
-        }
         try {
             this.host = host
         } catch (ex: UnknownHostException) {
@@ -159,25 +161,31 @@ open class Node {
         if (jsonObject.has(NodeFields.RPC_HOST.value)) {
             this.host = jsonObject.getString(NodeFields.RPC_HOST.value)
         }
-        this.rpcPort = if (jsonObject.has(NodeFields.RPC_PORT.value)) {
-            jsonObject.getInt(NodeFields.RPC_PORT.value)
-        } else {
-            defaultRpcPort
-        }
+        this.rpcPort =
+            if (jsonObject.has(NodeFields.RPC_PORT.value)) {
+                jsonObject.getInt(NodeFields.RPC_PORT.value)
+            } else {
+                defaultRpcPort
+            }
         if (jsonObject.has(NodeFields.NODE_NAME.value)) {
             this.name = jsonObject.getString(NodeFields.NODE_NAME.value)
         }
         if (jsonObject.has(NodeFields.RPC_NETWORK.value)) {
-            networkType = when (jsonObject.getString(NodeFields.RPC_NETWORK.value)) {
-                MAINNET -> NetworkType.NetworkType_Mainnet
-                STAGENET -> NetworkType.NetworkType_Stagenet
-                TESTNET -> NetworkType.NetworkType_Testnet
-                else -> throw IllegalArgumentException(
-                    "invalid net: " + jsonObject.getString(
-                        NodeFields.RPC_NETWORK.value
+            networkType =
+                when (jsonObject.getString(NodeFields.RPC_NETWORK.value)) {
+                    MAINNET -> NetworkType.NetworkType_Mainnet
+
+                    STAGENET -> NetworkType.NetworkType_Stagenet
+
+                    TESTNET -> NetworkType.NetworkType_Testnet
+
+                    else -> throw IllegalArgumentException(
+                        "invalid net: " +
+                            jsonObject.getString(
+                                NodeFields.RPC_NETWORK.value,
+                            ),
                     )
-                )
-            }
+                }
             require(networkType == WalletManager.instance?.networkType) { "wrong net: $networkType" }
         }
         if (jsonObject.has(NodeFields.NODE_TRUSTED.value)) {
@@ -203,20 +211,18 @@ open class Node {
         overwriteWith(anotherNode)
     }
 
-    override fun hashCode(): Int {
-        return host.hashCode()
-    }
+    override fun hashCode(): Int = host.hashCode()
 
     // Nodes are equal if they are the same host address:port & are on the same network
     override fun equals(other: Any?): Boolean {
         if (other !is Node) return false
-        return trusted == other.trusted && host == other.host && address == other.address && rpcPort == other.rpcPort && networkType == other.networkType && username == other.username && password == other.password
+        return trusted == other.trusted && host == other.host && address == other.address && rpcPort == other.rpcPort &&
+            networkType == other.networkType &&
+            username == other.username &&
+            password == other.password
     }
 
-
-    fun toNodeString(): String {
-        return "http://${host}:${rpcPort}"
-    }
+    fun toNodeString(): String = "http://$host:$rpcPort"
 
     fun toJson(): JSONObject {
         val jsonObject = JSONObject()
@@ -242,7 +248,11 @@ open class Node {
     override fun toString(): String {
         val sb = StringBuilder()
         if (username.isNotEmpty() && password.isNotEmpty()) {
-            sb.append(username).append(":").append(password).append("@")
+            sb
+                .append(username)
+                .append(":")
+                .append(password)
+                .append("@")
         }
         sb.append(host).append(":").append(rpcPort)
         sb.append("/")
@@ -252,10 +262,12 @@ open class Node {
             NetworkType.NetworkType_Testnet -> sb.append(TESTNET)
             null -> TODO()
         }
-        if (name != null) try {
-            sb.append("/").append(URLEncoder.encode(name, "UTF-8"))
-        } catch (ex: UnsupportedEncodingException) {
-            Timber.tag("Node.kt").w(ex) // if we can't encode it, we don't store it
+        if (name != null) {
+            try {
+                sb.append("/").append(URLEncoder.encode(name, "UTF-8"))
+            } catch (ex: UnsupportedEncodingException) {
+                Timber.tag("Node.kt").w(ex) // if we can't encode it, we don't store it
+            }
         }
         return sb.toString()
     }
@@ -286,27 +298,26 @@ open class Node {
             get() {
 
                 if (DEFAULT_RPC_PORT > 0) return DEFAULT_RPC_PORT
-                DEFAULT_RPC_PORT = when (WalletManager.instance?.networkType) {
-                    NetworkType.NetworkType_Mainnet -> 18081
-                    NetworkType.NetworkType_Testnet -> 28081
-                    NetworkType.NetworkType_Stagenet -> 38081
-                    else -> throw IllegalStateException("unsupported net " + WalletManager.instance?.networkType)
-                }
+                DEFAULT_RPC_PORT =
+                    when (WalletManager.instance?.networkType) {
+                        NetworkType.NetworkType_Mainnet -> 18081
+                        NetworkType.NetworkType_Testnet -> 28081
+                        NetworkType.NetworkType_Stagenet -> 38081
+                        else -> throw IllegalStateException("unsupported net " + WalletManager.instance?.networkType)
+                    }
                 return DEFAULT_RPC_PORT
             }
 
-
-        fun fromString(nodeString: String?): Node? {
-            return try {
+        fun fromString(nodeString: String?): Node? =
+            try {
                 Node(nodeString)
             } catch (ex: IllegalArgumentException) {
                 Timber.tag("Node.kt").w(ex)
                 null
             }
-        }
 
-        fun fromJson(jsonObject: JSONObject?): Node? {
-            return try {
+        fun fromJson(jsonObject: JSONObject?): Node? =
+            try {
                 Node(jsonObject)
             } catch (ex: IllegalArgumentException) {
                 Timber.tag("Node.kt").w(ex)
@@ -318,19 +329,19 @@ open class Node {
                 Timber.tag("Node.kt").w(ex)
                 null
             }
-        }
     }
 
     private val defaultLevinPort: Int
         // every node knows its network, but they are all the same
         get() {
             if (DEFAULT_LEVIN_PORT > 0) return DEFAULT_LEVIN_PORT
-            DEFAULT_LEVIN_PORT = when (WalletManager.instance?.networkType) {
-                NetworkType.NetworkType_Mainnet -> 18080
-                NetworkType.NetworkType_Testnet -> 28080
-                NetworkType.NetworkType_Stagenet -> 38080
-                else -> throw IllegalStateException("unsupported net " + WalletManager.instance?.networkType)
-            }
+            DEFAULT_LEVIN_PORT =
+                when (WalletManager.instance?.networkType) {
+                    NetworkType.NetworkType_Mainnet -> 18080
+                    NetworkType.NetworkType_Testnet -> 28080
+                    NetworkType.NetworkType_Stagenet -> 38080
+                    else -> throw IllegalStateException("unsupported net " + WalletManager.instance?.networkType)
+                }
             return DEFAULT_LEVIN_PORT
         }
 }

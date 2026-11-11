@@ -29,7 +29,6 @@ import io.anonero.ui.home.graph.routes.Home
 import io.anonero.ui.home.graph.routes.HomeScreenRoute
 import io.anonero.ui.home.graph.routes.LockScreenRoute
 
-
 /**
  * Top-level destination chooser for an unlocked process.
  *
@@ -38,9 +37,13 @@ import io.anonero.ui.home.graph.routes.LockScreenRoute
  * without a wallet can still reach onboarding from the landing graph.
  */
 fun NavGraphBuilder.homeGraph(navController: NavHostController) {
-    val walletStatus = WalletManager.instance?.wallet?.status?.isOk
+    val walletStatus =
+        WalletManager.instance
+            ?.wallet
+            ?.status
+            ?.isOk
     navigation<Home>(
-        startDestination = if (walletStatus == true) HomeScreenRoute() else LockScreenRoute
+        startDestination = if (walletStatus == true) HomeScreenRoute() else LockScreenRoute,
     ) {
         composable<HomeScreenRoute> {
             HomeScreenComposable(mainNavController = navController)
@@ -57,7 +60,7 @@ fun NavGraphBuilder.homeGraph(navController: NavHostController) {
                     if (shortCut != io.anonero.ui.home.LockScreenShortCut.HOME) {
                         walletState.emitUnlockShortcut(shortCut)
                     }
-                }
+                },
             )
         }
     }

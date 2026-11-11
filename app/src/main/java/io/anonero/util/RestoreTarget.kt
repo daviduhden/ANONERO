@@ -45,13 +45,14 @@ internal object RestoreTarget {
         if (hasWrappedSecret || hasCredentials) {
             throw RestoreTargetNotEmptyException()
         }
-        val attributes = try {
-            Files.readAttributes(directory.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-        } catch (_: NoSuchFileException) {
-            return
-        } catch (_: IOException) {
-            throw RestoreTargetNotEmptyException()
-        }
+        val attributes =
+            try {
+                Files.readAttributes(directory.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            } catch (_: NoSuchFileException) {
+                return
+            } catch (_: IOException) {
+                throw RestoreTargetNotEmptyException()
+            }
         if (!attributes.isDirectory || attributes.isSymbolicLink) throw RestoreTargetNotEmptyException()
         val entries = directory.listFiles() ?: throw RestoreTargetNotEmptyException()
         // Include broken symlinks and directories: filtering only regular files could

@@ -11,7 +11,10 @@ private const val TAG = "TransactionHistory"
  * [Wallet] is open. [refreshWithNotes] pulls the native list, drops transactions whose
  * account does not match [accountIndex], and reloads user notes from wallet2.
  */
-class TransactionHistory(private val handle: Long, var accountIndex: Int) {
+class TransactionHistory(
+    private val handle: Long,
+    var accountIndex: Int,
+) {
     var all: List<TransactionInfo> = ArrayList()
         private set
 

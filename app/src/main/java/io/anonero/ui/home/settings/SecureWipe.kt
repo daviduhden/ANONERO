@@ -74,11 +74,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.core.content.edit
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.anonero.AnonConfig
+import io.anonero.R
 import io.anonero.model.node.NodeFields
 import io.anonero.services.AnonWalletHandler
 import io.anonero.store.LogRepository
@@ -87,14 +89,14 @@ import io.anonero.ui.MainActivity
 import io.anonero.util.KeyStoreHelper
 import io.anonero.util.PREFS_PASSPHRASE_HASH
 import io.anonero.util.SecureClipboard
-import io.anonero.util.WalletProfileStore
 import io.anonero.util.ShakeConfig
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WALLET_PROXY
 import io.anonero.util.WALLET_PROXY_PORT
+import io.anonero.util.WalletProfileStore
+import io.anonero.util.backup.BackupHelper
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
-import io.anonero.util.backup.BackupHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -106,9 +108,6 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import timber.log.Timber
-import androidx.core.content.edit
-import io.anonero.R
-
 
 private const val TAG = "SecureWipe"
 
@@ -123,9 +122,8 @@ class SecureWipeViewModel(
     private val anonWalletHandler: AnonWalletHandler,
     private val sharedPreferences: SharedPreferences,
     private val nodesRepository: NodesRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
 ) : ViewModel() {
-
     private val _wipeProgressMessage = MutableLiveData<Int?>()
     val wipeProgressMessage: LiveData<Int?> = _wipeProgressMessage
 
@@ -136,7 +134,10 @@ class SecureWipeViewModel(
     var lastWipeFailed: Boolean = false
         private set
 
-    fun wipe(passPhrase: String, activity: Activity): Job {
+    fun wipe(
+        passPhrase: String,
+        activity: Activity,
+    ): Job {
         lastWipeFailed = false
         return viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -198,7 +199,6 @@ class SecureWipeViewModel(
             }
         }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -209,7 +209,6 @@ fun SecureWipe(
     requestClearScreen: (bool: Boolean) -> Unit = {},
     goToHome: () -> Unit = {},
 ) {
-
     val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val secureWipeViewModel = koinViewModel<SecureWipeViewModel>()
     val focusRequester = remember { FocusRequester() }
@@ -228,19 +227,20 @@ fun SecureWipe(
         wipeStarted || progressMessage != null
     }
 
-
     val animatedProgress by animateFloatAsState(
         targetValue = wipeProgress,
-        animationSpec = tween(
-            durationMillis = 300,//animation duration
-            delayMillis = 50,//delay before animation start
-            easing = LinearOutSlowInEasing
-        ), label = "animatedProgress"
+        animationSpec =
+            tween(
+                durationMillis = 300, // animation duration
+                delayMillis = 50, // delay before animation start
+                easing = LinearOutSlowInEasing,
+            ),
+        label = "animatedProgress",
     )
 
     val backgroundBlur: Float by animateFloatAsState(
         if (passPhraseDialog) 6f else 0f,
-        label = "blur-radius"
+        label = "blur-radius",
     )
 
     LaunchedEffect(true) {
@@ -250,8 +250,9 @@ fun SecureWipe(
         }
     }
     LaunchedEffect(progressMessage) {
-        if (progressMessage != null)
+        if (progressMessage != null) {
             requestClearScreen.invoke(false)
+        }
     }
 
     fun clearWallet() {
@@ -268,11 +269,12 @@ fun SecureWipe(
                     passPhraseDialog = false
                     HapticFeedbackConstants.CONTEXT_CLICK
                     activity?.let { activity ->
-                        secureWipeViewModel.wipe(passPhrase, activity)
+                        secureWipeViewModel
+                            .wipe(passPhrase, activity)
                             .invokeOnCompletion {
                                 if (it == null && !secureWipeViewModel.lastWipeFailed) {
                                     view.performHapticFeedback(
-                                        HapticFeedbackConstants.CONTEXT_CLICK
+                                        HapticFeedbackConstants.CONTEXT_CLICK,
                                     )
                                     scope.launch(Dispatchers.Main) {
                                         goToHome()
@@ -290,56 +292,61 @@ fun SecureWipe(
             } else {
                 errorShake.shake(
                     ShakeConfig(
-                        6, translateX = 5f
-                    )
+                        6,
+                        translateX = 5f,
+                    ),
                 )
                 repeat(6) {
                     delay(50)
                     view.performHapticFeedback(
-                        HapticFeedbackConstants.CONTEXT_CLICK
+                        HapticFeedbackConstants.CONTEXT_CLICK,
                     )
                 }
                 delay(100)
             }
-
         }
     }
 
-    if (passPhraseDialog)
+    if (passPhraseDialog) {
         AlertDialog(
-            modifier = Modifier
-                .shake(errorShake)
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+            modifier =
+                Modifier
+                    .shake(errorShake)
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                ),
             containerColor = MaterialTheme.colorScheme.secondary,
-            properties = DialogProperties(
-                securePolicy = SecureFlagPolicy.SecureOn,
-                dismissOnClickOutside = false, dismissOnBackPress = false
-            ),
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnClickOutside = false,
+                    dismissOnBackPress = false,
+                ),
             title = {
                 Column {
                     Text(
                         text = stringResource(id = R.string.securely_wipe_title),
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontSize = 18.sp
-                        )
+                        style =
+                            MaterialTheme.typography.titleSmall.copy(
+                                fontSize = 18.sp,
+                            ),
                     )
                     Spacer(Modifier.padding(12.dp))
                     Text(
                         text = stringResource(id = R.string.securely_wipe_warning),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(),
                     )
                     Spacer(Modifier.padding(8.dp))
                     Text(
                         text = stringResource(id = R.string.securely_wipe_passphrase_prompt),
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Light
+                        fontWeight = FontWeight.Light,
                     )
                 }
             },
@@ -348,27 +355,29 @@ fun SecureWipe(
                     value = passPhrase,
                     shape = MaterialTheme.shapes.small,
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    ),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        ),
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-
-                        }
-                    ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                        ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                            },
+                        ),
                     onValueChange = {
                         passPhrase = it
                     },
-
-                    )
+                )
             },
             onDismissRequest = {
                 passPhraseDialog = false
@@ -376,18 +385,20 @@ fun SecureWipe(
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onError
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        contentColor = MaterialTheme.colorScheme.onBackground,
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onError,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            contentColor = MaterialTheme.colorScheme.onBackground,
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
                         ),
                     onClick = {
                         clearWallet()
-                    }) { Text(stringResource(id = R.string.wipe)) }
+                    },
+                ) { Text(stringResource(id = R.string.wipe)) }
             },
             dismissButton = {
                 Button(
@@ -399,30 +410,34 @@ fun SecureWipe(
                         }
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(id = R.string.cancel),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
-            }
+            },
         )
-
+    }
 
     Scaffold(
         Modifier.blur(
-            backgroundBlur.dp
+            backgroundBlur.dp,
         ),
     ) {
         Column(
@@ -431,39 +446,43 @@ fun SecureWipe(
                 .padding(0.dp)
                 .fillMaxSize(),
             Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (progressMessage != null && errorRes == null)
+            if (progressMessage != null && errorRes == null) {
                 Box(
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(
                         progress = { animatedProgress },
-                        modifier = Modifier.size(320.dp)
+                        modifier = Modifier.size(320.dp),
                     )
                     Text(
                         progressMessage?.let { stringResource(it) } ?: "",
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.align(
-                            Alignment.Center
-                        )
+                        modifier =
+                            Modifier.align(
+                                Alignment.Center,
+                            ),
                     )
                 }
+            }
             errorRes?.let { wipeError ->
                 Box(
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         stringResource(wipeError),
-                        style = MaterialTheme.typography.labelSmall
-                            .copy(
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = 12.sp
-                            ),
+                        style =
+                            MaterialTheme.typography.labelSmall
+                                .copy(
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 12.sp,
+                                ),
                         textAlign = TextAlign.Justify,
-                        modifier = Modifier.align(
-                            Alignment.Center
-                        )
+                        modifier =
+                            Modifier.align(
+                                Alignment.Center,
+                            ),
                     )
                 }
             }

@@ -38,7 +38,6 @@ import javax.crypto.spec.PBEKeySpec
  * iterations of PBKDF2-HMAC-SHA256 matches the OWASP 2023 floor.
  */
 object PinHash {
-
     private const val PREFIX = "v2"
     private const val ITERATIONS = 210_000
     private const val MIN_ITERATIONS = 100_000
@@ -58,7 +57,10 @@ object PinHash {
         ).joinToString(":")
     }
 
-    fun matches(pin: String, stored: String?): Boolean {
+    fun matches(
+        pin: String,
+        stored: String?,
+    ): Boolean {
         if (stored.isNullOrEmpty()) return false
         if (!isLegacy(stored)) {
             val parts = stored.split(":")
@@ -74,16 +76,18 @@ object PinHash {
         return constantTimeEquals(legacyEncode(pin).toByteArray(), stored.toByteArray())
     }
 
-    /* True for values in the old reversible format, which verify but must be replaced. */
-    fun isLegacy(stored: String?): Boolean =
-        !stored.isNullOrEmpty() && !stored.startsWith("$PREFIX:")
+    // True for values in the old reversible format, which verify but must be replaced.
+    fun isLegacy(stored: String?): Boolean = !stored.isNullOrEmpty() && !stored.startsWith("$PREFIX:")
 
     /*
      * Verifies a PIN, or -- when no credential is configured -- performs the same PBKDF2
      * work anyway and returns false. This keeps the unlock path from revealing, through
      * timing, whether the optional decoy credential exists.
      */
-    fun matchesOrDummy(pin: String, stored: String?): Boolean {
+    fun matchesOrDummy(
+        pin: String,
+        stored: String?,
+    ): Boolean {
         if (!stored.isNullOrEmpty()) return matches(pin, stored)
         derive(pin, DUMMY_SALT, ITERATIONS)
         return false
@@ -91,18 +95,27 @@ object PinHash {
 
     private val DUMMY_SALT = ByteArray(SALT_BYTES) { (it + 1).toByte() }
 
-    private fun legacyEncode(pin: String): String = CrazyPassEncoder.encode(
-        pin.toByteArray().let { bytes ->
-            if (bytes.size < 32) bytes + ByteArray(32 - bytes.size) else bytes
-        }
-    )
+    private fun legacyEncode(pin: String): String =
+        CrazyPassEncoder.encode(
+            pin.toByteArray().let { bytes ->
+                if (bytes.size < 32) bytes + ByteArray(32 - bytes.size) else bytes
+            },
+        )
 
-    private fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray =
-        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+    private fun derive(
+        pin: String,
+        salt: ByteArray,
+        iterations: Int,
+    ): ByteArray =
+        SecretKeyFactory
+            .getInstance("PBKDF2WithHmacSHA256")
             .generateSecret(PBEKeySpec(pin.toCharArray(), salt, iterations, KEY_BITS))
             .encoded
 
-    private fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
+    private fun constantTimeEquals(
+        a: ByteArray,
+        b: ByteArray,
+    ): Boolean {
         if (a.size != b.size) return false
         var diff = 0
         for (i in a.indices) diff = diff or (a[i].toInt() xor b[i].toInt())

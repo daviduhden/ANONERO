@@ -32,15 +32,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/* Reusable settings section header used across the settings surface. */
+// Reusable settings section header used across the settings surface.
 @Composable
-fun SettingsSectionHeader(title: String, modifier: Modifier = Modifier) {
+fun SettingsSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         title,
-        style = MaterialTheme.typography.titleLarge.copy(
-            color = MaterialTheme.colorScheme.primary
-        ),
-        modifier = modifier.padding(vertical = 12.dp, horizontal = 8.dp)
+        style =
+            MaterialTheme.typography.titleLarge.copy(
+                color = MaterialTheme.colorScheme.primary,
+            ),
+        modifier = modifier.padding(vertical = 12.dp, horizontal = 8.dp),
     )
 }
 
@@ -53,12 +57,13 @@ fun SettingsSwitchItem(
     supporting: String? = null,
 ) {
     ListItem(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple()
-            ) { onCheckedChange(!checked) },
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(),
+                ) { onCheckedChange(!checked) },
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = {
             if (supporting != null) {
@@ -67,7 +72,7 @@ fun SettingsSwitchItem(
         },
         trailingContent = {
             Switch(checked = checked, onCheckedChange = onCheckedChange)
-        }
+        },
     )
 }
 
@@ -79,18 +84,19 @@ fun SettingsActionItem(
     supporting: String? = null,
 ) {
     ListItem(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(),
-                onClick = onClick
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(),
+                    onClick = onClick,
+                ),
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = {
             if (supporting != null) {
                 Text(supporting, style = MaterialTheme.typography.bodySmall)
             }
-        }
+        },
     )
 }

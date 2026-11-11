@@ -77,7 +77,6 @@ import androidx.compose.ui.window.Popup
 import io.anonero.R
 import kotlin.math.roundToInt
 
-
 data class RestorePayload(
     val seed: List<String>,
     val restoreHeight: Long?,
@@ -89,20 +88,19 @@ fun RestoreWallet(
     oNextPressed: (RestorePayload) -> Unit = {},
     onboardViewModel: OnboardViewModel?,
 ) {
-
     var restoreHeight by remember {
         mutableStateOf(onboardViewModel?.getRestorePayload()?.restoreHeight?.toString() ?: "")
     }
     var restoreHeightError by remember {
         mutableStateOf<Int?>(
-            null
+            null,
         )
     }
-     var seed by remember {
+    var seed by remember {
         mutableStateOf(
-            onboardViewModel?.getRestorePayload()?.seed?.fastJoinToString (
-                separator = " "
-            ) ?: ""
+            onboardViewModel?.getRestorePayload()?.seed?.fastJoinToString(
+                separator = " ",
+            ) ?: "",
         )
     }
     val seedList = remember(seed) { SeedRestoreInput.words(seed) }
@@ -111,31 +109,33 @@ fun RestoreWallet(
 
     Scaffold { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 IconButton(
-                    modifier = Modifier
-                        .size(24.dp),
+                    modifier =
+                        Modifier
+                            .size(24.dp),
                     onClick = {
                         onBackPressed()
-                    }
+                    },
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -143,28 +143,30 @@ fun RestoreWallet(
                 Image(
                     painter = painterResource(R.drawable.ic_anon),
                     contentDescription = stringResource(R.string.app_logo),
-                    modifier = Modifier
-                        .size(120.dp)
+                    modifier =
+                        Modifier
+                            .size(120.dp),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.import_polyseed),
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
             Column(
-                modifier = Modifier
-                    .weight(.8f)
-                    .padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier =
+                    Modifier
+                        .weight(.8f)
+                        .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ListItem(
                     headlineContent = {
                         Text(
                             text = stringResource(R.string.enter_seed),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -182,18 +184,20 @@ fun RestoreWallet(
                             },
                             maxLines = 5,
                             minLines = 5,
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done,
-                                keyboardType = KeyboardType.Text,
-                                autoCorrectEnabled = false,
-                                capitalization = KeyboardCapitalization.None,
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = {
-                                    focusManager.clearFocus()
-                                }
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Done,
+                                    keyboardType = KeyboardType.Text,
+                                    autoCorrectEnabled = false,
+                                    capitalization = KeyboardCapitalization.None,
+                                ),
+                            keyboardActions =
+                                KeyboardActions(
+                                    onDone = {
+                                        focusManager.clearFocus()
+                                    },
+                                ),
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     },
                 )
@@ -202,7 +206,7 @@ fun RestoreWallet(
                         Text(
                             text = stringResource(R.string.restore_height),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -213,29 +217,30 @@ fun RestoreWallet(
                                 restoreHeight = it
                                 restoreHeightError = null
                             },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done,
-                                keyboardType = KeyboardType.Number
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Done,
+                                    keyboardType = KeyboardType.Number,
+                                ),
                             isError = restoreHeightError != null,
                             supportingText = {
-                                if (restoreHeightError != null)
+                                if (restoreHeightError != null) {
                                     Text(
                                         stringResource(restoreHeightError!!),
-                                        color = MaterialTheme.colorScheme.error
+                                        color = MaterialTheme.colorScheme.error,
                                     )
-
+                                }
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     },
                 )
             }
             val enabled = SeedRestoreInput.hasSupportedCount(seedList)
-            AnonOutlineButton (
+            AnonOutlineButton(
                 onClick = {
                     if (enabled) {
-                         if (seedList.size == 25 && restoreHeight.isBlank()) {
+                        if (seedList.size == 25 && restoreHeight.isBlank()) {
                             restoreHeightError = R.string.restore_height_required
                             return@AnonOutlineButton
                         }
@@ -249,17 +254,17 @@ fun RestoreWallet(
                             RestorePayload(
                                 seed = seedList,
                                 restoreHeight = height,
-                            )
+                            ),
                         )
                     }
                 },
                 enabled = enabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 12.dp
-                    ),
-
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 12.dp,
+                        ),
             ) {
                 Text(stringResource(R.string.next))
             }
@@ -274,11 +279,10 @@ private fun SetupNodeComposablePreview() {
         RestoreWallet(
             onBackPressed = {},
             oNextPressed = { },
-            onboardViewModel = null
+            onboardViewModel = null,
         )
     }
 }
-
 
 @Composable
 fun CustomAutocompleteTextField(
@@ -287,7 +291,7 @@ fun CustomAutocompleteTextField(
     modifier: Modifier = Modifier,
     label: String = "",
     onQueryChanged: (String) -> Unit,
-    onSuggestionSelected: (String) -> Unit
+    onSuggestionSelected: (String) -> Unit,
 ) {
     var isPopupExpanded by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
@@ -304,12 +308,12 @@ fun CustomAutocompleteTextField(
                 isPopupExpanded = true
             },
             label = { if (label.isNotEmpty()) Text(label) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onGloballyPositioned { layoutCoordinates ->
-                    textFieldCoordinates.value = layoutCoordinates.localToWindow(Offset.Zero)
-                }
-                .focusRequester(focusRequester),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { layoutCoordinates ->
+                        textFieldCoordinates.value = layoutCoordinates.localToWindow(Offset.Zero)
+                    }.focusRequester(focusRequester),
             singleLine = true,
             trailingIcon = {
                 IconButton(onClick = {
@@ -318,26 +322,37 @@ fun CustomAutocompleteTextField(
                     Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear))
                 }
             },
-            keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(onDone = {
-                focusManager.clearFocus()
-                isPopupExpanded = false
-            })
+            keyboardOptions =
+                KeyboardOptions.Default.copy(
+                    imeAction = ImeAction.Done,
+                ),
+            keyboardActions =
+                KeyboardActions(onDone = {
+                    focusManager.clearFocus()
+                    isPopupExpanded = false
+                }),
         )
 
         if (isPopupExpanded && suggestions.isNotEmpty() && textFieldCoordinates.value != null) {
             val position = textFieldCoordinates.value!!
             Popup(
-                offset = IntOffset(
-                    x = position.x.roundToInt(),
-                    y = (position.y + with(localDensity) { /* field height */ 56.dp.toPx() }).roundToInt()
-                )
+                offset =
+                    IntOffset(
+                        x = position.x.roundToInt(),
+                        y =
+                            (
+                                position.y +
+                                    with(localDensity) {
+                                        // field height
+                                        56.dp.toPx()
+                                    }
+                            ).roundToInt(),
+                    ),
             ) {
                 Surface(
-                    modifier = Modifier
-                        .width(300.dp)
+                    modifier =
+                        Modifier
+                            .width(300.dp),
                 ) {
                     LazyColumn {
                         items(suggestions.size) { index ->
@@ -352,7 +367,7 @@ fun CustomAutocompleteTextField(
                                     onSuggestionSelected(suggestion)
                                     isPopupExpanded = false
                                     focusManager.clearFocus()
-                                }
+                                },
                             )
                         }
                     }

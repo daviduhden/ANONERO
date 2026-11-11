@@ -39,19 +39,20 @@ val jsonDecoder = Json { ignoreUnknownKeys = true }
 private const val TAG = "NodeDataStore"
 
 object NodeListSerializer : Serializer<List<Node>> {
-
     override val defaultValue: List<Node> = emptyList()
 
-    override suspend fun readFrom(input: InputStream): List<Node> {
-        return try {
+    override suspend fun readFrom(input: InputStream): List<Node> =
+        try {
             val json = input.readBytes().decodeToString()
             jsonDecoder.decodeFromString(ListSerializer(Node.serializer()), json)
         } catch (e: Exception) {
             emptyList()
         }
-    }
 
-    override suspend fun writeTo(t: List<Node>, output: OutputStream) {
+    override suspend fun writeTo(
+        t: List<Node>,
+        output: OutputStream,
+    ) {
         val json = jsonDecoder.encodeToString(ListSerializer(Node.serializer()), t)
         withContext(Dispatchers.IO) {
             output.write(json.encodeToByteArray())
@@ -59,12 +60,10 @@ object NodeListSerializer : Serializer<List<Node>> {
     }
 }
 
-
 private val Context.nodeDataStore: DataStore<List<Node>> by dataStore(
     fileName = NODE_STORE,
-    serializer = NodeListSerializer
+    serializer = NodeListSerializer,
 )
-
 
 /**
  * Persisted list of saved nodes.
@@ -73,17 +72,19 @@ private val Context.nodeDataStore: DataStore<List<Node>> by dataStore(
  * Keystore-encrypted. Treat the Android app sandbox as the protection boundary. Entries are
  * de-duplicated by their serialized node string, and [clearAll] is part of secure wipe.
  */
-class NodesRepository(private val context: Context) {
-
+class NodesRepository(
+    private val context: Context,
+) {
     // Expose a Flow to observe the list of items
-    val nodesFlow: Flow<List<Node>> = context.nodeDataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyList()) // Handle errors by emitting an empty list
-            } else {
-                throw exception
+    val nodesFlow: Flow<List<Node>> =
+        context.nodeDataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyList()) // Handle errors by emitting an empty list
+                } else {
+                    throw exception
+                }
             }
-        }
 
     // Save a list of items
     suspend fun saveItems(items: List<Node>) {
@@ -101,11 +102,10 @@ class NodesRepository(private val context: Context) {
         }
     }
 
-
     // Read the current list without observing future changes.
-    suspend fun getAll() : List<Node> {
+    suspend fun getAll(): List<Node> {
         try {
-            return context.nodeDataStore.data.first();
+            return context.nodeDataStore.data.first()
         } catch (e: Exception) {
             return emptyList()
         }

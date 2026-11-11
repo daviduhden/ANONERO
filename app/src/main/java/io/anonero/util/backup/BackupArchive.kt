@@ -39,23 +39,38 @@ internal object BackupArchive {
     private const val MAX_ENTRY_BYTES = 256L * 1024 * 1024
     private const val MAX_TOTAL_BYTES = 512L * 1024 * 1024
 
-    private fun isAllowedName(name: String, walletName: String): Boolean =
+    private fun isAllowedName(
+        name: String,
+        walletName: String,
+    ): Boolean =
         name.isNotEmpty() && name.none { it == '/' || it == '\\' || it == ':' || it == '\u0000' } &&
-            (name == METADATA_NAME || name == walletName ||
-                name == "$walletName.keys" || name == "$walletName.address.txt")
+            (
+                name == METADATA_NAME || name == walletName ||
+                    name == "$walletName.keys" || name == "$walletName.address.txt"
+            )
 
-    fun isValidDirectory(directory: File, walletName: String): Boolean {
+    fun isValidDirectory(
+        directory: File,
+        walletName: String,
+    ): Boolean {
         if (Files.isSymbolicLink(directory.toPath()) || !directory.isDirectory) return false
         val files = directory.listFiles() ?: return false
         if (files.any {
                 !isAllowedName(it.name, walletName) || !it.isFile ||
                     Files.isSymbolicLink(it.toPath())
-            }) return false
+            }
+        ) {
+            return false
+        }
         return files.any { it.name == METADATA_NAME } &&
             files.any { it.name == "$walletName.keys" }
     }
 
-    fun extract(archive: File, destination: File, walletName: String) {
+    fun extract(
+        archive: File,
+        destination: File,
+        walletName: String,
+    ) {
         if (Files.isSymbolicLink(destination.toPath()) || destination.exists()) {
             throw IOException("Backup extraction requires a fresh directory")
         }
@@ -67,7 +82,9 @@ internal object BackupArchive {
             entries.forEach { entry ->
                 if (entry.isDirectory || !isAllowedName(entry.name, walletName) ||
                     !names.add(entry.name)
-                ) throw IOException("Invalid backup archive entry")
+                ) {
+                    throw IOException("Invalid backup archive entry")
+                }
                 if (entry.size > MAX_ENTRY_BYTES) {
                     throw IOException("Backup archive entry is too large")
                 }
@@ -112,21 +129,30 @@ internal object BackupArchive {
         }
     }
 
-    /* Removes only a generated staging tree; symbolic links are never followed. */
+    // Removes only a generated staging tree; symbolic links are never followed.
     fun removeExtractionDirectory(directory: File) {
         val path = directory.toPath()
         if (!Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return
-        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                Files.delete(file)
-                return FileVisitResult.CONTINUE
-            }
+        Files.walkFileTree(
+            path,
+            object : SimpleFileVisitor<Path>() {
+                override fun visitFile(
+                    file: Path,
+                    attrs: BasicFileAttributes,
+                ): FileVisitResult {
+                    Files.delete(file)
+                    return FileVisitResult.CONTINUE
+                }
 
-            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                if (exc != null) throw exc
-                Files.delete(dir)
-                return FileVisitResult.CONTINUE
-            }
-        })
+                override fun postVisitDirectory(
+                    dir: Path,
+                    exc: IOException?,
+                ): FileVisitResult {
+                    if (exc != null) throw exc
+                    Files.delete(dir)
+                    return FileVisitResult.CONTINUE
+                }
+            },
+        )
     }
 }

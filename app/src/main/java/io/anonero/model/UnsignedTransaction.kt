@@ -30,7 +30,9 @@ package io.anonero.model
  * after the user has reviewed this one. The [handle] is owned by wallet2 and is valid
  * only while the owning wallet remains open.
  */
-class UnsignedTransaction internal constructor(override var handle: Long) : StagingTransaction {
+class UnsignedTransaction internal constructor(
+    override var handle: Long,
+) : StagingTransaction {
     internal fun invalidate() {
         handle = 0L
     }
@@ -38,16 +40,18 @@ class UnsignedTransaction internal constructor(override var handle: Long) : Stag
     enum class Status {
         Status_Ok,
         Status_Error,
-        Status_Critical
+        Status_Critical,
     }
 
-    enum class Priority(val value: Int) {
+    enum class Priority(
+        val value: Int,
+    ) {
         Priority_Default(0),
         Priority_Low(1),
         Priority_Medium(2),
         Priority_High(3),
-        Priority_Last(4);
-
+        Priority_Last(4),
+        ;
 
         companion object {
             fun fromInteger(n: Int): Priority? {
@@ -73,7 +77,6 @@ class UnsignedTransaction internal constructor(override var handle: Long) : Stag
 
     val txCount: Long
         external get
-
 
     val address: String?
         external get

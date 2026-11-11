@@ -18,13 +18,11 @@
 
 package io.anonero
 
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
-
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-
-import org.junit.Assert.*
 
 /*
  * Instrumented test, which will execute on an Android device.
@@ -39,14 +37,15 @@ class ExampleInstrumentedTest {
         // applicationId suffix, so the base package alone is not a valid assertion.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
         assertTrue(
-            appContext.packageName in setOf(
-                "io.anonero",
-                "io.anonero.debug",
-                "io.anonero.anon",
-                "io.anonero.anon.debug",
-                "io.anonero.nero",
-                "io.anonero.nero.debug",
-            )
+            appContext.packageName in
+                setOf(
+                    "io.anonero",
+                    "io.anonero.debug",
+                    "io.anonero.anon",
+                    "io.anonero.anon.debug",
+                    "io.anonero.nero",
+                    "io.anonero.nero.debug",
+                ),
         )
     }
 }

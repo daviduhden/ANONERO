@@ -26,25 +26,24 @@ import io.anonero.AnonConfig
 import io.anonero.model.NeroKeyPayload
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
-import io.anonero.util.PinHash
 import io.anonero.util.KeyStoreHelper
+import io.anonero.util.PREFS_PASSPHRASE_HASH
+import io.anonero.util.PREFS_PIN_HASH
+import io.anonero.util.PinHash
+import io.anonero.util.RESTORE_HEIGHT
+import io.anonero.util.RestoreTarget
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
-import io.anonero.util.PREFS_PASSPHRASE_HASH
-import io.anonero.util.PREFS_PIN_HASH
-import io.anonero.util.RESTORE_HEIGHT
-import io.anonero.util.RestoreTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 
-
 enum class Mode {
     RESTORE,
-    CREATE
+    CREATE,
 }
 
 private const val TAG = "OnboardViewModel"
@@ -59,8 +58,9 @@ private const val TAG = "OnboardViewModel"
  * PIN that matches the duress PIN, a passphrase that matches the decoy passphrase, or a
  * non-empty MAIN target.
  */
-class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
-
+class OnboardViewModel(
+    private val prefs: SharedPreferences,
+) : ViewModel() {
     private var mode = Mode.CREATE
     private var passPhrase = ""
     private var walllet: Wallet? = null
@@ -69,7 +69,7 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
 
     fun setMode(mode: Mode) = run { this.mode = mode }
 
-    /* A new main PIN must never collide with a configured duress PIN. */
+    // A new main PIN must never collide with a configured duress PIN.
     private fun requirePinNotDuress(pin: String) {
         val duress = prefs.getString(io.anonero.util.PREFS_DURESS_PIN_HASH, "")
         if (!duress.isNullOrEmpty() && PinHash.matches(pin, duress)) {
@@ -77,7 +77,7 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
         }
     }
 
-    /* The legitimate and decoy wallets must not share a seed passphrase. */
+    // The legitimate and decoy wallets must not share a seed passphrase.
     private fun requirePassphraseNotDecoy(passphrase: String) {
         val decoy = prefs.getString(io.anonero.util.PREFS_DECOY_PASSPHRASE_HASH, "")
         if (decoy.isNullOrEmpty()) return
@@ -93,8 +93,9 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
             directory = File(context.filesDir, "wallets"),
             walletName = WalletProfile.MAIN.walletName,
             hasWrappedSecret = WalletKey.exists(context, WalletProfile.MAIN.walletName),
-            hasCredentials = prefs.contains(PREFS_PIN_HASH) ||
-                prefs.contains(PREFS_PASSPHRASE_HASH) || prefs.contains(RESTORE_HEIGHT),
+            hasCredentials =
+                prefs.contains(PREFS_PIN_HASH) ||
+                    prefs.contains(PREFS_PASSPHRASE_HASH) || prefs.contains(RESTORE_HEIGHT),
         )
     }
 
@@ -120,7 +121,6 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
 
     fun getSeed() = walllet?.getSeed(passPhrase) ?: ""
 
-
     suspend fun create(pin: String) {
         if (AnonConfig.context == null) return
         withContext(Dispatchers.IO) {
@@ -145,20 +145,22 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
                 cleanupFailedMain(context)
                 throw e
             }
-            val anonWallet = try {
-                WalletManager.instance?.createWallet(
-                    walletFile,
-                    walletKey,
-                    passPhrase,
-                    "English",
-                    1,
-                )?.also {
-                    if (!it.store()) throw IllegalStateException("wallet store failed")
+            val anonWallet =
+                try {
+                    WalletManager.instance
+                        ?.createWallet(
+                            walletFile,
+                            walletKey,
+                            passPhrase,
+                            "English",
+                            1,
+                        )?.also {
+                            if (!it.store()) throw IllegalStateException("wallet store failed")
+                        }
+                } catch (e: Exception) {
+                    cleanupFailedMain(context)
+                    throw e
                 }
-            } catch (e: Exception) {
-                cleanupFailedMain(context)
-                throw e
-            }
             delay(100)
             if (anonWallet?.status?.isOk != true) {
                 cleanupFailedMain(context)
@@ -169,10 +171,10 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
         }
     }
 
-
     suspend fun createViewOnly(pin: String) {
-        val payload = neroKeyPayload
-            ?: throw IllegalStateException("view-only key payload missing")
+        val payload =
+            neroKeyPayload
+                ?: throw IllegalStateException("view-only key payload missing")
         if (payload.restoreHeight !in 0..io.anonero.util.MAX_RESTORE_HEIGHT) {
             throw IllegalArgumentException("restore height must be within the supported range")
         }
@@ -197,22 +199,24 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
                 cleanupFailedMain(context)
                 throw e
             }
-            val anonWallet = try {
-                WalletManager.instance?.createWalletWithKeys(
-                    walletFile,
-                    walletKey,
-                    language = "English",
-                    restoreHeight = payload.restoreHeight,
-                    viewKeyString = payload.privateViewKey,
-                    addressString = payload.primaryAddress,
-                    spendKeyString = ""
-                )?.also {
-                    if (!it.store()) throw IllegalStateException("wallet store failed")
+            val anonWallet =
+                try {
+                    WalletManager.instance
+                        ?.createWalletWithKeys(
+                            walletFile,
+                            walletKey,
+                            language = "English",
+                            restoreHeight = payload.restoreHeight,
+                            viewKeyString = payload.privateViewKey,
+                            addressString = payload.primaryAddress,
+                            spendKeyString = "",
+                        )?.also {
+                            if (!it.store()) throw IllegalStateException("wallet store failed")
+                        }
+                } catch (e: Exception) {
+                    cleanupFailedMain(context)
+                    throw e
                 }
-            } catch (e: Exception) {
-                cleanupFailedMain(context)
-                throw e
-            }
             delay(100)
             if (anonWallet?.status?.isOk != true) {
                 cleanupFailedMain(context)
@@ -235,13 +239,12 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
         restorePayload = it
     }
 
-    fun getRestorePayload(): RestorePayload? {
-        return restorePayload
-    }
+    fun getRestorePayload(): RestorePayload? = restorePayload
 
     suspend fun restoreFromSeed(pin: String) {
-        val payload = restorePayload
-            ?: throw IllegalStateException("restore payload missing")
+        val payload =
+            restorePayload
+                ?: throw IllegalStateException("restore payload missing")
         // Reject structural input errors before replacing MAIN files or credentials.
         // wallet2 remains responsible for mnemonic language and checksum validation.
         val seedWords = SeedRestoreInput.requireValid(payload.seed, payload.restoreHeight)
@@ -270,29 +273,30 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
             cleanupFailedMain(context)
             throw e
         }
-        val anonWallet = try {
-            if (seedWords.size == 25) {
-                WalletManager.instance?.recoveryWallet(
-                    walletFile,
-                    walletKey,
-                    seedWords.joinToString(" "),
-                    passPhrase,
-                    payload.restoreHeight ?: 0
-                )
-            } else if (seedWords.size == 16) {
-                WalletManager.instance?.recoveryWalletPolyseed(
-                    walletFile,
-                    walletKey,
-                    seedWords.joinToString(" "),
-                    passPhrase,
-                )
-            } else {
-                null
+        val anonWallet =
+            try {
+                if (seedWords.size == 25) {
+                    WalletManager.instance?.recoveryWallet(
+                        walletFile,
+                        walletKey,
+                        seedWords.joinToString(" "),
+                        passPhrase,
+                        payload.restoreHeight ?: 0,
+                    )
+                } else if (seedWords.size == 16) {
+                    WalletManager.instance?.recoveryWalletPolyseed(
+                        walletFile,
+                        walletKey,
+                        seedWords.joinToString(" "),
+                        passPhrase,
+                    )
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                cleanupFailedMain(context)
+                throw e
             }
-        } catch (e: Exception) {
-            cleanupFailedMain(context)
-            throw e
-        }
         if (anonWallet == null) {
             cleanupFailedMain(context)
             throw Exception("unable to create wallet from seed, invalid seed length ${seedWords.size}")
@@ -318,5 +322,4 @@ class OnboardViewModel(private val prefs: SharedPreferences) : ViewModel() {
         walllet = anonWallet
         delay(500)
     }
-
 }

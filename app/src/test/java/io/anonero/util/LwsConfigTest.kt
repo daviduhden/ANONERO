@@ -24,7 +24,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LwsConfigTest {
-
     @Test
     fun `valid onion and dns hosts pass`() {
         assertNull(LwsConfig.validate("lws.example.onion", 8443))

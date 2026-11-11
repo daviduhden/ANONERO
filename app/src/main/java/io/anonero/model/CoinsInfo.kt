@@ -8,7 +8,7 @@ package io.anonero.model
  * spent, locked by unlock time, or unavailable because of confirmations.
  */
 data class CoinsInfo(
-    /* wallet2 global output index (historical field name kept for compatibility). */
+    // wallet2 global output index (historical field name kept for compatibility).
     val unlockTime: Long,
     val spent: Boolean,
     val key: String,
@@ -16,7 +16,7 @@ data class CoinsInfo(
     val hash: String,
     val pub_key: String,
     val frozen: Boolean,
-    /* internal output index in the transaction (historical field name). */
+    // internal output index in the transaction (historical field name).
     val creationTime: Long,
     val unlocked: Boolean = false,
     val subaddrAccount: Int = 0,
@@ -26,7 +26,6 @@ data class CoinsInfo(
     val addressLabel: String = "",
     val keyImageKnown: Boolean = false,
 ) : Comparable<CoinsInfo> {
-
     override fun compareTo(other: CoinsInfo): Int {
         val b1: Long = this.amount
         val b2 = other.amount

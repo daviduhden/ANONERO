@@ -20,6 +20,7 @@ package io.anonero.ui.home.settings
 
 import AnonNeroTheme
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,8 +61,6 @@ import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WALLET_USE_TOR
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.TextButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,14 +112,14 @@ fun LwsSettingsScreen(
                 },
                 actions = {
                     TextButton(onClick = { save() }) { Text(stringResource(R.string.save)) }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 ListItem(
@@ -129,7 +129,7 @@ fun LwsSettingsScreen(
                     },
                     trailingContent = {
                         Switch(checked = enabled, onCheckedChange = { enabled = it })
-                    }
+                    },
                 )
             }
             item {
@@ -139,7 +139,7 @@ fun LwsSettingsScreen(
                     label = { Text(stringResource(R.string.lws_host)) },
                     placeholder = { Text("lws.example.onion") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
@@ -148,32 +148,40 @@ fun LwsSettingsScreen(
                     onValueChange = { portText = it.filter(Char::isDigit) },
                     label = { Text(stringResource(R.string.lws_port)) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                        keyboardType = KeyboardType.Number
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                            keyboardType = KeyboardType.Number,
+                        ),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             item {
                 Text(
                     stringResource(R.string.lws_privacy_warning),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             item {
                 Text(
-                    if (useTor) stringResource(R.string.lws_tor_enabled)
-                    else stringResource(R.string.lws_tor_disabled),
+                    if (useTor) {
+                        stringResource(R.string.lws_tor_enabled)
+                    } else {
+                        stringResource(R.string.lws_tor_disabled)
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (useTor) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error
+                    color =
+                        if (useTor) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
                 )
             }
             item {
                 Text(
                     stringResource(R.string.lws_restart_warning),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             error?.let { validationError ->
@@ -181,35 +189,40 @@ fun LwsSettingsScreen(
                     Text(
                         stringResource(validationError.messageRes()),
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
-            if (requiresTor) item {
-                Text(
-                    stringResource(R.string.lws_requires_tor),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            if (requiresTor) {
+                item {
+                    Text(
+                        stringResource(R.string.lws_requires_tor),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
-            if (saved) item {
-                Text(
-                    stringResource(R.string.lws_saved_restart),
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            if (saved) {
+                item {
+                    Text(
+                        stringResource(R.string.lws_saved_restart),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
     }
 }
 
-private fun LwsValidationError.messageRes(): Int = when (this) {
-    LwsValidationError.HOST_EMPTY -> R.string.lws_error_host_empty
-    LwsValidationError.HOST_TOO_LONG -> R.string.lws_error_host_too_long
-    LwsValidationError.HOST_HAS_SCHEME_OR_PORT -> R.string.lws_error_host_format
-    LwsValidationError.HOST_INVALID -> R.string.lws_error_host_invalid
-    LwsValidationError.PORT_RANGE -> R.string.lws_error_port_range
-}
+private fun LwsValidationError.messageRes(): Int =
+    when (this) {
+        LwsValidationError.HOST_EMPTY -> R.string.lws_error_host_empty
+        LwsValidationError.HOST_TOO_LONG -> R.string.lws_error_host_too_long
+        LwsValidationError.HOST_HAS_SCHEME_OR_PORT -> R.string.lws_error_host_format
+        LwsValidationError.HOST_INVALID -> R.string.lws_error_host_invalid
+        LwsValidationError.PORT_RANGE -> R.string.lws_error_port_range
+    }
 
 @Preview(device = "id:pixel_5")
 @Composable

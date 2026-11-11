@@ -77,10 +77,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import io.anonero.R
-import io.anonero.util.RestoreTargetNotEmptyException
 import io.anonero.model.BackupPayload
 import io.anonero.model.Wallet
 import io.anonero.ui.onboard.graph.OnboardLogsScreen
+import io.anonero.util.RestoreTargetNotEmptyException
 import io.anonero.util.backup.BackupHelper
 import io.anonero.util.backup.NetworkMismatchException
 import io.anonero.util.rememberShakeController
@@ -105,9 +105,8 @@ fun RestorePreview(
     backUpPath: String,
     onBackPressed: () -> Unit = {},
     oNextPressed: () -> Unit = {},
-    navigateTo: (route: Any) -> Unit = {}
+    navigateTo: (route: Any) -> Unit = {},
 ) {
-
     var passPhrase by remember { mutableStateOf<String>("") }
     var loadingMessage by remember { mutableStateOf<Int?>(R.string.loading) }
     var errorMessage by remember { mutableStateOf<Int?>(null) }
@@ -151,7 +150,6 @@ fun RestorePreview(
         }
     }
 
-
     LaunchedEffect(passphraseDialog) {
         scope.launch {
             if (passphraseDialog) {
@@ -161,88 +159,119 @@ fun RestorePreview(
         }
     }
 
-    if (passphraseDialog) AlertDialog(
-        modifier = Modifier
-            .shake(errorShake)
-            .border(
-                1.dp,
-                color = MaterialTheme.colorScheme.onBackground.copy(
-                    alpha = .2f
-                ),
-                shape = MaterialTheme.shapes.medium,
-            ), containerColor = MaterialTheme.colorScheme.secondary, properties = DialogProperties(
-            securePolicy = SecureFlagPolicy.SecureOn, dismissOnBackPress = false
-        ), title = {
-            Text(
-                text = stringResource(R.string.enter_seed_phrase), style = MaterialTheme.typography.titleSmall.copy(
-                    fontSize = 18.sp
-                )
-            )
-        }, text = {
-            OutlinedTextField(
-                value = passPhrase,
-                shape = MaterialTheme.shapes.small,
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                ),
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
-                    .padding(
-                        top = 8.dp
+    if (passphraseDialog) {
+        AlertDialog(
+            modifier =
+                Modifier
+                    .shake(errorShake)
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done,
+            containerColor = MaterialTheme.colorScheme.secondary,
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnBackPress = false,
                 ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        restoreFromBackup()
-                    }),
-                onValueChange = {
-                    passPhrase = it
-                },
-
-                )
-        }, onDismissRequest = {
-            passphraseDialog = false
-        }, confirmButton = {
-            Button(
-                shape = MaterialTheme.shapes.small, border = BorderStroke(
-                    1.dp, color = MaterialTheme.colorScheme.onBackground
-                ), colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.onBackground,
-
-                    ), onClick = {
-                    restoreFromBackup()
-                }) { Text(stringResource(R.string.restore)) }
-        }, dismissButton = {
-            Button(
-                onClick = {
-                    passphraseDialog = false
-                    onBackPressed.invoke()
-                }, shape = MaterialTheme.shapes.small, border = BorderStroke(
-                    1.dp, color = MaterialTheme.colorScheme.onSecondary
-                ), colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                )
-            ) {
+            title = {
                 Text(
-                    stringResource(R.string.cancel), style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = 0.8f
-                        )
-                    )
+                    text = stringResource(R.string.enter_seed_phrase),
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                        ),
                 )
-            }
-        })
-
+            },
+            text = {
+                OutlinedTextField(
+                    value = passPhrase,
+                    shape = MaterialTheme.shapes.small,
+                    singleLine = true,
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .padding(
+                                top = 8.dp,
+                            ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                        ),
+                    keyboardActions =
+                        KeyboardActions(onDone = {
+                            restoreFromBackup()
+                        }),
+                    onValueChange = {
+                        passPhrase = it
+                    },
+                )
+            },
+            onDismissRequest = {
+                passphraseDialog = false
+            },
+            confirmButton = {
+                Button(
+                    shape = MaterialTheme.shapes.small,
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    onClick = {
+                        restoreFromBackup()
+                    },
+                ) { Text(stringResource(R.string.restore)) }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        passphraseDialog = false
+                        onBackPressed.invoke()
+                    },
+                    shape = MaterialTheme.shapes.small,
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                ) {
+                    Text(
+                        stringResource(R.string.cancel),
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
+                    )
+                }
+            },
+        )
+    }
 
     if (passphraseDialog) {
         return Box {
-
         }
     }
 
@@ -250,7 +279,7 @@ fun RestorePreview(
         topBar = {
             TopAppBar(navigationIcon = {
                 IconButton(
-                    onClick = onBackPressed
+                    onClick = onBackPressed,
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
@@ -258,11 +287,13 @@ fun RestorePreview(
                 Text(
                     stringResource(R.string.backup_preview),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        color = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = 0.8f
-                        )
-                    )
+                    style =
+                        MaterialTheme.typography.titleMedium.copy(
+                            color =
+                                MaterialTheme.colorScheme.onBackground.copy(
+                                    alpha = 0.8f,
+                                ),
+                        ),
                 )
             })
         },
@@ -277,21 +308,23 @@ fun RestorePreview(
                 Text(
                     stringResource(restoreError),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 16.sp
-                    )
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 16.sp,
+                        ),
                 )
                 AnonOutlineButton(
                     onClick = {
                         navigateTo(OnboardLogsScreen)
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .safeContentPadding()
-                        .padding(
-                            horizontal = 16.dp,
-                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .safeContentPadding()
+                            .padding(
+                                horizontal = 16.dp,
+                            ),
                 ) {
                     Text(stringResource(R.string.view_logs))
                 }
@@ -305,17 +338,20 @@ fun RestorePreview(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(140.dp), strokeWidth = 2.dp
+                    modifier = Modifier.size(140.dp),
+                    strokeWidth = 2.dp,
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     loadingMessage?.let { stringResource(it) } ?: "",
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = 0.8f
-                        )
-                    )
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            color =
+                                MaterialTheme.colorScheme.onBackground.copy(
+                                    alpha = 0.8f,
+                                ),
+                        ),
                 )
             }
         }
@@ -325,90 +361,100 @@ fun RestorePreview(
             val node = backupPayload!!.backup.node
             val meta = backupPayload!!.backup.meta
 
-
             LazyColumn(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .padding(
-                        horizontal = 16.dp
-                    )
+                modifier =
+                    Modifier
+                        .padding(paddingValues)
+                        .padding(
+                            horizontal = 16.dp,
+                        ),
             ) {
                 item {
                     ListItem(
-                        modifier = modifier
-                            .border(
-                                .5.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(
-                                    alpha = .8f
-                                ),
-                                shape = MaterialTheme.shapes.medium,
-                            )
-                            .padding(8.dp),
+                        modifier =
+                            modifier
+                                .border(
+                                    .5.dp,
+                                    color =
+                                        MaterialTheme.colorScheme.primary.copy(
+                                            alpha = .8f,
+                                        ),
+                                    shape = MaterialTheme.shapes.medium,
+                                ).padding(8.dp),
                         headlineContent = {
                             Text(
                                 stringResource(R.string.wallet_title),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(
-                                    top = 8.dp
-                                ),
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    color = MaterialTheme.colorScheme.onBackground.copy(
-                                        alpha = 0.8f
-                                    )
-                                )
+                                modifier =
+                                    Modifier.padding(
+                                        top = 8.dp,
+                                    ),
+                                style =
+                                    MaterialTheme.typography.titleMedium.copy(
+                                        color =
+                                            MaterialTheme.colorScheme.onBackground.copy(
+                                                alpha = 0.8f,
+                                            ),
+                                    ),
                             )
                         },
                         supportingContent = {
                             Column {
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(
-                                        vertical = 8.dp
-                                    )
+                                    modifier =
+                                        Modifier.padding(
+                                            vertical = 8.dp,
+                                        ),
                                 )
                                 ListWidget(
                                     title = stringResource(R.string.seed),
                                     subtitle = "${wallet.seed}",
-                                    modifier = Modifier.padding(
-                                        bottom = 8.dp
-                                    )
+                                    modifier =
+                                        Modifier.padding(
+                                            bottom = 8.dp,
+                                        ),
                                 )
 
                                 if (wallet.primaryAddress.isNotEmpty()) {
                                     HorizontalDivider(
-                                        modifier = Modifier.padding(
-                                            vertical = 8.dp
-                                        )
+                                        modifier =
+                                            Modifier.padding(
+                                                vertical = 8.dp,
+                                            ),
                                     )
                                     ListWidget(
                                         title = stringResource(R.string.primary_address_title),
                                         subtitle = "${wallet.primaryAddress}",
-                                        modifier = Modifier.padding(
-                                            bottom = 8.dp
-                                        )
+                                        modifier =
+                                            Modifier.padding(
+                                                bottom = 8.dp,
+                                            ),
                                     )
                                 }
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(
-                                        vertical = 8.dp
-                                    )
+                                    modifier =
+                                        Modifier.padding(
+                                            vertical = 8.dp,
+                                        ),
                                 )
                                 ListWidget(
                                     title = stringResource(R.string.balance),
                                     subtitle = "${Wallet.getDisplayAmount(wallet.balanceAll)}",
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 )
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(
-                                        vertical = 8.dp
-                                    )
+                                    modifier =
+                                        Modifier.padding(
+                                            vertical = 8.dp,
+                                        ),
                                 )
                                 ListWidget(
                                     title = stringResource(R.string.restore_height_title),
                                     subtitle = "${wallet.restoreHeight}",
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
-                        }
+                        },
                     )
                 }
                 item {
@@ -416,68 +462,79 @@ fun RestorePreview(
                 }
                 item {
                     ListItem(
-                        modifier = modifier
-                            .border(
-                                .5.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(
-                                    alpha = .8f
-                                ),
-                                shape = MaterialTheme.shapes.medium,
-                            )
-                            .padding(8.dp),
+                        modifier =
+                            modifier
+                                .border(
+                                    .5.dp,
+                                    color =
+                                        MaterialTheme.colorScheme.primary.copy(
+                                            alpha = .8f,
+                                        ),
+                                    shape = MaterialTheme.shapes.medium,
+                                ).padding(8.dp),
                         headlineContent = {
                             Text(
                                 stringResource(R.string.node).lowercase(),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(
-                                    top = 8.dp
-                                ),
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    color = MaterialTheme.colorScheme.onBackground.copy(
-                                        alpha = 0.8f
-                                    )
-                                )
+                                modifier =
+                                    Modifier.padding(
+                                        top = 8.dp,
+                                    ),
+                                style =
+                                    MaterialTheme.typography.titleMedium.copy(
+                                        color =
+                                            MaterialTheme.colorScheme.onBackground.copy(
+                                                alpha = 0.8f,
+                                            ),
+                                    ),
                             )
                         },
                         supportingContent = {
-                            if (node.host.isNotEmpty())
+                            if (node.host.isNotEmpty()) {
                                 Column {
                                     HorizontalDivider(
-                                        modifier = Modifier.padding(
-                                            vertical = 8.dp
-                                        )
+                                        modifier =
+                                            Modifier.padding(
+                                                vertical = 8.dp,
+                                            ),
                                     )
                                     ListWidget(
                                         title = stringResource(R.string.host),
                                         subtitle = "${node.host}:${node.rpcPort}",
-                                        modifier = Modifier.padding(
-                                            bottom = 8.dp
-                                        )
+                                        modifier =
+                                            Modifier.padding(
+                                                bottom = 8.dp,
+                                            ),
                                     )
                                     HorizontalDivider(
-                                        modifier = Modifier.padding(
-                                            vertical = 8.dp
-                                        )
+                                        modifier =
+                                            Modifier.padding(
+                                                vertical = 8.dp,
+                                            ),
                                     )
-                                    if (node.password.isNotEmpty())
+                                    if (node.password.isNotEmpty()) {
                                         ListWidget(
                                             title = stringResource(R.string.password),
                                             subtitle = "${node.password}",
                                         )
-                                    if (node.password.isNotEmpty())
+                                    }
+                                    if (node.password.isNotEmpty()) {
                                         HorizontalDivider(
-                                            modifier = Modifier.padding(
-                                                vertical = 8.dp
-                                            )
+                                            modifier =
+                                                Modifier.padding(
+                                                    vertical = 8.dp,
+                                                ),
                                         )
-                                    if (node.username.isNotEmpty())
+                                    }
+                                    if (node.username.isNotEmpty()) {
                                         ListWidget(
                                             title = stringResource(R.string.username),
                                             subtitle = "${node.username}",
                                         )
-
+                                    }
                                 }
-                        }
+                            }
+                        },
                     )
                 }
                 item {
@@ -489,7 +546,7 @@ fun RestorePreview(
                                 // the device secret the restored wallet is bound to
                                 showPinSetup = true
                             },
-                        ){
+                        ) {
                             Text(stringResource(R.string.restore_wallet))
                         }
                     }
@@ -497,8 +554,8 @@ fun RestorePreview(
                 item {
                     Box(
                         Modifier.height(
-                            16.dp
-                        )
+                            16.dp,
+                        ),
                     )
                 }
                 if (meta.timestamp != 0L) {
@@ -506,38 +563,41 @@ fun RestorePreview(
                         Text(
                             stringResource(
                                 R.string.backup_created_at,
-                                LocalDateTime.ofInstant(
-                                    Instant.ofEpochMilli(meta.timestamp),
-                                    java.time.ZoneId.systemDefault()
-                                ).format(formatter)
+                                LocalDateTime
+                                    .ofInstant(
+                                        Instant.ofEpochMilli(meta.timestamp),
+                                        java.time.ZoneId.systemDefault(),
+                                    ).format(formatter),
                             ),
                             textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.onBackground.copy(
-                                    alpha = 0.8f
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    color =
+                                        MaterialTheme.colorScheme.onBackground.copy(
+                                            alpha = 0.8f,
+                                        ),
+                                    fontWeight = FontWeight.W100,
+                                    fontSize = 11.sp,
                                 ),
-                                fontWeight = FontWeight.W100,
-                                fontSize = 11.sp,
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    top = 8.dp,
-                                    bottom = 8.dp
-                                )
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        top = 8.dp,
+                                        bottom = 8.dp,
+                                    ),
                         )
                     }
                 }
                 item {
                     Box(
                         Modifier.height(
-                            16.dp
-                        )
+                            16.dp,
+                        ),
                     )
                 }
             }
         }
-
     }
 
     if (showPinSetup) {
@@ -545,9 +605,13 @@ fun RestorePreview(
         // that PIN opens it and becomes this phone's PIN too.
         io.anonero.ui.onboard.PinSetup(
             legacyBackupPin = (backupPayload?.version ?: 0) < 3,
-            changePin  = false,
-            enterLabel = if ((backupPayload?.version ?: 0) < 3)
-                stringResource(R.string.entering_backup_pin) else null,
+            changePin = false,
+            enterLabel =
+                if ((backupPayload?.version ?: 0) < 3) {
+                    stringResource(R.string.entering_backup_pin)
+                } else {
+                    null
+                },
             onNext = { pin ->
                 showPinSetup = false
                 scope.launch(Dispatchers.IO) {
@@ -565,8 +629,12 @@ fun RestorePreview(
                     } catch (e: Exception) {
                         Timber.tag(TAG).e("Backup restore failed")
                         withContext(Dispatchers.Main) {
-                            errorMessage = if (e is RestoreTargetNotEmptyException) R.string.wallet_target_not_empty
-                                else R.string.restore_failed
+                            errorMessage =
+                                if (e is RestoreTargetNotEmptyException) {
+                                    R.string.wallet_target_not_empty
+                                } else {
+                                    R.string.restore_failed
+                                }
                         }
                     } finally {
                         loading = false
@@ -577,23 +645,28 @@ fun RestorePreview(
     }
 }
 
-
 @Composable
 fun ListWidget(
-    subtitle: String, title: String, modifier: Modifier = Modifier
+    subtitle: String,
+    title: String,
+    modifier: Modifier = Modifier,
 ) {
-    ListItem(
-        headlineContent = {
-            Text(
-                title, style = MaterialTheme.typography.titleSmall.copy(
-                    fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground
-                )
-            )
-        }, supportingContent = {
-            Text(
-                subtitle, style = MaterialTheme.typography.bodySmall.copy(
+    ListItem(headlineContent = {
+        Text(
+            title,
+            style =
+                MaterialTheme.typography.titleSmall.copy(
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                ),
+        )
+    }, supportingContent = {
+        Text(
+            subtitle,
+            style =
+                MaterialTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
-                )
-            )
-        })
+                ),
+        )
+    })
 }

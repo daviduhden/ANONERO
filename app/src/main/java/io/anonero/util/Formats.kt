@@ -31,13 +31,14 @@ import kotlin.math.log10
 import kotlin.math.pow
 
 object Formats {
-
-    fun convertNumber(number: Number, locale: Locale): String? {
+    fun convertNumber(
+        number: Number,
+        locale: Locale,
+    ): String? {
         val compactDecimalFormat =
             CompactDecimalFormat.getInstance(locale, CompactDecimalFormat.CompactStyle.SHORT)
         return compactDecimalFormat.format(number)
     }
-
 
     fun maskAmount(amount: Long): String {
         val plain = getDisplayAmount(amount)
@@ -45,10 +46,11 @@ object Formats {
     }
 
     fun getDisplayAmount(amount: Long): String {
-
         if (amount == 0L) return "0.00000000"
-        var d = BigDecimal(amount).scaleByPowerOfTen(-AnonConfig.XMR_DECIMALS)
-            .setScale(8, RoundingMode.HALF_UP)
+        var d =
+            BigDecimal(amount)
+                .scaleByPowerOfTen(-AnonConfig.XMR_DECIMALS)
+                .setScale(8, RoundingMode.HALF_UP)
         if (d.scale() < 2) d = d.setScale(2, RoundingMode.UNNECESSARY)
         return d.toPlainString()
     }
@@ -65,7 +67,10 @@ object Formats {
             .toPlainString()
     }
 
-    fun formatTransactionTime(timestamp: Long, pattern: String = "HH:mm\ndd/MM"): String {
+    fun formatTransactionTime(
+        timestamp: Long,
+        pattern: String = "HH:mm\ndd/MM",
+    ): String {
         val instant =
             Instant.ofEpochSecond(timestamp)
         val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
@@ -73,14 +78,12 @@ object Formats {
         return dateTime.format(formatter)
     }
 
-
     fun formatLogTime(timestamp: Long): String {
         val instant =
             Instant.ofEpochMilli(timestamp)
         val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
         val formatter = DateTimeFormatter.ofPattern("MMM dd hh:mm")
         return dateTime.format(formatter)
-
     }
 
     fun formatFileSize(sizeInBytes: Long): String {
@@ -91,8 +94,7 @@ object Formats {
             Locale.US,
             "%.2f %s",
             sizeInBytes / 1024.0.pow(digitGroups.toDouble()),
-            units[digitGroups]
+            units[digitGroups],
         )
     }
-
 }

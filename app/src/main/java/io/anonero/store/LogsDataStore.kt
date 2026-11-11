@@ -42,24 +42,24 @@ data class AnonLog(
     val date: Long,
     val tag: String,
     val message: String,
-    val priority: Int
+    val priority: Int,
 )
 
-
 object LogSerializer : Serializer<List<AnonLog>> {
-
     override val defaultValue: List<AnonLog> = emptyList()
 
-    override suspend fun readFrom(input: InputStream): List<AnonLog> {
-        return try {
+    override suspend fun readFrom(input: InputStream): List<AnonLog> =
+        try {
             val json = input.readBytes().decodeToString()
             jsonDecoder.decodeFromString(ListSerializer(AnonLog.serializer()), json)
         } catch (e: Exception) {
             emptyList()
         }
-    }
 
-    override suspend fun writeTo(t: List<AnonLog>, output: OutputStream) {
+    override suspend fun writeTo(
+        t: List<AnonLog>,
+        output: OutputStream,
+    ) {
         val json = jsonDecoder.encodeToString(ListSerializer(AnonLog.serializer()), t)
         withContext(Dispatchers.IO) {
             output.write(json.encodeToByteArray())
@@ -67,12 +67,10 @@ object LogSerializer : Serializer<List<AnonLog>> {
     }
 }
 
-
 private val Context.logsStore: DataStore<List<AnonLog>> by dataStore(
     fileName = LOG_STORE,
-    serializer = LogSerializer
+    serializer = LogSerializer,
 )
-
 
 /**
  * Persisted application log shown in the Logs screen.
@@ -81,17 +79,19 @@ private val Context.logsStore: DataStore<List<AnonLog>> by dataStore(
  * is capped and pruned, is cleared on a successful unlock and on secure wipe, and must
  * never receive seeds, passphrases, PINs, wallet passwords, or node credentials.
  */
-class LogRepository(private val context: Context) {
-
+class LogRepository(
+    private val context: Context,
+) {
     // Expose a Flow to observe the list of items
-    val logFlow: Flow<List<AnonLog>> = context.logsStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyList()) // Handle errors by emitting an empty list
-            } else {
-                throw exception
+    val logFlow: Flow<List<AnonLog>> =
+        context.logsStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyList()) // Handle errors by emitting an empty list
+                } else {
+                    throw exception
+                }
             }
-        }
 
     suspend fun saveItems(items: List<AnonLog>) {
         context.logsStore.updateData { items }
@@ -100,11 +100,12 @@ class LogRepository(private val context: Context) {
     // Add a new item to the list,prune old items
     suspend fun addItem(item: AnonLog) {
         context.logsStore.updateData { currentItems ->
-            val prunedList = if (currentItems.size > AnonConfig.MAX_LOG_SIZE) {
-                currentItems.takeLast(AnonConfig.MAX_LOG_SIZE - 5)
-            } else {
-                currentItems
-            }
+            val prunedList =
+                if (currentItems.size > AnonConfig.MAX_LOG_SIZE) {
+                    currentItems.takeLast(AnonConfig.MAX_LOG_SIZE - 5)
+                } else {
+                    currentItems
+                }
             prunedList + item
         }
     }
@@ -113,8 +114,8 @@ class LogRepository(private val context: Context) {
     suspend fun remove(logId: AnonLog) {
         context.logsStore.updateData { currentItems ->
             currentItems.filter {
-                it.date == logId.date && it.tag == logId.tag && logId.priority == it.priority
-                        && it.message == logId.message
+                it.date == logId.date && it.tag == logId.tag && logId.priority == it.priority &&
+                    it.message == logId.message
             }
         }
     }

@@ -28,8 +28,10 @@ import org.junit.Test
 class SeedRestoreInputTest {
     @Test
     fun normalizesUnicodeSeparatorsWithoutChangingWords() {
-        assertEquals(listOf("Dummy", "word", "placeholder", "item"),
-            SeedRestoreInput.words("  Dummy\tword\nplaceholder\u00a0item\u3000"))
+        assertEquals(
+            listOf("Dummy", "word", "placeholder", "item"),
+            SeedRestoreInput.words("  Dummy\tword\nplaceholder\u00a0item\u3000"),
+        )
     }
 
     @Test
@@ -43,8 +45,14 @@ class SeedRestoreInputTest {
 
     @Test
     fun rejectsMalformedNegativeAndOverflowHeights() {
-        for (value in listOf("-1", "+1", "1.5", "one", "9223372036854775808",
-                Long.MAX_VALUE.toString())) {
+        for (value in listOf(
+            "-1",
+            "+1",
+            "1.5",
+            "one",
+            "9223372036854775808",
+            Long.MAX_VALUE.toString(),
+        )) {
             assertFalse(SeedRestoreInput.isValidHeightInput(value))
         }
         for (value in listOf("", " ", "0", " 123 ", MAX_RESTORE_HEIGHT.toString())) {

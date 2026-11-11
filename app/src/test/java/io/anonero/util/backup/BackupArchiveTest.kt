@@ -18,11 +18,6 @@
 
 package io.anonero.util.backup
 
-import java.io.File
-import java.io.IOException
-import java.nio.file.Files
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,19 +25,25 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class BackupArchiveTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private fun archive(vararg names: String): File = tmp.newFile().also { file ->
-        ZipOutputStream(file.outputStream()).use { zip ->
-            names.forEach { name ->
-                zip.putNextEntry(ZipEntry(name))
-                zip.write("archive fixture".toByteArray())
-                zip.closeEntry()
+    private fun archive(vararg names: String): File =
+        tmp.newFile().also { file ->
+            ZipOutputStream(file.outputStream()).use { zip ->
+                names.forEach { name ->
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write("archive fixture".toByteArray())
+                    zip.closeEntry()
+                }
             }
         }
-    }
 
     private fun expectRejected(block: () -> Unit) {
         try {
@@ -65,10 +66,18 @@ class BackupArchiveTest {
 
     @Test
     fun `invalid trailing entry is rejected before writing valid preceding files`() {
-        val invalidNames = listOf(
-            "../outside", "/absolute", "nested/anon.keys", "anon/../anon.keys",
-            "..\\outside", "C:\\outside", "anon.keys/", "anon-alt.keys", "unrelated"
-        )
+        val invalidNames =
+            listOf(
+                "../outside",
+                "/absolute",
+                "nested/anon.keys",
+                "anon/../anon.keys",
+                "..\\outside",
+                "C:\\outside",
+                "anon.keys/",
+                "anon-alt.keys",
+                "unrelated",
+            )
         invalidNames.forEachIndexed { index, name ->
             val source = archive("anon.json", "anon.keys", name)
             val destination = File(tmp.root, "extract-$index")

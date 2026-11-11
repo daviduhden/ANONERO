@@ -37,9 +37,12 @@ import java.io.File
  * secrets, not plausible deniability. The decoy file, its Keystore alias, and its PIN
  * hash are all discoverable by an adversary with root/forensic access to the device.
  */
-enum class WalletProfile(val walletName: String) {
+enum class WalletProfile(
+    val walletName: String,
+) {
     MAIN("anon"),
-    DECOY("anon-alt");
+    DECOY("anon-alt"),
+    ;
 
     val isDecoy: Boolean get() = this == DECOY
 }
@@ -71,51 +74,58 @@ object WalletProfileStore {
     private const val TAG = "WalletProfileStore"
     private const val DECOY_RESTORE_HEIGHT = "decoyRestoreHeight"
 
-    fun walletFile(context: Context, profile: WalletProfile): File =
-        File(AnonConfig.getDefaultWalletDir(context), profile.walletName)
+    fun walletFile(
+        context: Context,
+        profile: WalletProfile,
+    ): File = File(AnonConfig.getDefaultWalletDir(context), profile.walletName)
 
-    fun activeWalletFile(context: Context): File =
-        walletFile(context, WalletSession.profile)
+    fun activeWalletFile(context: Context): File = walletFile(context, WalletSession.profile)
 
-    fun activeWalletName(context: Context): String =
-        activeWalletFile(context).name
+    fun activeWalletName(context: Context): String = activeWalletFile(context).name
 
-    fun pinHashKey(profile: WalletProfile): String =
-        if (profile.isDecoy) PREFS_DURESS_PIN_HASH else PREFS_PIN_HASH
+    fun pinHashKey(profile: WalletProfile): String = if (profile.isDecoy) PREFS_DURESS_PIN_HASH else PREFS_PIN_HASH
 
     fun activePinHashKey(): String = pinHashKey(WalletSession.profile)
 
-    fun passphraseHashKey(profile: WalletProfile): String =
-        if (profile.isDecoy) PREFS_DECOY_PASSPHRASE_HASH else PREFS_PASSPHRASE_HASH
+    fun passphraseHashKey(profile: WalletProfile): String = if (profile.isDecoy) PREFS_DECOY_PASSPHRASE_HASH else PREFS_PASSPHRASE_HASH
 
     fun activePassphraseHashKey(): String = passphraseHashKey(WalletSession.profile)
 
-    fun restoreHeightKey(profile: WalletProfile): String =
-        if (profile.isDecoy) DECOY_RESTORE_HEIGHT else RESTORE_HEIGHT
+    fun restoreHeightKey(profile: WalletProfile): String = if (profile.isDecoy) DECOY_RESTORE_HEIGHT else RESTORE_HEIGHT
 
     /*
      * A decoy is usable only when all three pieces are present: the configured flag,
      * the encrypted wallet file, and the Keystore-wrapped wallet secret. If the file is
      * missing the duress PIN must not fall through to the legitimate wallet.
      */
-    fun isDecoyConfigured(context: Context, prefs: SharedPreferences): Boolean {
+    fun isDecoyConfigured(
+        context: Context,
+        prefs: SharedPreferences,
+    ): Boolean {
         if (!prefs.getBoolean(PREFS_DECOY_CONFIGURED, false)) return false
         if (prefs.getString(PREFS_DURESS_PIN_HASH, "").isNullOrEmpty()) return false
         val file = walletFile(context, WalletProfile.DECOY)
         return file.exists() && WalletKey.exists(context, file.name)
     }
 
-    /* Files belonging to one wallet file: base cache, .keys, .address.txt, snapshots. */
-    fun walletFiles(context: Context, profile: WalletProfile): List<File> {
+    // Files belonging to one wallet file: base cache, .keys, .address.txt, snapshots.
+    fun walletFiles(
+        context: Context,
+        profile: WalletProfile,
+    ): List<File> {
         val dir = AnonConfig.getDefaultWalletDir(context)
         val name = profile.walletName
-        return dir.listFiles()
+        return dir
+            .listFiles()
             ?.filter { it.isFile && (it.name == name || it.name.startsWith("$name.")) }
             ?: emptyList()
     }
 
-    /* True if the legitimate wallet, a usable decoy, or both exist. */
-    fun anyWalletExists(context: Context, prefs: SharedPreferences): Boolean =
+    // True if the legitimate wallet, a usable decoy, or both exist.
+    fun anyWalletExists(
+        context: Context,
+        prefs: SharedPreferences,
+    ): Boolean =
         walletFile(context, WalletProfile.MAIN).exists() ||
             isDecoyConfigured(context, prefs)
 
@@ -124,7 +134,11 @@ object WalletProfileStore {
      * what makes a wipe performed from the decoy profile non-destructive to the real
      * wallet.
      */
-    fun removeProfile(context: Context, prefs: SharedPreferences, profile: WalletProfile): Boolean {
+    fun removeProfile(
+        context: Context,
+        prefs: SharedPreferences,
+        profile: WalletProfile,
+    ): Boolean {
         var ok = true
         val keyName = walletFile(context, profile).name
         walletFiles(context, profile).forEach { file ->
@@ -166,7 +180,7 @@ object WalletProfileStore {
     fun resolvePin(
         context: Context,
         prefs: SharedPreferences,
-        pin: String
+        pin: String,
     ): WalletProfile? {
         val mainHash = prefs.getString(PREFS_PIN_HASH, "")
         val decoyHash = prefs.getString(PREFS_DURESS_PIN_HASH, "")
@@ -175,12 +189,13 @@ object WalletProfileStore {
         // Always perform both derivations. Short-circuiting on the main match would make
         // a correct main PIN noticeably faster than a correct duress PIN.
         val mainMatches = PinHash.matches(pin, mainHash)
-        val decoyMatches = if (decoyUsable) {
-            PinHash.matches(pin, decoyHash)
-        } else {
-            PinHash.matchesOrDummy(pin, decoyHash)
-            false
-        }
+        val decoyMatches =
+            if (decoyUsable) {
+                PinHash.matches(pin, decoyHash)
+            } else {
+                PinHash.matchesOrDummy(pin, decoyHash)
+                false
+            }
 
         return when {
             mainMatches -> WalletProfile.MAIN

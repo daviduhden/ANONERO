@@ -54,7 +54,7 @@ class WalletManager {
         password: String,
         passphrase: String,
         language: String,
-        height: Long
+        height: Long,
     ): Wallet {
         val walletHandle =
             createWalletJ(aFile.absolutePath, password, passphrase, language, networkType.value)
@@ -93,11 +93,16 @@ class WalletManager {
         password: String,
         passphrase: String,
         language: String,
-        height: Long
+        height: Long,
     ): Wallet {
-        val handle = createWalletJ(
-            aFile.absolutePath, password, passphrase, language, networkType.value
-        )
+        val handle =
+            createWalletJ(
+                aFile.absolutePath,
+                password,
+                passphrase,
+                language,
+                networkType.value,
+            )
         if (handle == 0L) throw IllegalStateException("Wallet creation failed")
         return Wallet(handle)
     }
@@ -107,10 +112,13 @@ class WalletManager {
         password: String,
         passphrase: String,
         language: String,
-        networkType: Int
+        networkType: Int,
     ): Long
 
-    fun openWallet(path: String, password: String): Wallet {
+    fun openWallet(
+        path: String,
+        password: String,
+    ): Wallet {
         val walletHandle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
         if (walletHandle == 0L) throw IllegalStateException("Wallet open failed")
         val wallet = Wallet(walletHandle)
@@ -122,7 +130,10 @@ class WalletManager {
      * Opens a second wallet without making it the managed live one -- for working on a
      * copy while the real wallet stays open. Close it with [closeUnmanaged].
      */
-    fun openWalletUnmanaged(path: String, password: String): Wallet {
+    fun openWalletUnmanaged(
+        path: String,
+        password: String,
+    ): Wallet {
         val handle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
         if (handle == 0L) throw IllegalStateException("Wallet open failed")
         return Wallet(handle)
@@ -134,7 +145,7 @@ class WalletManager {
         path: String,
         password: String,
         networkType: Int,
-        isViewOnly: Boolean
+        isViewOnly: Boolean,
     ): Long
 
     fun recoveryWallet(
@@ -142,13 +153,17 @@ class WalletManager {
         password: String,
         mnemonic: String,
         offset: String,
-        restoreHeight: Long
+        restoreHeight: Long,
     ): Wallet {
-        val walletHandle = recoveryWalletJ(
-            aFile.absolutePath, password,
-            mnemonic, offset,
-            networkType.value, restoreHeight
-        )
+        val walletHandle =
+            recoveryWalletJ(
+                aFile.absolutePath,
+                password,
+                mnemonic,
+                offset,
+                networkType.value,
+                restoreHeight,
+            )
         if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
@@ -156,20 +171,28 @@ class WalletManager {
     }
 
     private external fun recoveryWalletJ(
-        path: String, password: String,
-        mnemonic: String, offset: String,
-        networkType: Int, restoreHeight: Long
+        path: String,
+        password: String,
+        mnemonic: String,
+        offset: String,
+        networkType: Int,
+        restoreHeight: Long,
     ): Long
 
     fun recoveryWalletPolyseed(
-        aFile: File, password: String,
-        mnemonic: String, offset: String
+        aFile: File,
+        password: String,
+        mnemonic: String,
+        offset: String,
     ): Wallet {
-        val walletHandle = recoveryWalletPolyseedJ(
-            aFile.absolutePath, password,
-            mnemonic, offset,
-            networkType.value
-        )
+        val walletHandle =
+            recoveryWalletPolyseedJ(
+                aFile.absolutePath,
+                password,
+                mnemonic,
+                offset,
+                networkType.value,
+            )
         if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
@@ -177,20 +200,33 @@ class WalletManager {
     }
 
     private external fun recoveryWalletPolyseedJ(
-        path: String, password: String,
-        mnemonic: String, offset: String,
-        networkType: Int
+        path: String,
+        password: String,
+        mnemonic: String,
+        offset: String,
+        networkType: Int,
     ): Long
 
     fun createWalletWithKeys(
-        aFile: File, password: String, language: String, restoreHeight: Long,
-        addressString: String, viewKeyString: String, spendKeyString: String
+        aFile: File,
+        password: String,
+        language: String,
+        restoreHeight: Long,
+        addressString: String,
+        viewKeyString: String,
+        spendKeyString: String,
     ): Wallet {
-        val walletHandle = createWalletFromKeysJ(
-            aFile.absolutePath, password,
-            language, networkType.value, restoreHeight,
-            addressString, viewKeyString, spendKeyString
-        )
+        val walletHandle =
+            createWalletFromKeysJ(
+                aFile.absolutePath,
+                password,
+                language,
+                networkType.value,
+                restoreHeight,
+                addressString,
+                viewKeyString,
+                spendKeyString,
+            )
         if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
@@ -198,24 +234,31 @@ class WalletManager {
     }
 
     private external fun createWalletFromKeysJ(
-        path: String, password: String,
+        path: String,
+        password: String,
         language: String,
         networkType: Int,
         restoreHeight: Long,
         addressString: String,
         viewKeyString: String,
-        spendKeyString: String
+        spendKeyString: String,
     ): Long
 
     fun createWalletFromDevice(
-        aFile: File, password: String, restoreHeight: Long,
-        deviceName: String
+        aFile: File,
+        password: String,
+        restoreHeight: Long,
+        deviceName: String,
     ): Wallet {
-        val walletHandle = createWalletFromDeviceJ(
-            aFile.absolutePath, password,
-            networkType.value, deviceName, restoreHeight,
-            "5:20"
-        )
+        val walletHandle =
+            createWalletFromDeviceJ(
+                aFile.absolutePath,
+                password,
+                networkType.value,
+                deviceName,
+                restoreHeight,
+                "5:20",
+            )
         if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
@@ -223,14 +266,16 @@ class WalletManager {
     }
 
     private external fun createWalletFromDeviceJ(
-        path: String, password: String,
+        path: String,
+        password: String,
         networkType: Int,
         deviceName: String,
         restoreHeight: Long,
-        subaddressLookahead: String
+        subaddressLookahead: String,
     ): Long
 
     external fun closeJ(wallet: Wallet?): Boolean
+
     fun close(wallet: Wallet): Boolean {
         unmanageWallet(wallet)
         return try {
@@ -248,22 +293,25 @@ class WalletManager {
         }
     }
 
-    fun walletExists(aFile: File): Boolean {
-        return walletExists(aFile.absolutePath)
-    }
+    fun walletExists(aFile: File): Boolean = walletExists(aFile.absolutePath)
 
     private external fun walletExists(path: String?): Boolean
+
     external fun verifyWalletPassword(
         keysFileName: String?,
         password: String?,
-        watchOnly: Boolean
+        watchOnly: Boolean,
     ): Boolean
 
-    fun verifyWalletPasswordOnly(keysFileName: String, password: String): Boolean {
-        return queryWalletDeviceJ(keysFileName, password) >= 0
-    }
+    fun verifyWalletPasswordOnly(
+        keysFileName: String,
+        password: String,
+    ): Boolean = queryWalletDeviceJ(keysFileName, password) >= 0
 
-    private external fun queryWalletDeviceJ(keysFileName: String, password: String): Int
+    private external fun queryWalletDeviceJ(
+        keysFileName: String,
+        password: String,
+    ): Int
 
     // this should not be called on the main thread as it connects to the node (and takes a long time)
     fun setDaemon(node: Node?) {
@@ -279,32 +327,42 @@ class WalletManager {
             daemonAddress = null
             daemonUsername = ""
             daemonPassword = ""
-            //setDaemonAddressJ(""); // don't disconnect as monero code blocks for many seconds!
-            //TODO: need to do something about that later
+            // setDaemonAddressJ(""); // don't disconnect as monero code blocks for many seconds!
+            // TODO: need to do something about that later
         }
     }
 
-    fun getDaemonAddress(): String? {
-        return daemonAddress
-    }
+    fun getDaemonAddress(): String? = daemonAddress
 
     private external fun setDaemonAddressJ(address: String)
+
     external fun getDaemonVersion(): Int
+
     external fun getBlockchainHeight(): Long
+
     external fun getBlockchainTargetHeight(): Long
+
     external fun getNetworkDifficulty(): Long
+
     external fun getMiningHashRate(): Double
+
     external fun getBlockTarget(): Long
+
     external fun isMining(): Boolean
 
     external fun startMining(
         address: String?,
         backgroundMining: Boolean,
-        ignoreBattery: Boolean
+        ignoreBattery: Boolean,
     ): Boolean
 
     external fun stopMining(): Boolean
-    external fun resolveOpenAlias(address: String?, dnssec_valid: Boolean): String?
+
+    external fun resolveOpenAlias(
+        address: String?,
+        dnssec_valid: Boolean,
+    ): String?
+
     fun setProxy(address: String): Boolean {
         val accepted = setProxyJ(address)
         if (accepted) proxy = address
@@ -313,14 +371,16 @@ class WalletManager {
 
     private external fun setProxyJ(address: String?): Boolean
 
-    inner class WalletInfo(wallet: File) : Comparable<WalletInfo> {
+    inner class WalletInfo(
+        wallet: File,
+    ) : Comparable<WalletInfo> {
         private val path: File? = wallet.parentFile
         private val name: String = wallet.name
 
-        override fun compareTo(other: WalletInfo): Int {
-            return name.lowercase(Locale.getDefault())
+        override fun compareTo(other: WalletInfo): Int =
+            name
+                .lowercase(Locale.getDefault())
                 .compareTo(other.name.lowercase(Locale.getDefault()))
-        }
     }
 
     companion object {
@@ -346,35 +406,49 @@ class WalletManager {
             System.loadLibrary("anonero")
         }
 
-        fun addressPrefix(networkType: NetworkType): String {
-            return when (networkType) {
+        fun addressPrefix(networkType: NetworkType): String =
+            when (networkType) {
                 NetworkType.NetworkType_Testnet -> "9A-"
                 NetworkType.NetworkType_Mainnet -> "4-"
                 NetworkType.NetworkType_Stagenet -> "5-"
             }
-        }
 
         fun resetInstance() {
             instance = null
         }
 
         @JvmStatic
-        external fun initLogger(argv0: String?, defaultLogBaseName: String?)
+        external fun initLogger(
+            argv0: String?,
+            defaultLogBaseName: String?,
+        )
 
         @JvmStatic
         external fun setLogLevel(level: Int)
 
         @JvmStatic
-        external fun logDebug(category: String?, message: String?)
+        external fun logDebug(
+            category: String?,
+            message: String?,
+        )
 
         @JvmStatic
-        external fun logInfo(category: String?, message: String?)
+        external fun logInfo(
+            category: String?,
+            message: String?,
+        )
 
         @JvmStatic
-        external fun logWarning(category: String?, message: String?)
+        external fun logWarning(
+            category: String?,
+            message: String?,
+        )
 
         @JvmStatic
-        external fun logError(category: String?, message: String?)
+        external fun logError(
+            category: String?,
+            message: String?,
+        )
 
         @JvmStatic
         external fun moneroVersion(): String?

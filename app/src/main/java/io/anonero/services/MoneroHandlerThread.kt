@@ -19,29 +19,37 @@ import timber.log.Timber
  * A reconnect re-initializes the native wallet and, for LWS, logs in again with the trust
  * flag disabled.
  */
-class MoneroHandlerThread(private val wallet: Wallet, private val walletState: WalletState) :
-    Thread(null, null, "MoneroHandler", THREAD_STACK_SIZE), WalletListener {
-
-
+class MoneroHandlerThread(
+    private val wallet: Wallet,
+    private val walletState: WalletState,
+) : Thread(null, null, "MoneroHandler", THREAD_STACK_SIZE),
+    WalletListener {
     @Synchronized
     override fun start() {
         super.start()
     }
 
     override fun run() {
-
     }
 
-    override fun moneySpent(txId: String?, amount: Long) {
-
+    override fun moneySpent(
+        txId: String?,
+        amount: Long,
+    ) {
     }
 
-    override fun moneyReceived(txId: String?, amount: Long) {
+    override fun moneyReceived(
+        txId: String?,
+        amount: Long,
+    ) {
         // Do not log the amount; logs are persisted and may be shared by the user.
         WalletManager.instance?.wallet?.store()
     }
 
-    override fun unconfirmedMoneyReceived(txId: String?, amount: Long) {}
+    override fun unconfirmedMoneyReceived(
+        txId: String?,
+        amount: Long,
+    ) {}
 
     override fun newBlock(height: Long) {
         Timber.tag(name).d("newBlock: %s", height)
@@ -55,11 +63,12 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
         if (syncHeight < 0 || left < 0) {
             return
         }
-        val progress = if (wallet.getDaemonBlockChainTargetHeight().toDouble() == 0.0) {
-            1f
-        } else {
-            (height.toDouble() / wallet.getDaemonBlockChainTargetHeight().toDouble()).toFloat()
-        }
+        val progress =
+            if (wallet.getDaemonBlockChainTargetHeight().toDouble() == 0.0) {
+                1f
+            } else {
+                (height.toDouble() / wallet.getDaemonBlockChainTargetHeight().toDouble()).toFloat()
+            }
         walletState.syncUpdate(SyncProgress(progress, left))
     }
 
@@ -73,9 +82,9 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
         val status = wallet.fullStatus.connectionStatus
         val daemonHeight = wallet.getDaemonBlockChainHeight()
         val chainHeight = wallet.getBlockChainHeight()
-        /// height
+        // / height
         // runs every ~10s: routine passes are debug-only, reconnects stay in release logs
-        val summary = "refreshed() status:${status} daemonHeight:$daemonHeight chainHeight:$chainHeight"
+        val summary = "refreshed() status:$status daemonHeight:$daemonHeight chainHeight:$chainHeight"
         Timber.tag(name).d(summary)
         if (wallet.isLightWallet) {
             // LWS scan height legitimately trails the chain; the normal height-difference
@@ -94,7 +103,7 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
             return
         }
         if (walletState.offline) {
-            //no node to reconnect to
+            // no node to reconnect to
             walletState.setLoading(false)
         } else if (status === Wallet.ConnectionStatus.ConnectionStatus_Disconnected || status == null) {
             Timber.tag(name).i("restarting connection: $summary")
@@ -115,7 +124,6 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
                 refresh(true)
                 walletState.setLoading(false)
             }
-
         }
         walletState.update()
     }
@@ -156,13 +164,13 @@ class MoneroHandlerThread(private val wallet: Wallet, private val walletState: W
         walletState.update()
     }
 
-    fun sendTx(pendingTx: PendingTransaction): Boolean {
-        return pendingTx.commit("", true)
-    }
+    fun sendTx(pendingTx: PendingTransaction): Boolean = pendingTx.commit("", true)
 
     interface Listener {
         fun onRefresh(walletSynced: Boolean)
+
         fun onConnectionFail()
+
         fun onNewBlockFound(block: Long)
     }
 

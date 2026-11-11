@@ -93,9 +93,9 @@ import io.anonero.icons.AnonIcons
 import io.anonero.util.Formats
 import io.anonero.util.KeyStoreHelper
 import io.anonero.util.PREFS_PASSPHRASE_HASH
-import io.anonero.util.WalletProfileStore
 import io.anonero.util.ShakeConfig
 import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WalletProfileStore
 import io.anonero.util.backup.BackupHelper
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
@@ -110,7 +110,6 @@ import org.koin.core.qualifier.named
 import timber.log.Timber
 import java.io.File
 
-
 private const val TAG = "ExportBackUp"
 
 /**
@@ -121,15 +120,14 @@ private const val TAG = "ExportBackUp"
  * decoy is recovered from its seed.
  */
 class ExportBackUpViewModel : ViewModel() {
-
     private val backupFile = MutableLiveData<File?>(null)
     private val backupError = MutableLiveData<Boolean>(false)
 
     val backupFileLive: LiveData<File?> = backupFile
     val backupErrorLive: LiveData<Boolean> = backupError
 
-    fun createBackUp(passPhrase: String): Job {
-        return viewModelScope.launch(Dispatchers.IO) {
+    fun createBackUp(passPhrase: String): Job =
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val path = BackupHelper.createBackUp(passPhrase, AnonConfig.context!!)
                 Timber.tag(TAG).i("Backup created")
@@ -143,13 +141,11 @@ class ExportBackUpViewModel : ViewModel() {
                 backupError.postValue(true)
             }
         }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportBackUp(onBackPress: () -> Unit = {}) {
-
     val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val exportViewModel = viewModel<ExportBackUpViewModel>()
     val focusRequester = remember { FocusRequester() }
@@ -166,37 +162,42 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
     val backupFailedMessage = stringResource(R.string.backup_failed_generic)
     LaunchedEffect(backupError) {
         if (backupError == true) {
-            android.widget.Toast.makeText(context, backupFailedMessage, android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast
+                .makeText(context, backupFailedMessage, android.widget.Toast.LENGTH_LONG)
+                .show()
         }
     }
 
     val backgroundBlur: Float by animateFloatAsState(
         if (passPhraseDialog) 6f else 0f,
-        label = "blur-radius"
+        label = "blur-radius",
     )
 
     fun createBackUp() {
         if (AnonConfig.viewOnly &&
             (passPhrase.length < 8 || passPhrase != confirmPassPhrase)
-        ) return
+        ) {
+            return
+        }
         val candidate = passPhrase
         scope.launch {
-            val accepted = try {
-                if (AnonConfig.viewOnly) {
-                    true
-                } else {
-                    withContext(Dispatchers.IO) {
-                        val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
-                        hash == KeyStoreHelper.getCrazyPass(context, candidate)
+            val accepted =
+                try {
+                    if (AnonConfig.viewOnly) {
+                        true
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
+                            hash == KeyStoreHelper.getCrazyPass(context, candidate)
+                        }
                     }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    Timber.tag(TAG).e("Backup passphrase verification failed")
+                    Toast.makeText(context, backupFailedMessage, Toast.LENGTH_LONG).show()
+                    return@launch
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                Timber.tag(TAG).e("Backup passphrase verification failed")
-                Toast.makeText(context, backupFailedMessage, Toast.LENGTH_LONG).show()
-                return@launch
-            }
             if (accepted) {
                 passPhraseDialog = false
                 passPhrase = ""
@@ -219,63 +220,77 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
         }
     }
 
-    //write the backup to the place picked in the system save dialog
-    val saveBackup = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        val file = backupFile
-        if (uri != null && file != null) {
-            scope.launch(Dispatchers.IO) {
-                val saved = try {
-                    context.contentResolver.openOutputStream(uri)?.use { out ->
-                        file.inputStream().use { it.copyTo(out) }
-                    } != null
-                } catch (e: Exception) {
-                    Timber.tag(TAG).e(e)
-                    false
-                }
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        if (saved) resources.getString(R.string.file_saved)
-                        else resources.getString(R.string.could_not_save_file),
-                        Toast.LENGTH_SHORT
-                    ).show()
+    // write the backup to the place picked in the system save dialog
+    val saveBackup =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/octet-stream"),
+        ) { uri ->
+            val file = backupFile
+            if (uri != null && file != null) {
+                scope.launch(Dispatchers.IO) {
+                    val saved =
+                        try {
+                            context.contentResolver.openOutputStream(uri)?.use { out ->
+                                file.inputStream().use { it.copyTo(out) }
+                            } != null
+                        } catch (e: Exception) {
+                            Timber.tag(TAG).e(e)
+                            false
+                        }
+                    withContext(Dispatchers.Main) {
+                        Toast
+                            .makeText(
+                                context,
+                                if (saved) {
+                                    resources.getString(R.string.file_saved)
+                                } else {
+                                    resources.getString(R.string.could_not_save_file)
+                                },
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
                 }
             }
         }
-    }
 
     fun exportToExternDir() {
         val file = backupFile ?: return
         saveBackup.launch(file.name)
     }
-    if (passPhraseDialog)
+    if (passPhraseDialog) {
         AlertDialog(
-            modifier = Modifier
-                .shake(errorShake)
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+            modifier =
+                Modifier
+                    .shake(errorShake)
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                ),
             containerColor = MaterialTheme.colorScheme.secondary,
-            properties = DialogProperties(
-                securePolicy = SecureFlagPolicy.SecureOn,
-                dismissOnBackPress = false,
-                dismissOnClickOutside = false
-            ),
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                ),
             title = {
                 Text(
-                    text = stringResource(
-                        if (AnonConfig.viewOnly) R.string.encrypted_backup
-                        else R.string.enter_seed_phrase
-                    ),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 18.sp
-                    )
+                    text =
+                        stringResource(
+                            if (AnonConfig.viewOnly) {
+                                R.string.encrypted_backup
+                            } else {
+                                R.string.enter_seed_phrase
+                            },
+                        ),
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                        ),
                 )
             },
             text = {
@@ -287,32 +302,35 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                         value = passPhrase,
                         shape = MaterialTheme.shapes.small,
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                        ),
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                            .padding(
-                                top = 8.dp
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                             ),
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = if (AnonConfig.viewOnly) ImeAction.Next else ImeAction.Done,
-                            keyboardType = KeyboardType.Password,
-                            autoCorrectEnabled = false,
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                createBackUp()
-                            }
-                        ),
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
+                                .padding(
+                                    top = 8.dp,
+                                ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = if (AnonConfig.viewOnly) ImeAction.Next else ImeAction.Done,
+                                keyboardType = KeyboardType.Password,
+                                autoCorrectEnabled = false,
+                            ),
+                        keyboardActions =
+                            KeyboardActions(
+                                onDone = {
+                                    createBackUp()
+                                },
+                            ),
                         onValueChange = {
                             passPhrase = it
                         },
-
-                        )
+                    )
 
                     if (AnonConfig.viewOnly) {
                         OutlinedTextField(
@@ -327,11 +345,12 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                                     Text(stringResource(R.string.passphrases_do_not_match))
                                 }
                             },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done,
-                                keyboardType = KeyboardType.Password,
-                                autoCorrectEnabled = false,
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Done,
+                                    keyboardType = KeyboardType.Password,
+                                    autoCorrectEnabled = false,
+                                ),
                             keyboardActions = KeyboardActions(onDone = { createBackUp() }),
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -344,19 +363,22 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
                         ),
-                    enabled = !AnonConfig.viewOnly ||
-                        (passPhrase.length >= 8 && passPhrase == confirmPassPhrase),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    enabled =
+                        !AnonConfig.viewOnly ||
+                            (passPhrase.length >= 8 && passPhrase == confirmPassPhrase),
                     onClick = {
                         createBackUp()
-                    }) { Text(stringResource(R.string.create)) }
+                    },
+                ) { Text(stringResource(R.string.create)) }
             },
             dismissButton = {
                 Button(
@@ -365,97 +387,104 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                         onBackPress.invoke()
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.cancel),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
-            }
+            },
         )
-
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 title = {
                     Text(stringResource(R.string.encrypted_backup))
-                }
+                },
             )
-        }
+        },
     ) {
         Box(
-            modifier = Modifier
-                .padding(it)
-                .blur(backgroundBlur.dp)
-                .padding(
-                    horizontal = 8.dp
-                )
+            modifier =
+                Modifier
+                    .padding(it)
+                    .blur(backgroundBlur.dp)
+                    .padding(
+                        horizontal = 8.dp,
+                    ),
         ) {
             if (!passPhraseDialog && backupFile == null) {
                 Column(
                     Modifier
                         .fillMaxSize()
                         .padding(
-                            all = 12.dp
+                            all = 12.dp,
                         ),
                     verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(300.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.generating_backup))
                 }
             } else {
                 if (backupFile != null) {
-
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(
-                                horizontal = 12.dp
-                            ),
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(
+                                    horizontal = 12.dp,
+                                ),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Spacer(Modifier.fillMaxWidth())
                         Column {
-
                             ListItem(
-                                modifier = Modifier
-                                    .border(
-                                        1.dp,
-                                        color = MaterialTheme.colorScheme.primary.copy(
-                                            alpha = 1f
+                                modifier =
+                                    Modifier
+                                        .border(
+                                            1.dp,
+                                            color =
+                                                MaterialTheme.colorScheme.primary.copy(
+                                                    alpha = 1f,
+                                                ),
+                                            shape = MaterialTheme.shapes.medium,
                                         ),
-                                        shape = MaterialTheme.shapes.medium,
-                                    ),
                                 headlineContent = {
                                     Text(
                                         "${backupFile?.name}",
-                                        style = MaterialTheme.typography
-                                            .titleSmall
+                                        style =
+                                            MaterialTheme.typography
+                                                .titleSmall,
                                     )
                                 },
                                 trailingContent = {
@@ -466,34 +495,39 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                                         AnonIcons.FileEarmarkLock,
                                         contentDescription = stringResource(R.string.app_logo),
                                         modifier = Modifier.size(24.dp),
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = MaterialTheme.colorScheme.primary,
                                     )
-                                }
+                                },
                             )
                             Text(
-                                stringResource(R.string.backup_generated_successfully), textAlign = TextAlign.Center,
+                                stringResource(R.string.backup_generated_successfully),
+                                textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        top = 24.dp,
-                                        bottom = 4.dp
-                                    )
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            top = 24.dp,
+                                            bottom = 4.dp,
+                                        ),
                             )
                             Text(
                                 stringResource(R.string.save_backup_instruction),
                                 textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = Color.Gray
-                                )
+                                style =
+                                    MaterialTheme.typography.bodySmall.copy(
+                                        color = Color.Gray,
+                                    ),
                             )
                         }
                         AnonOutlineButton(
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(0.9f),
                             onClick = {
                                 exportToExternDir()
-                            }) { Text(stringResource(R.string.export_to_file)) }
+                            },
+                        ) { Text(stringResource(R.string.export_to_file)) }
                     }
                 }
             }
@@ -501,12 +535,10 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(device = "id:pixel_5")
 @Composable
 private fun SeedSettingsPre() {
     AnonNeroTheme {
-
     }
 }

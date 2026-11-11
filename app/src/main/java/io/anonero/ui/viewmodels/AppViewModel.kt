@@ -50,9 +50,7 @@ class AppViewModel(
     private val walletState: WalletState,
     private val torService: TorService,
     private val logRepository: LogRepository,
-) :
-    ViewModel() {
-
+) : ViewModel() {
     private var splashInit = false
     private var walletExist: MutableSharedFlow<Boolean> = MutableSharedFlow(replay = 2)
 
@@ -68,17 +66,17 @@ class AppViewModel(
                     AnonConfig.context!!,
                     AnonConfig.context!!.getSharedPreferences(
                         AnonConfig.PREFS,
-                        android.content.Context.MODE_PRIVATE
-                    )
-                )
+                        android.content.Context.MODE_PRIVATE,
+                    ),
+                ),
             )
             splashInit = true
         }
     }
 
     @Synchronized
-    fun openWallet(pin: String): Boolean {
-        return try {
+    fun openWallet(pin: String): Boolean =
+        try {
             val opened = walletHandler.openWallet(pin)
             if (opened) {
                 walletState.setProfile(io.anonero.util.WalletSession.profile)
@@ -90,8 +88,10 @@ class AppViewModel(
                 // Do not leave a previous profile's notification (or an old activity
                 // count) sitting in the system shade.
                 AnonConfig.context?.let { context ->
-                    (context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
-                        as? android.app.NotificationManager)?.cancel(NOTIFICATION_ID + 1)
+                    (
+                        context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+                            as? android.app.NotificationManager
+                    )?.cancel(NOTIFICATION_ID + 1)
                     // A copied address or signature must not cross into the other profile.
                     SecureClipboard.clear(context)
                 }
@@ -100,17 +100,16 @@ class AppViewModel(
         } catch (e: InvalidPin) {
             false
         }
-    }
 
     @Synchronized
     fun startService() {
-        walletHandler.scope.launch {
-            walletHandler.startService()
-        }.invokeOnCompletion {
-            if (it != null)
-                Timber.tag(TAG).e(it)
-        }
+        walletHandler.scope
+            .launch {
+                walletHandler.startService()
+            }.invokeOnCompletion {
+                if (it != null) {
+                    Timber.tag(TAG).e(it)
+                }
+            }
     }
-
-
 }

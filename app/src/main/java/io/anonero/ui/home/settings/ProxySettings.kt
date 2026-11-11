@@ -24,6 +24,7 @@ import android.net.Uri
 import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -75,7 +76,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.annotation.StringRes
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
@@ -89,6 +89,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -96,8 +98,8 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import io.anonero.AnonConfig
 import io.anonero.R
-import io.anonero.model.WalletManager
 import io.anonero.icons.AnonIcons
+import io.anonero.model.WalletManager
 import io.anonero.services.AnonWalletHandler
 import io.anonero.services.TorService
 import io.anonero.util.WALLET_PROXY
@@ -111,27 +113,28 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
 import java.util.regex.Pattern
-import androidx.core.content.edit
-import androidx.core.net.toUri
 
 private const val TAG = "ProxySettings"
 
-enum class ProxyValidationError(@StringRes val messageRes: Int) {
+enum class ProxyValidationError(
+    @StringRes val messageRes: Int,
+) {
     INVALID_ADDRESS(R.string.invalid_proxy_address),
     INVALID_PORT(R.string.invalid_port),
     UPDATE_FAILED(R.string.proxy_update_failed),
 }
 
-
 // Accepts IPv4 and the full eight-group IPv6 form. Compressed IPv6 (::) is intentionally
 // not accepted by this UI validator; a valid compressed address may be rejected here.
 fun isNumericAddress(address: String): Boolean {
-    val ipv4Pattern = Pattern.compile(
-        "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
-    )
-    val ipv6Pattern = Pattern.compile(
-        "^(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}$"
-    )
+    val ipv4Pattern =
+        Pattern.compile(
+            "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+        )
+    val ipv6Pattern =
+        Pattern.compile(
+            "^(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}$",
+        )
     return ipv4Pattern.matcher(address).matches() || ipv6Pattern.matcher(address).matches()
 }
 
@@ -140,7 +143,6 @@ class ProxySettingsViewModel(
     private val torService: TorService,
     private val anonPrefs: SharedPreferences,
 ) : ViewModel() {
-
     private val addressValidationError = MutableLiveData<ProxyValidationError?>()
     private val _proxyLoading = MutableLiveData(false)
     private val _proxyAddress = MutableLiveData<Pair<String, Int>?>()
@@ -149,12 +151,11 @@ class ProxySettingsViewModel(
     val proxy: LiveData<Pair<String, Int>?> get() = _proxyAddress
     val loading: LiveData<Boolean> get() = _proxyLoading
     val useManualProxy: LiveData<Boolean> get() = _useManualProxy
-    val logs: LiveData<List<String>> = torService.torLogs
-        .runningFold<String, List<String>>(emptyList()) { accumulator, value ->
-            accumulator + value
-        }
-        .asLiveData()
-
+    val logs: LiveData<List<String>> =
+        torService.torLogs
+            .runningFold<String, List<String>>(emptyList()) { accumulator, value ->
+                accumulator + value
+            }.asLiveData()
 
     init {
         updateProxyState()
@@ -168,7 +169,11 @@ class ProxySettingsViewModel(
         }
     }
 
-    fun setProxy(proxy: String, port: Int, persist: Boolean = true): Job {
+    fun setProxy(
+        proxy: String,
+        port: Int,
+        persist: Boolean = true,
+    ): Job {
         _proxyLoading.postValue(true)
         return viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -205,8 +210,10 @@ class ProxySettingsViewModel(
 
     fun enableTor(enable: Boolean) {
         if (!enable &&
-            (anonPrefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) ||
-                WalletManager.instance?.wallet?.isLightWallet == true)
+            (
+                anonPrefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) ||
+                    WalletManager.instance?.wallet?.isLightWallet == true
+            )
         ) {
             addressValidationError.postValue(ProxyValidationError.UPDATE_FAILED)
             return
@@ -236,7 +243,6 @@ class ProxySettingsViewModel(
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -274,17 +280,17 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                     left = 0.dp,
                     top = 0.dp,
                     right = 0.dp,
-                    bottom = 0.dp
+                    bottom = 0.dp,
                 )
             },
             shape = MaterialTheme.shapes.large,
-            properties = ModalBottomSheetProperties(
-                shouldDismissOnBackPress = true,
-            ),
+            properties =
+                ModalBottomSheetProperties(
+                    shouldDismissOnBackPress = true,
+                ),
         ) {
             TorLogs()
         }
-
     }
 
     Scaffold(
@@ -294,7 +300,7 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                 TopAppBar(
                     navigationIcon = {
                         IconButton(
-                            onClick = onBackPress
+                            onClick = onBackPress,
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
@@ -303,7 +309,7 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                         IconButton(
                             onClick = {
                                 showLogs = !showLogs
-                            }
+                            },
                         ) {
                             Icon(Icons.AutoMirrored.Outlined.List, contentDescription = null)
                         }
@@ -315,43 +321,50 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                 Box(modifier = Modifier.height(4.dp)) {
                     this@Column.AnimatedVisibility(visible = loading) {
                         LinearProgressIndicator(
-                            trackColor = MaterialTheme.colorScheme.primary.copy(
-                                alpha = 0.2f
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
+                            trackColor =
+                                MaterialTheme.colorScheme.primary.copy(
+                                    alpha = 0.2f,
+                                ),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
                         )
                     }
                 }
             }
-        }
+        },
     ) {
         Column(
             modifier = Modifier.padding(it),
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.Top,
         ) {
             Card(
-                modifier = Modifier
-                    .padding(
-                        horizontal = 12.dp,
-                        vertical = 6.dp
+                modifier =
+                    Modifier
+                        .padding(
+                            horizontal = 12.dp,
+                            vertical = 6.dp,
+                        ),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = Color.Transparent,
                     ),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.Transparent,
-                ),
                 shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+                border =
+                    BorderStroke(
+                        width = 1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
                     ),
-                )
             ) {
                 ListItem(
-                    colors = ListItemDefaults.colors(
-                        containerColor = Color.Transparent
-                    ),
+                    colors =
+                        ListItemDefaults.colors(
+                            containerColor = Color.Transparent,
+                        ),
                     headlineContent = {
                         Text(stringResource(id = R.string.manual_proxy))
                     },
@@ -364,10 +377,11 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                             onCheckedChange = { onState ->
                                 proxyViewModel.enableTor(!onState)
                                 view.performHapticFeedback(
-                                    HapticFeedbackConstants.KEYBOARD_TAP
+                                    HapticFeedbackConstants.KEYBOARD_TAP,
                                 )
-                            })
-                    }
+                            },
+                        )
+                    },
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
@@ -392,23 +406,24 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                         try {
                             text.toUri()
                         } catch (_: Exception) {
-
                         }
                     },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next,
-                    ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                        ),
                     placeholder = {
                         Text(
                             text = stringResource(id = R.string.proxy_address),
-                            color = labelColor
+                            color = labelColor,
                         )
                     },
-                    modifier = Modifier
-                        .weight(2.5f)
-                        .padding(
-                            horizontal = 8.dp
-                        )
+                    modifier =
+                        Modifier
+                            .weight(2.5f)
+                            .padding(
+                                horizontal = 8.dp,
+                            ),
                 )
                 OutlinedTextField(
                     enabled = useManualProxy,
@@ -418,85 +433,97 @@ fun ProxySettings(onBackPress: () -> Unit = {}) {
                     onValueChange = { port ->
                         proxyPort = port.toIntOrNull()
                     },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                        keyboardType = KeyboardType.Number
-                    ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                            keyboardType = KeyboardType.Number,
+                        ),
                     placeholder = {
                         Text(
                             text = stringResource(id = R.string.proxy_port),
-                            color = labelColor
+                            color = labelColor,
                         )
                     },
-                    modifier = Modifier
-                        .weight(1f)
+                    modifier =
+                        Modifier
+                            .weight(1f),
                 )
             }
-            if (useManualProxy)
+            if (useManualProxy) {
                 OutlinedButton(
                     enabled = proxyAddress.isNotEmpty() && proxyPort != null,
                     onClick = {
                         if (loading) {
                             return@OutlinedButton
                         }
-                        proxyViewModel.setProxy(
-                            proxyAddress, proxyPort!!
-                        ).invokeOnCompletion { error ->
-                            if (error == null) {
-                                scope.launch(Dispatchers.Main) {
-                                    val appContext = AnonConfig.context ?: return@launch
-                                    Toast.makeText(
-                                        appContext,
-                                        appContext.getString(R.string.proxy_updated),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                        proxyViewModel
+                            .setProxy(
+                                proxyAddress,
+                                proxyPort!!,
+                            ).invokeOnCompletion { error ->
+                                if (error == null) {
+                                    scope.launch(Dispatchers.Main) {
+                                        val appContext = AnonConfig.context ?: return@launch
+                                        Toast
+                                            .makeText(
+                                                appContext,
+                                                appContext.getString(R.string.proxy_updated),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    }
                                 }
                             }
-                        }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 16.dp
-                        ),
-
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = 16.dp,
+                            ),
                     shape = MaterialTheme.shapes.medium,
-                    contentPadding = PaddingValues(12.dp)
+                    contentPadding = PaddingValues(12.dp),
                 ) {
                     Text(stringResource(id = R.string.update_external_proxy))
                 }
+            }
 
             if (!useManualProxy) {
                 Column(
-                    modifier = Modifier
-                        .padding(top = 48.dp)
-                        .fillMaxSize(),
+                    modifier =
+                        Modifier
+                            .padding(top = 48.dp)
+                            .fillMaxSize(),
                     verticalArrangement = Arrangement.Top,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(
-                        AnonIcons.ShieldCheck, contentDescription = stringResource(R.string.tor_status),
-                        tint = MaterialTheme.colorScheme.onBackground.copy(
-                            alpha = 0.8f
-                        ), modifier = Modifier.size(44.dp)
+                        AnonIcons.ShieldCheck,
+                        contentDescription = stringResource(R.string.tor_status),
+                        tint =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = 0.8f,
+                            ),
+                        modifier = Modifier.size(44.dp),
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
                         stringResource(id = R.string.using_built_in_tor),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        ),
+                        style =
+                            MaterialTheme.typography.labelSmall.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(
-                            horizontal = 16.dp
-                        )
+                        modifier =
+                            Modifier.padding(
+                                horizontal = 16.dp,
+                            ),
                     )
                 }
             }
         }
-
     }
 }
 
@@ -508,22 +535,25 @@ fun TorLogs() {
 
     LazyColumn(
         state = listState,
-        modifier = Modifier
-            .padding(
-                horizontal = 8.dp
-            )
-            .navigationBarsPadding()
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .padding(
+                    horizontal = 8.dp,
+                ).navigationBarsPadding()
+                .fillMaxSize(),
         contentPadding = PaddingValues(0.dp),
-        verticalArrangement = Arrangement.Bottom
+        verticalArrangement = Arrangement.Bottom,
     ) {
         item {
             Text(
-                stringResource(id = R.string.tor_logs), textAlign = TextAlign.Center, modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        vertical = 12.dp,
-                    )
+                stringResource(id = R.string.tor_logs),
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            vertical = 12.dp,
+                        ),
             )
         }
         items(logs.size) { index ->
@@ -535,16 +565,15 @@ fun TorLogs() {
                 maxLines = 30,
                 lineHeight = 12.sp,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        vertical = 4.dp
-                    )
-                    .background(Color.Transparent),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            vertical = 4.dp,
+                        ).background(Color.Transparent),
             )
         }
     }
-
 }
 
 @Preview(device = "id:pixel_5")

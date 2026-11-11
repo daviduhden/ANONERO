@@ -38,29 +38,31 @@ val BottomNavHeight = 44.dp
 @Composable
 fun MainBottomNavigation(
     currentRoute: Any,
-    onTabSelected: (BottomNavigationItem) -> Unit
+    onTabSelected: (BottomNavigationItem) -> Unit,
 ) {
-
     var selectedItem by remember { mutableIntStateOf(0) }
     LaunchedEffect(key1 = currentRoute) {
         getRoutes().forEachIndexed { index, bottomNavigationItem ->
-            val isSelected = if (currentRoute is String) {
-                currentRoute.contains(bottomNavigationItem.getRouteAsString)
-            } else {
-                currentRoute == bottomNavigationItem.getRouteAsString
-            }
+            val isSelected =
+                if (currentRoute is String) {
+                    currentRoute.contains(bottomNavigationItem.getRouteAsString)
+                } else {
+                    currentRoute == bottomNavigationItem.getRouteAsString
+                }
             if (isSelected) {
                 selectedItem = index
             }
         }
     }
-    val navigationItemColors = NavigationBarItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.primary,
-        indicatorColor = MaterialTheme.colorScheme.primary.copy(
-            alpha = 0.2f
-        ),
-        selectedTextColor = MaterialTheme.colorScheme.primary,
-    )
+    val navigationItemColors =
+        NavigationBarItemDefaults.colors(
+            selectedIconColor = MaterialTheme.colorScheme.primary,
+            indicatorColor =
+                MaterialTheme.colorScheme.primary.copy(
+                    alpha = 0.2f,
+                ),
+            selectedTextColor = MaterialTheme.colorScheme.primary,
+        )
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.background,
@@ -79,7 +81,7 @@ fun MainBottomNavigation(
                 icon = {
                     Icon(
                         bottomNavigationItem.icon,
-                        contentDescription = bottomNavigationItem.title
+                        contentDescription = bottomNavigationItem.title,
                     )
                 },
             )

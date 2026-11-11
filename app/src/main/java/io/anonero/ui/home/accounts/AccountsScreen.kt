@@ -107,7 +107,7 @@ fun AccountsScreen(
                         Timber.tag(TAG).e("could not create account")
                     }
                 }
-            }
+            },
         )
     }
     renameTarget?.let { target ->
@@ -120,7 +120,7 @@ fun AccountsScreen(
                 scope.launch(Dispatchers.IO) {
                     walletState.updateAccountLabel(target.index, label)
                 }
-            }
+            },
         )
     }
 
@@ -133,59 +133,61 @@ fun AccountsScreen(
                     IconButton(onClick = onBackPress) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
-                }
+                },
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAdd = true }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_account))
             }
-        }
+        },
     ) { padding ->
         if (accounts.isEmpty()) {
             Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(24.dp)
-                    .fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .padding(padding)
+                        .padding(24.dp)
+                        .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     stringResource(R.string.no_accounts),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
             return@Scaffold
         }
         LazyColumn(
             modifier = Modifier.padding(padding),
-            contentPadding = PaddingValues(bottom = 96.dp)
+            contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(accounts.size) { index ->
                 val account = accounts[index]
                 ListItem(
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .clickable {
-                            scope.launch(Dispatchers.IO) {
-                                walletState.selectAccount(account.index)
-                            }
-                        },
+                    modifier =
+                        Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clickable {
+                                scope.launch(Dispatchers.IO) {
+                                    walletState.selectAccount(account.index)
+                                }
+                            },
                     leadingContent = {
                         if (account.index == active) {
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = stringResource(R.string.a11y_selected),
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     },
                     headlineContent = {
                         Text(
                             account.label,
-                            fontWeight = if (account.index == active) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (account.index == active) FontWeight.Bold else FontWeight.Normal,
                         )
                     },
                     supportingContent = {
@@ -193,15 +195,18 @@ fun AccountsScreen(
                             Text(
                                 account.address,
                                 style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1
+                                maxLines = 1,
                             )
                             Text(
                                 stringResource(
                                     R.string.available_balance_amount,
-                                    if (hideAmounts) Formats.maskAmount(account.balance)
-                                    else Formats.getDisplayAmount(account.balance)
+                                    if (hideAmounts) {
+                                        Formats.maskAmount(account.balance)
+                                    } else {
+                                        Formats.getDisplayAmount(account.balance)
+                                    },
                                 ),
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
                             )
                         }
                     },
@@ -210,13 +215,13 @@ fun AccountsScreen(
                             Text(
                                 if (hideAmounts) Formats.maskAmount(account.balance) else Formats.getDisplayAmount(account.balance),
                                 color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
                             )
                             IconButton(onClick = { renameTarget = account }) {
                                 Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_account))
                             }
                         }
-                    }
+                    },
                 )
             }
         }
@@ -240,18 +245,18 @@ private fun AccountLabelDialog(
                 onValueChange = { if (it.length <= 32) value = it },
                 singleLine = true,
                 label = { Text(stringResource(R.string.account_label)) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         },
         confirmButton = {
             TextButton(
                 enabled = value.isNotBlank(),
-                onClick = { onConfirm(value.trim()) }
+                onClick = { onConfirm(value.trim()) },
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        }
+        },
     )
 }
 

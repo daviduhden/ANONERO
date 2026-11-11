@@ -37,9 +37,10 @@ object MoneroAmount {
         val parts = value.split('.', limit = 2)
         val whole = parts[0]
         val fraction = parts.getOrNull(1).orEmpty().padEnd(DECIMALS, '0')
-        val atomic = runCatching {
-            BigInteger(whole).multiply(SCALE).add(BigInteger(fraction))
-        }.getOrNull() ?: return null
+        val atomic =
+            runCatching {
+                BigInteger(whole).multiply(SCALE).add(BigInteger(fraction))
+            }.getOrNull() ?: return null
         if (atomic.signum() <= 0) return null
         // Reject anything that cannot be represented by wallet2's uint64_t / jlong path.
         if (atomic.bitLength() > 63) return null

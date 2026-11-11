@@ -16,7 +16,7 @@
  *
  */
 
-package io.anonero.model;
+package io.anonero.model
 
 /**
  * A Kotlin wrapper for a transaction object owned by wallet2.

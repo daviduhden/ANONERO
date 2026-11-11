@@ -70,16 +70,19 @@ import io.anonero.util.Formats
 import kotlinx.coroutines.flow.map
 import org.koin.java.KoinJavaComponent.inject
 
-class SubAddressDetail(subAddress: Subaddress) : ViewModel() {
+class SubAddressDetail(
+    subAddress: Subaddress,
+) : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
 
-    val transactions = walletState.transactions
-        .map {
-            it.filter { txInfo ->
-                return@filter txInfo.addressIndex == subAddress.addressIndex
-                        && txInfo.direction == TransactionInfo.Direction.Direction_In
-            }
-        }.asLiveData()
+    val transactions =
+        walletState.transactions
+            .map {
+                it.filter { txInfo ->
+                    return@filter txInfo.addressIndex == subAddress.addressIndex &&
+                        txInfo.direction == TransactionInfo.Direction.Direction_In
+                }
+            }.asLiveData()
     val hideAmounts = walletState.hideAmountsFlow.asLiveData()
     val offline = walletState.offlineFlow.asLiveData()
 }
@@ -92,13 +95,14 @@ fun SubAddressDetailScreen(
     onTransactionClick: (TransactionInfo) -> Unit = {},
     subAddress: Subaddress,
     sharedTransitionScope: SharedTransitionScope,
-    animatedContentScope: AnimatedContentScope
+    animatedContentScope: AnimatedContentScope,
 ) {
     val walletState: WalletState by inject(WalletState::class.java)
     var showQR by remember { mutableStateOf(false) }
-    val subAddressDetailVm = viewModel {
-        SubAddressDetail(subAddress)
-    }
+    val subAddressDetailVm =
+        viewModel {
+            SubAddressDetail(subAddress)
+        }
     val transactions by subAddressDetailVm.transactions.observeAsState(listOf())
     val hideAmounts by subAddressDetailVm.hideAmounts.observeAsState(false)
     val offline by subAddressDetailVm.offline.observeAsState(false)
@@ -109,37 +113,42 @@ fun SubAddressDetailScreen(
 
     var labelDialog by remember { mutableStateOf(false) }
 
-    if (labelDialog)
+    if (labelDialog) {
         SubAddressLabelDialog(
             label = addressLabel,
             onSave = { label ->
                 walletState.updateAddressLabel(label, subAddress.addressIndex)
                 addressLabel = label
                 labelDialog = false
-            }, onCancel = {
+            },
+            onCancel = {
                 labelDialog = false
-            })
+            },
+        )
+    }
 
     if (showQR) {
         ModalBottomSheet(
-            scrimColor = MaterialTheme.colorScheme.background.copy(
-                alpha = 0.5f
-            ),
+            scrimColor =
+                MaterialTheme.colorScheme.background.copy(
+                    alpha = 0.5f,
+                ),
             containerColor = MaterialTheme.colorScheme.background,
             onDismissRequest = {
                 showQR = false
-            }
+            },
         ) {
             Column(
                 Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 QrCodeView(
                     data = subAddress.address,
-                    modifier = Modifier
-                        .size(300.dp)
-                        .padding(20.dp)
+                    modifier =
+                        Modifier
+                            .size(300.dp)
+                            .padding(20.dp),
                 )
             }
         }
@@ -149,7 +158,7 @@ fun SubAddressDetailScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
@@ -159,44 +168,50 @@ fun SubAddressDetailScreen(
                     IconButton(
                         onClick = {
                             showQR = true
-                        }
+                        },
                     ) {
                         Icon(AnonIcons.QrCode, contentDescription = null)
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         LazyColumn(modifier = Modifier.padding(paddingValues)) {
             item {
                 with(sharedTransitionScope) {
                     ListItem(
-                        modifier = Modifier
-                            .sharedElement(
-                                sharedTransitionScope.rememberSharedContentState(key = "${subAddress.address}:${subAddress.addressIndex}"),
-                                animatedVisibilityScope = animatedContentScope
-                            )
-                            .padding(
-                                horizontal = 4.dp,
-                                vertical = 6.dp
-                            ),
+                        modifier =
+                            Modifier
+                                .sharedElement(
+                                    sharedTransitionScope.rememberSharedContentState(
+                                        key = "${subAddress.address}:${subAddress.addressIndex}",
+                                    ),
+                                    animatedVisibilityScope = animatedContentScope,
+                                ).padding(
+                                    horizontal = 4.dp,
+                                    vertical = 6.dp,
+                                ),
                         headlineContent = {
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(
                                     addressLabel,
-                                    modifier = Modifier.clickable {
-                                        labelDialog = true
-                                    },
+                                    modifier =
+                                        Modifier.clickable {
+                                            labelDialog = true
+                                        },
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
-                                    if (hideAmounts || offline) Formats.maskAmount(subAddress.totalAmount)
-                                    else Formats.getDisplayAmount(subAddress.totalAmount),
+                                    if (hideAmounts || offline) {
+                                        Formats.maskAmount(subAddress.totalAmount)
+                                    } else {
+                                        Formats.getDisplayAmount(subAddress.totalAmount)
+                                    },
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                             }
                         },
@@ -206,7 +221,7 @@ fun SubAddressDetailScreen(
                                     subAddress.address,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 14.sp,
-                                    textAlign = TextAlign.Justify
+                                    textAlign = TextAlign.Justify,
                                 )
                             }
                         },
@@ -216,14 +231,15 @@ fun SubAddressDetailScreen(
             items(transactions.size) {
                 with(sharedTransitionScope) {
                     TransactionItem(
-                        transactions[it], modifier = Modifier
-                            .clickable {
-                                onTransactionClick(transactions[it])
-                            }
-                            .sharedElement(
-                                sharedTransitionScope.rememberSharedContentState(key = "${transactions[it].hash}"),
-                                animatedVisibilityScope = animatedContentScope
-                            )
+                        transactions[it],
+                        modifier =
+                            Modifier
+                                .clickable {
+                                    onTransactionClick(transactions[it])
+                                }.sharedElement(
+                                    sharedTransitionScope.rememberSharedContentState(key = "${transactions[it].hash}"),
+                                    animatedVisibilityScope = animatedContentScope,
+                                ),
                     )
                 }
             }
@@ -236,6 +252,5 @@ fun SubAddressDetailScreen(
 @Composable
 private fun SubAddressScreenPrev() {
     AnonNeroTheme {
-
     }
 }

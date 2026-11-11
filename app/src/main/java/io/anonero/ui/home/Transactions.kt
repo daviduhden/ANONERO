@@ -83,6 +83,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -98,24 +99,25 @@ import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
 import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.icons.AnonIcons
 import io.anonero.model.TransactionInfo
 import io.anonero.model.WalletManager
+import io.anonero.services.TorService
 import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
 import io.anonero.ui.home.graph.routes.AccountsRoute
 import io.anonero.ui.home.graph.routes.CoinsScreenRoute
 import io.anonero.ui.home.graph.routes.PayToManyRoute
-import io.anonero.ui.home.graph.routes.SignVerifyRoute
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.ui.home.graph.routes.SendScreenRoute
 import io.anonero.ui.home.graph.routes.SettingsNodeRoute
+import io.anonero.ui.home.graph.routes.SignVerifyRoute
 import io.anonero.ui.home.graph.routes.TransactionsRoute
 import io.anonero.ui.home.spend.qr.ExportType
 import io.anonero.ui.home.spend.qr.ImportEvents
@@ -124,6 +126,8 @@ import io.anonero.ui.home.spend.qr.SpendQRExchangeParam
 import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.util.Formats
 import io.anonero.util.StealthMode
+import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WALLET_USE_TOR
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -133,32 +137,30 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
-import io.anonero.services.TorService
-import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WALLET_USE_TOR
 import org.koin.java.KoinJavaComponent.inject
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
-import androidx.compose.ui.res.painterResource
-
 
 class TransactionsViewModel : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
 
-    val balance = walletState.balanceInfo.map {
-        it ?: 0L
-    }.asLiveData()
+    val balance =
+        walletState.balanceInfo
+            .map {
+                it ?: 0L
+            }.asLiveData()
 
-    val transactions = walletState.transactions
-        .asLiveData()
-
+    val transactions =
+        walletState.transactions
+            .asLiveData()
 }
 
 private const val TAG = "Transactions"
 
 @OptIn(
-    ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
-    ExperimentalSharedTransitionApi::class
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalSharedTransitionApi::class,
 )
 @Composable
 fun TransactionScreen(
@@ -169,7 +171,6 @@ fun TransactionScreen(
     animatedContentScope: AnimatedContentScope,
     sharedTransitionScope: SharedTransitionScope,
 ) {
-
     val transactionsViewModel = viewModel<TransactionsViewModel>()
     val balance by transactionsViewModel.balance.observeAsState()
     val transactions by transactionsViewModel.transactions.observeAsState(listOf())
@@ -189,7 +190,7 @@ fun TransactionScreen(
     val showLockScreen by walletState.backgroundSyncFlow.asLiveData().observeAsState(walletState.backgroundSync)
     val streetMode by walletState.hideAmountsFlow.asLiveData().observeAsState(false)
     val offline by walletState.offlineFlow.asLiveData().observeAsState(walletState.offline)
-    //the offline signer cannot know its balance
+    // the offline signer cannot know its balance
     val hideAmounts = streetMode || offline
     val scope = rememberCoroutineScope()
     val toastState = rememberToasterState()
@@ -199,25 +200,30 @@ fun TransactionScreen(
 
     if (broadcastSignedTxPath != null) {
         AlertDialog(
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+            modifier =
+                Modifier
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                ),
             containerColor = MaterialTheme.colorScheme.background,
-            properties = DialogProperties(
-                securePolicy = SecureFlagPolicy.SecureOn, dismissOnBackPress = false
-            ),
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnBackPress = false,
+                ),
             title = {
                 Text(
                     text = stringResource(R.string.app_name),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 18.sp
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                        ),
                 )
             },
             text = {
@@ -233,34 +239,40 @@ fun TransactionScreen(
                         broadcastSignedTxPath = null
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.cancel),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
             },
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-                    ),
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
+                        ),
                     onClick = {
                         if (!broadcastProgree) {
                             val path = broadcastSignedTxPath
@@ -269,8 +281,9 @@ fun TransactionScreen(
                                 scope.launch(Dispatchers.IO) {
                                     var success = false
                                     try {
-                                        val wallet = WalletManager.instance?.wallet
-                                            ?: throw IllegalStateException("wallet unavailable")
+                                        val wallet =
+                                            WalletManager.instance?.wallet
+                                                ?: throw IllegalStateException("wallet unavailable")
                                         val error = wallet.submitTransaction(path)
                                         if (error != "Transaction submitted!") {
                                             throw IllegalStateException(error ?: "broadcast failed")
@@ -290,7 +303,7 @@ fun TransactionScreen(
                                                 toastState.show(
                                                     resources.getString(R.string.broadcast_failed_generic),
                                                     type = ToastType.Warning,
-                                                    duration = 6.seconds
+                                                    duration = 6.seconds,
                                                 )
                                             }
                                         }
@@ -298,32 +311,37 @@ fun TransactionScreen(
                                 }
                             }
                         }
-                    }) { Text(stringResource(R.string.yes)) }
+                    },
+                ) { Text(stringResource(R.string.yes)) }
             },
         )
     }
     if (showExitDialog) {
         AlertDialog(
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
-                    ),
-                    shape = MaterialTheme.shapes.medium,
-                )
-                .fillMaxWidth(),
+            modifier =
+                Modifier
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
+                    ).fillMaxWidth(),
             containerColor = MaterialTheme.colorScheme.background,
-            properties = DialogProperties(
-                securePolicy = SecureFlagPolicy.SecureOn, dismissOnBackPress = false
-            ),
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnBackPress = false,
+                ),
             title = {
                 Text(
                     text = stringResource(R.string.app_name),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 18.sp
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                        ),
                 )
             },
             text = {
@@ -338,37 +356,44 @@ fun TransactionScreen(
                         showExitDialog = false
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.cancel),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
             },
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-                    ),
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
+                        ),
                     onClick = {
                         activity?.finishAffinity()
-                    }) { Text(stringResource(R.string.exit)) }
+                    },
+                ) { Text(stringResource(R.string.exit)) }
             },
         )
     }
@@ -390,7 +415,7 @@ fun TransactionScreen(
         )
     }
 
-    if (showScanner)
+    if (showScanner) {
         URQRScanner(
             onQRCodeScanned = {
                 if (it.isNotEmpty()) {
@@ -411,11 +436,12 @@ fun TransactionScreen(
                 when (it.getOrNull()) {
                     ImportEvents.IMPORT_OUTPUTS -> {
                         showScanner = false
-                        qrScannerParam = SpendQRExchangeParam(
-                            exportType = ExportType.IMAGE,
-                            title = resources.getString(R.string.key_images),
-                            ctaText = resources.getString(R.string.scan_unsigned_tx),
-                        )
+                        qrScannerParam =
+                            SpendQRExchangeParam(
+                                exportType = ExportType.IMAGE,
+                                title = resources.getString(R.string.key_images),
+                                ctaText = resources.getString(R.string.scan_unsigned_tx),
+                            )
                     }
 
                     null -> {
@@ -428,7 +454,7 @@ fun TransactionScreen(
                         toastState.show(
                             resources.getString(R.string.key_images_imported),
                             type = ToastType.Success,
-                            duration = 4.seconds
+                            duration = 4.seconds,
                         )
                     }
 
@@ -437,8 +463,8 @@ fun TransactionScreen(
                             navigateTo.invoke(
                                 ReviewTransactionRoute(
                                     "",
-                                )
-                            );
+                                ),
+                            )
                         }
                     }
 
@@ -446,34 +472,40 @@ fun TransactionScreen(
                 }
                 showScanner = false
             },
-            showScanner = showScanner
+            showScanner = showScanner,
         )
+    }
 
     if (spendDialog != null) {
         AlertDialog(
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+            modifier =
+                Modifier
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                ),
             containerColor = MaterialTheme.colorScheme.background,
-            properties = DialogProperties(
-                securePolicy = SecureFlagPolicy.SecureOn, dismissOnBackPress = false
-            ),
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnBackPress = false,
+                ),
             title = {
                 Text(
                     text = stringResource(R.string.app_name),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 18.sp
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                        ),
                 )
             },
             text = {
-                Text("${spendDialog}")
+                Text("$spendDialog")
             },
             onDismissRequest = {
                 spendDialog = null
@@ -484,45 +516,48 @@ fun TransactionScreen(
                         spendDialog = null
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.ok),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
             },
             confirmButton = {
-
             },
         )
     }
     val showIndefiniteLoading by walletState.isLoading.asLiveData().observeAsState(false)
-    val refreshState = rememberPullToRefreshState();
-    val view = LocalView.current;
+    val refreshState = rememberPullToRefreshState()
+    val view = LocalView.current
     val torSocket by torService.socksFlow.asLiveData().observeAsState(torService.socks)
     val torConnected = torSocket != null
     val useTor = anonPrefs.getBoolean(WALLET_USE_TOR, true)
     val stealthEnabled by StealthMode.enabled.collectAsState()
     val hazeState = rememberHazeState()
     val hazeSurface = MaterialTheme.colorScheme.surface
-    val hazeStyle = remember(hazeSurface) {
-        HazeBlurStyle {
-            backgroundColor(hazeSurface.copy(alpha = 0.95f))
-            blurRadius(26.dp)
+    val hazeStyle =
+        remember(hazeSurface) {
+            HazeBlurStyle {
+                backgroundColor(hazeSurface.copy(alpha = 0.95f))
+                blurRadius(26.dp)
+            }
         }
-    }
-
 
     BackHandler {
         showExitDialog = true
@@ -541,52 +576,62 @@ fun TransactionScreen(
         alignment = Alignment.BottomCenter,
         darkTheme = true,
         richColors = true,
-        containerPadding = PaddingValues(
-            bottom = 84.dp,
-        ),
+        containerPadding =
+            PaddingValues(
+                bottom = 84.dp,
+            ),
     )
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors().copy(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-                modifier = Modifier
-                    .hazeBlur(
-                        input = HazeInput.Sources(hazeState),
-                        style = hazeStyle,
-                    )
-                    .fillMaxWidth(),
+                colors =
+                    TopAppBarDefaults.topAppBarColors().copy(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
+                modifier =
+                    Modifier
+                        .hazeBlur(
+                            input = HazeInput.Sources(hazeState),
+                            style = hazeStyle,
+                        ).fillMaxWidth(),
                 title = {
                     Text(
-                        if (stealthEnabled) stringResource(R.string.wallet_title)
-                        else if (AnonConfig.viewOnly) "[ИΞR0]" else "[ΛИ0И]"
+                        if (stealthEnabled) {
+                            stringResource(R.string.wallet_title)
+                        } else if (AnonConfig.viewOnly) {
+                            "[ИΞR0]"
+                        } else {
+                            "[ΛИ0И]"
+                        },
                     )
                 },
                 actions = {
                     IconButton(
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onBackground
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onBackground,
+                            ),
                         onClick = {
                             showScanner = true
-                        }
+                        },
                     ) {
                         Icon(AnonIcons.Scan, contentDescription = stringResource(R.string.scan))
                     }
-                    if (!offline) IconButton(
-                        onClick = {
-                            navigateTo(SettingsNodeRoute)
+                    if (!offline) {
+                        IconButton(
+                            onClick = {
+                                navigateTo(SettingsNodeRoute)
+                            },
+                        ) {
+                            val torIconColor = if (useTor && torConnected == false) Color.Red else MaterialTheme.colorScheme.onBackground
+                            Icon(
+                                painterResource(R.drawable.ic_tor),
+                                contentDescription = stringResource(R.string.tor_status),
+                                tint = torIconColor,
+                            )
                         }
-                    ) {
-                        val torIconColor = if (useTor && torConnected == false) Color.Red else MaterialTheme.colorScheme.onBackground
-                        Icon(
-                            painterResource(R.drawable.ic_tor),
-                            contentDescription = stringResource(R.string.tor_status),
-                            tint = torIconColor
-                        )
                     }
 //                    LockButton(
 //                        onLock = {
@@ -609,97 +654,107 @@ fun TransactionScreen(
 //                        }, loading = settingBSync
 //                    )
                     IconButton(
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onBackground
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onBackground,
+                            ),
                         onClick = {
                             showMenu = !showMenu
-                        }
+                        },
                     ) {
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
                         DropdownMenu(
                             expanded = showMenu,
                             containerColor = MaterialTheme.colorScheme.background,
-                            modifier = Modifier
-                                .border(
-                                    1.dp,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(
-                                        alpha = .2f
+                            modifier =
+                                Modifier
+                                    .border(
+                                        1.dp,
+                                        color =
+                                            MaterialTheme.colorScheme.onBackground.copy(
+                                                alpha = .2f,
+                                            ),
+                                        shape = MaterialTheme.shapes.medium,
                                     ),
-                                    shape = MaterialTheme.shapes.medium,
-                                ),
-                            onDismissRequest = { showMenu = false }
+                            onDismissRequest = { showMenu = false },
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.accounts)) },
                                 onClick = {
                                     showMenu = false
                                     navigateTo(AccountsRoute)
-                                }
+                                },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.sign_verify_title)) },
                                 onClick = {
                                     showMenu = false
                                     navigateTo(SignVerifyRoute)
-                                }
+                                },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.pay_to_many)) },
                                 onClick = {
                                     showMenu = false
                                     navigateTo(PayToManyRoute)
-                                }
+                                },
                             )
-                            if (!offline) DropdownMenuItem(
-                                text = { Text(stringResource(R.string.coin_control)) },
-                                onClick = {
-                                    navigateTo(CoinsScreenRoute)
-                                }
-                            )
-                            if (!offline) DropdownMenuItem(
-                                text = { Text(stringResource(R.string.refresh)) },
-                                onClick = {
-                                    showMenu = false
-                                    scope.launch(Dispatchers.IO) {
-                                        runCatching { walletState.refresh() }
-                                            .onFailure { failure ->
-                                                Timber.tag(TAG)
-                                                    .e(failure, "wallet refresh failed")
-                                                withContext(Dispatchers.Main) {
-                                                    toastState.show(
-                                                        resources.getString(R.string.connection_failed),
-                                                        type = ToastType.Warning,
-                                                        duration = 6.seconds
-                                                    )
+                            if (!offline) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.coin_control)) },
+                                    onClick = {
+                                        navigateTo(CoinsScreenRoute)
+                                    },
+                                )
+                            }
+                            if (!offline) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.refresh)) },
+                                    onClick = {
+                                        showMenu = false
+                                        scope.launch(Dispatchers.IO) {
+                                            runCatching { walletState.refresh() }
+                                                .onFailure { failure ->
+                                                    Timber
+                                                        .tag(TAG)
+                                                        .e(failure, "wallet refresh failed")
+                                                    withContext(Dispatchers.Main) {
+                                                        toastState.show(
+                                                            resources.getString(R.string.connection_failed),
+                                                            type = ToastType.Warning,
+                                                            duration = 6.seconds,
+                                                        )
+                                                    }
                                                 }
+                                        }
+                                    },
+                                )
+                            }
+                            if (!offline) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.resync_blockchain)) },
+                                    onClick = {
+                                        showMenu = false
+                                        val result = walletState.resyncBlockchain()
+                                        if (result.isFailure) {
+                                            scope.launch {
+                                                toastState.show(
+                                                    resources.getString(R.string.resync_failed),
+                                                    type = ToastType.Warning,
+                                                    duration = 6.seconds,
+                                                )
                                             }
-                                    }
-                                }
-                            )
-                            if (!offline) DropdownMenuItem(
-                                text = { Text(stringResource(R.string.resync_blockchain)) },
-                                onClick = {
-                                    showMenu = false
-                                    val result = walletState.resyncBlockchain()
-                                    if (result.isFailure) {
-                                        scope.launch {
-                                            toastState.show(
-                                                resources.getString(R.string.resync_failed),
-                                                type = ToastType.Warning,
-                                                duration = 6.seconds
-                                            )
+                                        } else {
+                                            scope.launch {
+                                                toastState.show(
+                                                    resources.getString(R.string.resync_initiated_this_may_take_a_while),
+                                                    type = ToastType.Success,
+                                                )
+                                            }
                                         }
-                                    } else {
-                                        scope.launch {
-                                            toastState.show(
-                                                resources.getString(R.string.resync_initiated_this_may_take_a_while),
-                                                type = ToastType.Success,
-                                            )
-                                        }
-                                    }
-                                }
-                            )
+                                    },
+                                )
+                            }
                             if (AnonConfig.viewOnly) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.show_outputs)) },
@@ -710,7 +765,7 @@ fun TransactionScreen(
                                                 title = resources.getString(R.string.outputs),
                                                 ctaText = resources.getString(R.string.scan_key_images),
                                             )
-                                    }
+                                    },
                                 )
                             }
                             if (!AnonConfig.viewOnly) {
@@ -723,23 +778,23 @@ fun TransactionScreen(
                                                 title = resources.getString(R.string.key_images),
                                                 ctaText = "",
                                             )
-                                    }
+                                    },
                                 )
                             }
                         }
                     }
-                }
+                },
             )
-
-        }
+        },
     ) { contentPadding ->
         PullToRefreshBox(
             isRefreshing = false,
             state = refreshState,
-            modifier = Modifier
-                .hazeSource(
-                    state = hazeState,
-                ),
+            modifier =
+                Modifier
+                    .hazeSource(
+                        state = hazeState,
+                    ),
             onRefresh = {
                 scope.launch {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -751,70 +806,78 @@ fun TransactionScreen(
                     refreshState.animateToHidden()
                 }
             },
-            indicator = {}
+            indicator = {},
         ) {
             LazyColumn(
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
             ) {
                 stickyHeader(key = "progress") {
                     Column {
                         WalletProgressIndicator(
-                            refreshIndicatorProgress = refreshState.distanceFraction
+                            refreshIndicatorProgress = refreshState.distanceFraction,
                         )
                         AnimatedVisibility(
                             visible = refreshState.distanceFraction > .2f && !showIndefiniteLoading,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
                                 stringResource(R.string.pull_to_start_refresh),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(
-                                    top = 16.dp, bottom = 8.dp
-                                ),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 9.sp
-                                )
+                                modifier =
+                                    Modifier.padding(
+                                        top = 16.dp,
+                                        bottom = 8.dp,
+                                    ),
+                                style =
+                                    MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 9.sp,
+                                    ),
                             )
-                        };
+                        }
                     }
                 }
                 item(key = "balance") {
                     Box(
-                        modifier = Modifier
-                            .padding(
-                                vertical = 32.dp
-                            )
-                            .combinedClickable(
-                                onClick = { walletState.toggleHideAmounts() },
-                                onLongClick = {
-                                    if (!offline) navigateTo(CoinsScreenRoute)
-                                }
-                            )
-                            .fillParentMaxWidth()
+                        modifier =
+                            Modifier
+                                .padding(
+                                    vertical = 32.dp,
+                                ).combinedClickable(
+                                    onClick = { walletState.toggleHideAmounts() },
+                                    onLongClick = {
+                                        if (!offline) navigateTo(CoinsScreenRoute)
+                                    },
+                                ).fillParentMaxWidth(),
                     ) {
                         Text(
-                            if (hideAmounts) Formats.maskAmount(balance ?: 0)
-                            else Formats.getDisplayAmount(balance ?: 0),
-                            style = MaterialTheme.typography
-                                .displaySmall,
+                            if (hideAmounts) {
+                                Formats.maskAmount(balance ?: 0)
+                            } else {
+                                Formats.getDisplayAmount(balance ?: 0)
+                            },
+                            style =
+                                MaterialTheme.typography
+                                    .displaySmall,
                             modifier = Modifier.fillParentMaxWidth(),
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
                 items(transactions.size, key = { transactions[it].getListKey() }) {
                     with(sharedTransitionScope) {
                         TransactionItem(
-                            transactions[it], hideAmounts = hideAmounts, modifier = Modifier
-                                .clickable {
-                                    onItemClick(transactions[it])
-                                }
-                                .sharedElement(
-                                    sharedTransitionScope.rememberSharedContentState(
-                                        key = "${transactions[it].hash}",
+                            transactions[it],
+                            hideAmounts = hideAmounts,
+                            modifier =
+                                Modifier
+                                    .clickable {
+                                        onItemClick(transactions[it])
+                                    }.sharedElement(
+                                        sharedTransitionScope.rememberSharedContentState(
+                                            key = "${transactions[it].hash}",
+                                        ),
+                                        animatedVisibilityScope = animatedContentScope,
                                     ),
-                                    animatedVisibilityScope = animatedContentScope
-                                )
                         )
                     }
                 }
@@ -823,90 +886,103 @@ fun TransactionScreen(
     }
 }
 
-
 @Composable
-fun TransactionItem(tx: TransactionInfo, modifier: Modifier = Modifier, hideAmounts: Boolean = false) {
+fun TransactionItem(
+    tx: TransactionInfo,
+    modifier: Modifier = Modifier,
+    hideAmounts: Boolean = false,
+) {
     val isIncoming = tx.direction == TransactionInfo.Direction.Direction_In
     val amount = if (isIncoming) tx.amount else tx.amount
     val confirmations = tx.confirmations
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = 12.dp,
-                vertical = 20.dp
-            )
-            .border(
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = 12.dp,
+                    vertical = 20.dp,
+                ).border(
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                        ),
+                    shape = MaterialTheme.shapes.medium,
+                ).padding(
+                    horizontal = 12.dp,
+                    vertical = 12.dp,
                 ),
-                shape = MaterialTheme.shapes.medium
-            )
-            .padding(
-                horizontal = 12.dp,
-                vertical = 12.dp
-            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Box(modifier = Modifier.padding(top = 2.dp)) {
-            if (confirmations >= 10)
+            if (confirmations >= 10) {
                 Icon(
                     if (isIncoming) AnonIcons.ArrowDownLeft else AnonIcons.ArrowUpRight,
                     modifier = Modifier.size(32.dp),
                     tint = if (isIncoming) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    contentDescription = ""
+                    contentDescription = "",
                 )
-            else
+            } else {
                 Box(
-                    modifier = Modifier
-                        .size(28.dp)
+                    modifier =
+                        Modifier
+                            .size(28.dp),
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(28.dp),
                         strokeWidth = 2.dp,
                         progress = {
                             ((confirmations.toFloat()) / (10f))
-                        }
+                        },
                     )
                     Text(
                         text = "$confirmations",
                         modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 9.sp
-                        )
+                        style =
+                            MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 9.sp,
+                            ),
                     )
                 }
+            }
         }
         Text(
-            if (hideAmounts) Formats.maskAmount(amount)
-            else Formats.getDisplayAmount(amount),
+            if (hideAmounts) {
+                Formats.maskAmount(amount)
+            } else {
+                Formats.getDisplayAmount(amount)
+            },
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.titleLarge,
         )
         Text(
             Formats.formatTransactionTime(tx.timestamp),
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelSmall,
         )
     }
 }
 
 @Composable
-fun LockButton(onLock: () -> Unit, loading: Boolean = false) {
+fun LockButton(
+    onLock: () -> Unit,
+    loading: Boolean = false,
+) {
     val walletState = koinInject<WalletState>()
     val walletLoading by walletState.isLoading.asLiveData().observeAsState(false)
     IconButton(
         modifier = Modifier.alpha(if (walletLoading) 0.2f else 1.0f),
-        colors = IconButtonDefaults.iconButtonColors(
-            contentColor = MaterialTheme.colorScheme.onBackground
-        ),
+        colors =
+            IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onBackground,
+            ),
         onClick = {
             if (walletLoading || loading) {
                 return@IconButton
             }
             onLock()
-        }
+        },
     ) {
         if (loading) {
             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)

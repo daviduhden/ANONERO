@@ -68,13 +68,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiveScreen(
     modifier: Modifier = Modifier,
     onBackPress: () -> Unit = {},
-    navigateToSubAddresses: () -> Unit = {}
+    navigateToSubAddresses: () -> Unit = {},
 ) {
     val walletState: WalletState by inject(WalletState::class.java)
     val nextAddress by walletState.nextAddress.collectAsState(null)
@@ -87,7 +86,7 @@ fun ReceiveScreen(
         if (nextAddress == null) labelDialog = false
     }
     val address = nextAddress
-    if (labelDialog && address != null)
+    if (labelDialog && address != null) {
         SubAddressLabelDialog(
             label = address.displayLabel,
             onSave = { label ->
@@ -95,37 +94,41 @@ fun ReceiveScreen(
                 scope.launch(Dispatchers.IO) {
                     walletState.updateAddressLabel(label, address.addressIndex)
                 }
-            }, onCancel = {
+            },
+            onCancel = {
                 labelDialog = false
-            })
+            },
+        )
+    }
 
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = {
-
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 actions = {
                     IconButton(
-                        onClick = navigateToSubAddresses
+                        onClick = navigateToSubAddresses,
                     ) {
                         Icon(AnonIcons.History, contentDescription = null)
                     }
-                }
+                },
             )
-        }) {
+        },
+    ) {
         if (address != null) {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize(),
+                modifier =
+                    Modifier
+                        .fillMaxSize(),
                 contentPadding = it,
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top,
@@ -134,18 +137,19 @@ fun ReceiveScreen(
                     Text(
                         text = address.displayLabel,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                labelDialog = true
-                            },
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    labelDialog = true
+                                },
+                        style =
+                            MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
                     )
-
                 }
                 item {
                     Spacer(Modifier.height(24.dp))
@@ -153,34 +157,39 @@ fun ReceiveScreen(
                 item {
                     QrCodeView(
                         data = address.address,
-                        colors = QrCodeColors(
-                            background = MaterialTheme.colorScheme.background,
-                            foreground = MaterialTheme.colorScheme.onBackground,
-                        ),
-                        modifier = Modifier
-                            .size(300.dp)
-                            .padding(18.dp),
+                        colors =
+                            QrCodeColors(
+                                background = MaterialTheme.colorScheme.background,
+                                foreground = MaterialTheme.colorScheme.onBackground,
+                            ),
+                        modifier =
+                            Modifier
+                                .size(300.dp)
+                                .padding(18.dp),
                     )
                 }
                 item {
                     SelectionContainer(
-                        modifier = Modifier.clickable {
-                            SecureClipboard.copy(context, address.address)
-                            Toast.makeText(context,
-                                resources.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
-                                .show()
-                        }
+                        modifier =
+                            Modifier.clickable {
+                                SecureClipboard.copy(context, address.address)
+                                Toast
+                                    .makeText(
+                                        context,
+                                        resources.getString(R.string.copied_to_clipboard),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            },
                     ) {
                         Text(
                             address.address,
-                            modifier = Modifier.width(300.dp)
+                            modifier = Modifier.width(300.dp),
                         )
                     }
                 }
                 item {
                     Spacer(Modifier.height(18.dp))
                 }
-
             }
         }
     }

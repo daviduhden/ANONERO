@@ -19,14 +19,13 @@
 package io.anonero.ui.home.graph.routes
 
 import android.net.Uri
+import androidx.core.net.toUri
 import io.anonero.AnonConfig
 import io.anonero.model.Wallet
 import io.anonero.util.MoneroAmount
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import timber.log.Timber
-import androidx.core.net.toUri
-
 
 // PaymentUri is a data class that represents a payment URI.
 // example: monero:84jaiKcu3....d9a49f5&tx_amount=0.000000000010&recipient_name=el00ruobuob%20Stagenet%20wallet&tx_description=Testing%20out%20the%20make_uri%20function.
@@ -65,7 +64,6 @@ data class SendScreenRoute(
         fun parse(uri: String): SendScreenRoute? {
             try {
                 if (uri.startsWith("monero")) {
-
                     var parsedUri = uri.toUri()
 
                     if (parsedUri.schemeSpecificPart != "monero://") {
@@ -80,9 +78,10 @@ data class SendScreenRoute(
                     }
                     // Extract query parameters safely. Reject a malformed or over-precise
                     // amount instead of silently changing what the user will send.
-                    val amount = parseAmountParameter(
-                        parsedUri.getQueryParameter("tx_amount")
-                    ) ?: return null
+                    val amount =
+                        parseAmountParameter(
+                            parsedUri.getQueryParameter("tx_amount"),
+                        ) ?: return null
                     val paymentId = parsedUri.getQueryParameter("payment_id")
                     val recipientName = parsedUri.getQueryParameter("recipient_name") ?: ""
                     val txDescription = parsedUri.getQueryParameter("tx_description") ?: ""
@@ -92,14 +91,14 @@ data class SendScreenRoute(
                         amount = amount,
                         paymentId = paymentId,
                         recipientName = recipientName,
-                        txDescription = txDescription
+                        txDescription = txDescription,
                     )
                 } else {
-                    Wallet.isAddressValid(
-                        uri,
-                        AnonConfig.getNetworkType().value
-                    )
-                        .let {
+                    Wallet
+                        .isAddressValid(
+                            uri,
+                            AnonConfig.getNetworkType().value,
+                        ).let {
                             if (it) {
                                 return SendScreenRoute(address = uri)
                             }

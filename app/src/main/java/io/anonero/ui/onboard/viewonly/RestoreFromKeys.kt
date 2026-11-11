@@ -68,7 +68,6 @@ import io.anonero.model.NeroKeyPayload
 import io.anonero.ui.components.scanner.QRScannerDialog
 import kotlinx.serialization.json.Json
 
-
 @Composable
 fun RestoreFromKeys(
     onBackPressed: () -> Unit = {},
@@ -98,36 +97,38 @@ fun RestoreFromKeys(
         },
         onDismiss = {
             showScanner = false
-        }
+        },
     )
 
     Scaffold { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 IconButton(
-                    modifier = Modifier
-                        .size(24.dp),
+                    modifier =
+                        Modifier
+                            .size(24.dp),
                     onClick = {
                         onBackPressed()
-                    }
+                    },
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -135,29 +136,30 @@ fun RestoreFromKeys(
                 Image(
                     painter = painterResource(R.drawable.ic_anon),
                     contentDescription = stringResource(R.string.app_logo),
-                    modifier = Modifier
-                        .size(120.dp)
+                    modifier =
+                        Modifier
+                            .size(120.dp),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.import_view_keys),
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
             Column(
-                modifier = Modifier
-                    .weight(.8f)
-                    .padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier =
+                    Modifier
+                        .weight(.8f)
+                        .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-
                 ListItem(
                     headlineContent = {
                         Text(
                             text = stringResource(R.string.primary_address),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -167,12 +169,14 @@ fun RestoreFromKeys(
                             onValueChange = {
                                 primaryAddress = it
                             },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Next,
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusable()
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Next,
+                                ),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusable(),
                         )
                     },
                 )
@@ -182,7 +186,7 @@ fun RestoreFromKeys(
                         Text(
                             text = stringResource(R.string.private_view_key),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -190,14 +194,14 @@ fun RestoreFromKeys(
                             value = viewKey,
                             shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Next,
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Next,
+                                ),
                             onValueChange = {
                                 viewKey = it
                             },
-
-                            )
+                        )
                     },
                 )
                 ListItem(
@@ -205,7 +209,7 @@ fun RestoreFromKeys(
                         Text(
                             text = stringResource(R.string.restore_height),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier.padding(start = 4.dp),
                         )
                     },
                     supportingContent = {
@@ -215,11 +219,12 @@ fun RestoreFromKeys(
                             onValueChange = {
                                 restoreHeight = it
                             },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done,
-                                keyboardType = KeyboardType.Number
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    imeAction = ImeAction.Done,
+                                    keyboardType = KeyboardType.Number,
+                                ),
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     },
                 )
@@ -227,7 +232,7 @@ fun RestoreFromKeys(
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                     onClick = {
                         showScanner = true
-                    }
+                    },
                 ) {
                     Icon(AnonIcons.Scan, contentDescription = "")
                 }
@@ -236,37 +241,40 @@ fun RestoreFromKeys(
                         text = error,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .fillMaxWidth()
+                        modifier =
+                            Modifier
+                                .padding(top = 8.dp)
+                                .fillMaxWidth(),
                     )
                 }
             }
             val enabled =
                 primaryAddress.isNotEmpty() && viewKey.isNotEmpty() && restoreHeight.isNotEmpty()
-            AnonOutlineButton (
+            AnonOutlineButton(
                 onClick = {
                     if (enabled) {
                         val height = restoreHeight.toLongOrNull()
                         if (height == null || height < 0) {
                             error = resources.getString(R.string.invalid_restore_height)
                         } else {
-                            val payload = NeroKeyPayload(
-                                primaryAddress = primaryAddress,
-                                privateViewKey = viewKey,
-                                restoreHeight = height,
-                                version = AnonConfig.NERO_KEY_PAYLOAD_VERSION
-                            )
+                            val payload =
+                                NeroKeyPayload(
+                                    primaryAddress = primaryAddress,
+                                    privateViewKey = viewKey,
+                                    restoreHeight = height,
+                                    version = AnonConfig.NERO_KEY_PAYLOAD_VERSION,
+                                )
                             oNextPressed(payload)
                         }
                     }
                 },
                 enabled = enabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 12.dp
-                    ),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 12.dp,
+                        ),
             ) {
                 Text(stringResource(R.string.next))
             }

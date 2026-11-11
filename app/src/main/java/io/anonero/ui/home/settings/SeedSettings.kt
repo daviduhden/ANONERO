@@ -96,9 +96,9 @@ import io.anonero.ui.components.qr.QrCodeColors
 import io.anonero.ui.components.qr.QrCodeView
 import io.anonero.util.KeyStoreHelper
 import io.anonero.util.PREFS_PASSPHRASE_HASH
-import io.anonero.util.WalletProfileStore
 import io.anonero.util.ShakeConfig
 import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WalletProfileStore
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
 import kotlinx.coroutines.Dispatchers
@@ -114,37 +114,29 @@ import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import kotlin.random.Random
 
+fun getWalletSeed(passPhrase: String): String? = WalletManager.instance?.wallet?.getSeed(passPhrase)
 
-fun getWalletSeed(passPhrase: String): String? {
-    return WalletManager.instance?.wallet?.getSeed(passPhrase)
-}
+fun getLegacySeed(passPhrase: String): String? = WalletManager.instance?.wallet?.getLegacySeed(passPhrase)
 
-fun getLegacySeed(passPhrase: String): String? {
-    return WalletManager.instance?.wallet?.getLegacySeed(passPhrase)
-}
-
-fun generatePlaceHolderSeed(): List<String> {
-    return (1..16).map {
+fun generatePlaceHolderSeed(): List<String> =
+    (1..16).map {
         (1..Random.nextInt(6, 8)).joinToString("") { "*" }
     }
-}
-
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
-
     val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val placeholderSeed = remember { generatePlaceHolderSeed() }
 
     var seedWords by remember {
         mutableStateOf(
-            generatePlaceHolderSeed()
+            generatePlaceHolderSeed(),
         )
     }
     var legacySeed by remember {
         mutableStateOf(
-            generatePlaceHolderSeed()
+            generatePlaceHolderSeed(),
         )
     }
     val focusRequester = remember { FocusRequester() }
@@ -192,18 +184,19 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             return@LaunchedEffect
         }
         // Never read wallet2 keys during composition or on the main thread.
-        val values = withContext(Dispatchers.IO) {
-            val w = WalletManager.instance?.wallet
-            if (w == null) {
-                Triple("", "", "")
-            } else {
-                Triple(
-                    runCatching { w.getSecretViewKey() }.getOrDefault(""),
-                    runCatching { w.getSecretSpendKey() }.getOrDefault(""),
-                    runCatching { w.getRestoreHeight().toString() }.getOrDefault(""),
-                )
+        val values =
+            withContext(Dispatchers.IO) {
+                val w = WalletManager.instance?.wallet
+                if (w == null) {
+                    Triple("", "", "")
+                } else {
+                    Triple(
+                        runCatching { w.getSecretViewKey() }.getOrDefault(""),
+                        runCatching { w.getSecretSpendKey() }.getOrDefault(""),
+                        runCatching { w.getRestoreHeight().toString() }.getOrDefault(""),
+                    )
+                }
             }
-        }
         viewKeyText = values.first
         spendKeyText = values.second
         restoreHeightText = values.third
@@ -211,9 +204,8 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
 
     val backgroundBlur: Float by animateFloatAsState(
         if (passPhraseDialog) 6f else 0f,
-        label = "blur-radius"
+        label = "blur-radius",
     )
-
 
     fun exportForNero() {
         if (walletState.backgroundSync) return
@@ -226,126 +218,138 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
         neroPayload = payload
     }
 
-
     LaunchedEffect(passPhraseDialog, locked) {
         if (passPhraseDialog && !locked) {
             delay(100)
             focusRequester.requestFocus()
         }
     }
+
     fun getSeed() {
         if (walletState.backgroundSync) return
         seedJob?.cancel()
         val enteredPassphrase = passPhrase
-        seedJob = scope.launch {
-            val seeds = withContext(Dispatchers.IO) {
-                val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
-                val appContext = AnonConfig.context?.applicationContext
-                val hashedPass = appContext?.let {
-                    KeyStoreHelper.getCrazyPass(it, enteredPassphrase)
-                } ?: ""
+        seedJob =
+            scope.launch {
+                val seeds =
+                    withContext(Dispatchers.IO) {
+                        val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
+                        val appContext = AnonConfig.context?.applicationContext
+                        val hashedPass =
+                            appContext?.let {
+                                KeyStoreHelper.getCrazyPass(it, enteredPassphrase)
+                            } ?: ""
+                        currentCoroutineContext().ensureActive()
+                        if (hash == hashedPass && !walletState.backgroundSync) {
+                            val seed = getWalletSeed(enteredPassphrase)?.split(" ")
+                            currentCoroutineContext().ensureActive()
+                            val legacy = getLegacySeed(enteredPassphrase)?.split(" ")
+                            seed to legacy
+                        } else {
+                            null
+                        }
+                    }
                 currentCoroutineContext().ensureActive()
-                if (hash == hashedPass && !walletState.backgroundSync) {
-                    val seed = getWalletSeed(enteredPassphrase)?.split(" ")
-                    currentCoroutineContext().ensureActive()
-                    val legacy = getLegacySeed(enteredPassphrase)?.split(" ")
-                    seed to legacy
-                } else null
-            }
-            currentCoroutineContext().ensureActive()
-            if (walletState.backgroundSync) return@launch
-            if (seeds != null) {
-                val (seed, legacy) = seeds
-                if (seed != null) {
-                    seedWords = seed
-                    verified = true
-                    passPhraseDialog = false
-                    passPhrase = ""
-                }
-                if (legacy != null) {
-                    legacySeed = legacy
-                }
-            } else {
-                errorShake.shake(
-                    ShakeConfig(
-                        6, translateX = 5f
+                if (walletState.backgroundSync) return@launch
+                if (seeds != null) {
+                    val (seed, legacy) = seeds
+                    if (seed != null) {
+                        seedWords = seed
+                        verified = true
+                        passPhraseDialog = false
+                        passPhrase = ""
+                    }
+                    if (legacy != null) {
+                        legacySeed = legacy
+                    }
+                } else {
+                    errorShake.shake(
+                        ShakeConfig(
+                            6,
+                            translateX = 5f,
+                        ),
                     )
-                )
-                repeat(6) {
-                    delay(50)
-                    view.performHapticFeedback(
-                        HapticFeedbackConstants.CONTEXT_CLICK
-                    )
+                    repeat(6) {
+                        delay(50)
+                        view.performHapticFeedback(
+                            HapticFeedbackConstants.CONTEXT_CLICK,
+                        )
+                    }
+                    delay(100)
                 }
-                delay(100)
             }
-
-        }
     }
     if (neroPayload.isNotEmpty() && !locked) {
         ModalBottomSheet(
-            sheetState = rememberModalBottomSheetState(
-                skipPartiallyExpanded = true,
-            ),
-            scrimColor = MaterialTheme.colorScheme.background.copy(
-                alpha = 0.5f
-            ),
+            sheetState =
+                rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                ),
+            scrimColor =
+                MaterialTheme.colorScheme.background.copy(
+                    alpha = 0.5f,
+                ),
             containerColor = MaterialTheme.colorScheme.background,
             onDismissRequest = {
                 neroPayload = ""
-            }
+            },
         ) {
             Column(
                 Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Box(modifier = Modifier.padding(8.dp))
                 Text(
                     stringResource(id = R.string.nero_keys),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 Box(modifier = Modifier.padding(8.dp))
                 QrCodeView(
                     data = neroPayload,
-                    colors = QrCodeColors(
-                        background = MaterialTheme.colorScheme.background,
-                        foreground = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    modifier = Modifier
-                        .size(320.dp)
-                        .padding(20.dp)
+                    colors =
+                        QrCodeColors(
+                            background = MaterialTheme.colorScheme.background,
+                            foreground = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    modifier =
+                        Modifier
+                            .size(320.dp)
+                            .padding(20.dp),
                 )
                 Box(modifier = Modifier.padding(16.dp))
             }
         }
     }
 
-
-    if (passPhraseDialog && !locked)
+    if (passPhraseDialog && !locked) {
         AlertDialog(
-            modifier = Modifier
-                .shake(errorShake)
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+            modifier =
+                Modifier
+                    .shake(errorShake)
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                ),
             containerColor = MaterialTheme.colorScheme.secondary,
-            properties = DialogProperties(
-                securePolicy = SecureFlagPolicy.SecureOn,
-                dismissOnBackPress = false,
-                dismissOnClickOutside = false
-            ),
+            properties =
+                DialogProperties(
+                    securePolicy = SecureFlagPolicy.SecureOn,
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                ),
             title = {
                 Text(
                     text = stringResource(id = R.string.enter_seed_phrase),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 18.sp
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 18.sp,
+                        ),
                 )
             },
             text = {
@@ -353,30 +357,33 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                     value = passPhrase,
                     shape = MaterialTheme.shapes.small,
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                        .padding(
-                            top = 8.dp
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                         ),
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            getSeed()
-                        }
-                    ),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .padding(
+                                top = 8.dp,
+                            ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                        ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                                getSeed()
+                            },
+                        ),
                     onValueChange = {
                         passPhrase = it
                     },
-
-                    )
+                )
             },
             onDismissRequest = {
                 passPhraseDialog = false
@@ -384,17 +391,19 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
                         ),
                     onClick = {
                         getSeed()
-                    }) { Text(stringResource(id = R.string.view)) }
+                    },
+                ) { Text(stringResource(id = R.string.view)) }
             },
             dismissButton = {
                 Button(
@@ -403,25 +412,30 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         onBackPress.invoke()
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(id = R.string.cancel),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
-            }
+            },
         )
+    }
 
     var showLegacy by remember { mutableStateOf(false) }
 
@@ -431,24 +445,25 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             TopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
                 title = {
                     Text("")
-                }
+                },
             )
         },
     ) {
         Box(
-            modifier = Modifier
-                .padding(it)
-                .blur(backgroundBlur.dp)
-                .padding(
-                    horizontal = 8.dp
-                )
+            modifier =
+                Modifier
+                    .padding(it)
+                    .blur(backgroundBlur.dp)
+                    .padding(
+                        horizontal = 8.dp,
+                    ),
         ) {
             LazyColumn {
                 item {
@@ -457,76 +472,90 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                             Text(
                                 text = stringResource(id = R.string.primary_address),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         },
                         supportingContent = {
                             SelectionContainer {
                                 Text(
                                     text = "${wallet?.address ?: ""}",
-                                    modifier = Modifier.padding(start = 4.dp)
+                                    modifier = Modifier.padding(start = 4.dp),
                                 )
                             }
-                        }
+                        },
                     )
                 }
                 item {
                     HorizontalDivider(
-                        thickness = 1.dp
+                        thickness = 1.dp,
                     )
                 }
                 item {
                     ListItem(
                         headlineContent = {
                             Text(
-                                text = if (showLegacy) stringResource(id = R.string.legacy_seed) else stringResource(id = R.string.polyseed),
+                                text =
+                                    if (showLegacy) {
+                                        stringResource(
+                                            id = R.string.legacy_seed,
+                                        )
+                                    } else {
+                                        stringResource(id = R.string.polyseed)
+                                    },
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .padding(start = 4.dp)
-                                    .animateContentSize()
+                                modifier =
+                                    Modifier
+                                        .padding(start = 4.dp)
+                                        .animateContentSize(),
                             )
                         },
                         supportingContent = {
                             FlowRow(
-                                modifier = Modifier
-                                    .padding(4.dp)
-                                    .fillMaxWidth()
-                                    .animateContentSize()
-                                    .clickable {
-                                        showLegacy = !showLegacy
-                                    },
+                                modifier =
+                                    Modifier
+                                        .padding(4.dp)
+                                        .fillMaxWidth()
+                                        .animateContentSize()
+                                        .clickable {
+                                            showLegacy = !showLegacy
+                                        },
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                                verticalArrangement = Arrangement.spacedBy(0.dp),
                             ) {
-                                val seed = if (!verified || locked) placeholderSeed
-                                    else if (showLegacy) legacySeed else seedWords
+                                val seed =
+                                    if (!verified || locked) {
+                                        placeholderSeed
+                                    } else if (showLegacy) {
+                                        legacySeed
+                                    } else {
+                                        seedWords
+                                    }
                                 seed.forEach {
                                     Text(
-                                        it, modifier = Modifier
-                                            .padding(
-                                                4.dp
-                                            )
-                                            .background(
-                                                Color.Gray.copy(
-                                                    alpha = 0.3f
+                                        it,
+                                        modifier =
+                                            Modifier
+                                                .padding(
+                                                    4.dp,
+                                                ).background(
+                                                    Color.Gray.copy(
+                                                        alpha = 0.3f,
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                ).padding(
+                                                    vertical = 4.dp,
+                                                    horizontal = 8.dp,
                                                 ),
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                            .padding(
-                                                vertical = 4.dp,
-                                                horizontal = 8.dp
-                                            )
                                     )
                                 }
                             }
-                        }
-
+                        },
                     )
                 }
 
                 item {
                     HorizontalDivider(
-                        thickness = 1.dp
+                        thickness = 1.dp,
                     )
                 }
                 item {
@@ -535,21 +564,21 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                             Text(
                                 text = stringResource(id = R.string.view_key),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         },
                         supportingContent = {
                             // private keys are not selectable: a copy lands in the clipboard and its history
                             Text(
                                 text = if (verified && !locked) viewKeyText else "••••••••",
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
-                        }
+                        },
                     )
                 }
                 item {
                     HorizontalDivider(
-                        thickness = 1.dp
+                        thickness = 1.dp,
                     )
                 }
                 item {
@@ -558,21 +587,21 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                             Text(
                                 text = stringResource(id = R.string.spend_key),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         },
                         supportingContent = {
                             Text(
                                 text = if (verified && !locked) spendKeyText else "••••••••",
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
-                        }
+                        },
                     )
                 }
 
                 item {
                     HorizontalDivider(
-                        thickness = 1.dp
+                        thickness = 1.dp,
                     )
                 }
                 item {
@@ -581,58 +610,62 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                             Text(
                                 text = stringResource(id = R.string.restore_height),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         },
                         supportingContent = {
                             SelectionContainer {
                                 Text(
                                     text = restoreHeightText,
-                                    modifier = Modifier.padding(start = 4.dp)
+                                    modifier = Modifier.padding(start = 4.dp),
                                 )
                             }
-                        }
+                        },
                     )
                 }
                 item {
                     HorizontalDivider(
                         thickness = 1.dp,
-                        modifier = Modifier.padding(
-                            bottom = 24.dp
-                        )
+                        modifier =
+                            Modifier.padding(
+                                bottom = 24.dp,
+                            ),
                     )
                 }
                 item {
                     AnonOutlineButton(
-                        modifier = Modifier
-                            .padding(
-                                horizontal = 8.dp,
-                            )
-                            .fillMaxWidth(),
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal = 8.dp,
+                                ).fillMaxWidth(),
                         onClick = {
                             exportForNero()
-                        }) {
+                        },
+                    ) {
                         Text(
-                            stringResource(id = R.string.export_nero_keys), style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onBackground.copy(
-                                    alpha = 0.8f
-                                )
-                            )
+                            stringResource(id = R.string.export_nero_keys),
+                            style =
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    color =
+                                        MaterialTheme.colorScheme.onBackground.copy(
+                                            alpha = 0.8f,
+                                        ),
+                                ),
                         )
                     }
                 }
                 item {
                     Box(
                         Modifier.height(
-                            44.dp
-                        )
+                            44.dp,
+                        ),
                     )
                 }
             }
         }
     }
 }
-
 
 @Preview(device = "id:pixel_5")
 @Composable

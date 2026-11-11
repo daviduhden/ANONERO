@@ -23,15 +23,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.SharedPreferences
 import io.anonero.di.appModule
-import io.anonero.util.LocaleController
-import io.anonero.util.WalletKey
 import io.anonero.model.WalletManager
 import io.anonero.model.node.NodeFields
 import io.anonero.services.TorService
 import io.anonero.store.LogRepository
 import io.anonero.store.NodesRepository
 import io.anonero.ui.util.AnonLogTree
+import io.anonero.util.LocaleController
 import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WalletKey
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext.startKoin
@@ -39,7 +39,6 @@ import org.koin.core.qualifier.named
 import timber.log.Timber
 import timber.log.Timber.DebugTree
 import java.io.File
-
 
 const val FOREGROUND_CHANNEL = "anon_foreground"
 const val TX_CHANNEL = "anon_transactions"
@@ -54,8 +53,9 @@ private const val TAG = "AnonApplication"
  * The startup cleanup removes transient backup/export files and recovers an interrupted
  * Keystore migration.
  */
-class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
-
+class AnonApplication :
+    Application(),
+    Thread.UncaughtExceptionHandler {
     private lateinit var anonLogTree: AnonLogTree
     private val defaultHandler =
         Thread.getDefaultUncaughtExceptionHandler()
@@ -89,7 +89,8 @@ class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
             if (!removed) Timber.tag(TAG).w("Could not clear temporary backup data")
         }
         // Older builds wrote the unencrypted ZIP directly in cache. Remove any leftovers.
-        cacheDir.listFiles()
+        cacheDir
+            .listFiles()
             ?.filter { it.isFile && it.name.contains("_backup_") && it.name.endsWith(".zip") }
             ?.forEach { stale ->
                 if (!stale.delete()) Timber.tag(TAG).w("Could not clear stale backup archive")
@@ -102,7 +103,6 @@ class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
     }
 
     private fun plantLog() {
-
         anonLogTree = AnonLogTree(AnonConfig.getLogFile(applicationContext), get<LogRepository>())
 
         if (BuildConfig.DEBUG) {
@@ -115,22 +115,24 @@ class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
         Timber.tag(TAG).i("FLAVOR: %s", BuildConfig.FLAVOR)
         Timber.tag(TAG).i("APPLICATION_ID: %s", BuildConfig.APPLICATION_ID)
         Timber.tag(TAG).i("MONERO_NETWORK: %s", AnonConfig.getNetworkType())
-        Timber.tag(TAG)
+        Timber
+            .tag(TAG)
             .i("VERSION: ${BuildConfig.VERSION_NAME} ${BuildConfig.VERSION_CODE}\n\n")
     }
 
     private fun initConfigs() {
-        //initialize wallet manager
+        // initialize wallet manager
         WalletManager.instance?.init()
         initNotificationChannels()
     }
 
     fun initNotificationChannels() {
-        val foregroundChannel = NotificationChannel(
-            FOREGROUND_CHANNEL,
-            getString(R.string.notification_channel_wallet),
-            NotificationManager.IMPORTANCE_LOW,
-        )
+        val foregroundChannel =
+            NotificationChannel(
+                FOREGROUND_CHANNEL,
+                getString(R.string.notification_channel_wallet),
+                NotificationManager.IMPORTANCE_LOW,
+            )
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(foregroundChannel)
         notificationManager.createNotificationChannel(
@@ -138,7 +140,7 @@ class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
                 TX_CHANNEL,
                 getString(R.string.notification_channel_wallet_activity),
                 NotificationManager.IMPORTANCE_HIGH,
-            )
+            ),
         )
     }
 
@@ -149,9 +151,11 @@ class AnonApplication : Application(), Thread.UncaughtExceptionHandler {
         super.onTerminate()
     }
 
-    override fun uncaughtException(t: Thread, e: Throwable) {
+    override fun uncaughtException(
+        t: Thread,
+        e: Throwable,
+    ) {
         Timber.tag(TAG).e(e)
         defaultHandler?.uncaughtException(t, e)
     }
-
 }

@@ -61,7 +61,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             // Production APKs are intentionally unsigned here. GitHub Actions signs
             // them with the protected release Keystore after verifying every artifact.
@@ -121,7 +121,6 @@ android {
         resources {
             excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
-
     }
 
     flavorDimensions += "anon_mode"
@@ -141,7 +140,6 @@ android {
             buildConfigField("String", "FLAVOR", "\"nero\"")
             buildConfigField("boolean", "VIEW_ONLY", "true")
         }
-
     }
     // Keep these in sync with ANDROID_BUILD_TOOLS / ANDROID_NDK in the workflows and
     // with NDK_REVISION in external-libs/build.sh. The native archives are built there.
@@ -163,7 +161,6 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
-
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)

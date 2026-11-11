@@ -21,9 +21,10 @@ package io.anonero.ui.home.graph.routes
 import io.anonero.ui.home.LockScreenShortCut
 import kotlinx.serialization.Serializable
 
-
 @Serializable
-data class HomeScreenRoute(val lockScreenShortCut: LockScreenShortCut? = null)
+data class HomeScreenRoute(
+    val lockScreenShortCut: LockScreenShortCut? = null,
+)
 
 @Serializable
 data object LockScreenRoute
@@ -35,7 +36,9 @@ data object Home
 data object TransactionsRoute
 
 @Serializable
-data class TransactionDetailRoute(val transactionId: String)
+data class TransactionDetailRoute(
+    val transactionId: String,
+)
 
 @Serializable
 data object ReceiveRoute
@@ -90,4 +93,6 @@ data object SecureWipeRoute
 data object SubAddressesRoute
 
 @Serializable
-data class SubAddressDetailRoute(val subAddress: String)
+data class SubAddressDetailRoute(
+    val subAddress: String,
+)

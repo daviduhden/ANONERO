@@ -48,7 +48,6 @@ val jsonDecoder = Json { ignoreUnknownKeys = true }
  * has not completed Application.onCreate().
  */
 object AnonConfig {
-
     const val NERO_KEY_PAYLOAD_VERSION = 1
     const val XMR_DECIMALS = 12
     val ONE_XMR = Math.round(10.0.pow(XMR_DECIMALS.toDouble()))
@@ -69,7 +68,6 @@ object AnonConfig {
     const val EXPORT_SIGNED_TX_FILE = "export_signed_tx.stx"
     const val IMPORT_SIGNED_TX_FILE = "import_signed_tx"
 
-
     // The stageNet build type adds ".stagenet" to the application ID; all other builds use
     // mainnet. The network is a build property, not a user setting.
     fun getNetworkType(): NetworkType {
@@ -87,7 +85,6 @@ object AnonConfig {
         return anonWallet
     }
 
-
     fun getTorConfig(scope: CoroutineScope): TorRuntime.Environment {
         val appContext = requireNotNull(context)
         val torDir = File(appContext.filesDir, "tor")
@@ -101,12 +98,8 @@ object AnonConfig {
         )
     }
 
-
-    /* Legacy, asynchronous flag. Do not use as the source of truth for wallet presence. */
-    fun isWalletFileExist(): Boolean {
-        return walletFound
-    }
-
+    // Legacy, asynchronous flag. Do not use as the source of truth for wallet presence.
+    fun isWalletFileExist(): Boolean = walletFound
 
     fun getLogFile(context: Context): File {
         val logDir = File(context.applicationContext.cacheDir, "logs")
@@ -145,19 +138,17 @@ object AnonConfig {
      * restart.
      */
     fun clearSpendCacheFiles(context: Context) {
-        val files = arrayListOf(
-            EXPORT_OUTPUT_FILE,
-            IMPORT_OUTPUT_FILE,
-
-            EXPORT_KEY_IMAGE_FILE,
-            IMPORT_KEY_IMAGE_FILE,
-
-            EXPORT_UNSIGNED_TX_FILE,
-            IMPORT_UNSIGNED_TX_FILE,
-
-            EXPORT_SIGNED_TX_FILE,
-            IMPORT_SIGNED_TX_FILE
-        );
+        val files =
+            arrayListOf(
+                EXPORT_OUTPUT_FILE,
+                IMPORT_OUTPUT_FILE,
+                EXPORT_KEY_IMAGE_FILE,
+                IMPORT_KEY_IMAGE_FILE,
+                EXPORT_UNSIGNED_TX_FILE,
+                IMPORT_UNSIGNED_TX_FILE,
+                EXPORT_SIGNED_TX_FILE,
+                IMPORT_SIGNED_TX_FILE,
+            )
         context.cacheDir.listFiles()?.forEach { file ->
             if (files.any { file.name.contains(it) }) {
                 file.delete()

@@ -37,18 +37,18 @@ import io.anonero.model.node.Node
 import io.anonero.model.node.NodeFields
 import io.anonero.store.NodesRepository
 import io.anonero.util.KeyStoreHelper
-import io.anonero.util.PREFS_PIN_HASH
-import io.anonero.util.WalletProfile
-import io.anonero.util.WalletProfileStore
-import io.anonero.util.WalletSession
-import io.anonero.util.WalletKey
-import io.anonero.util.PinHash
+import io.anonero.util.MAX_RESTORE_HEIGHT
 import io.anonero.util.PREFS_PASSPHRASE_HASH
+import io.anonero.util.PREFS_PIN_HASH
+import io.anonero.util.PinHash
 import io.anonero.util.RESTORE_HEIGHT
 import io.anonero.util.RestoreTarget
 import io.anonero.util.RestoreTargetNotEmptyException
-import io.anonero.util.MAX_RESTORE_HEIGHT
 import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WalletKey
+import io.anonero.util.WalletProfile
+import io.anonero.util.WalletProfileStore
+import io.anonero.util.WalletSession
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.core.qualifier.named
@@ -63,6 +63,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class NetworkMismatchException : Exception()
+
 /**
  * Encrypted backup export and restore.
  *
@@ -84,7 +85,8 @@ object BackupHelper {
     const val BUFFER = 2048
     private const val TAG = "BackUpHelper"
     val walletPrefs: SharedPreferences by inject(
-        SharedPreferences::class.java, named(WALLET_PREFERENCES)
+        SharedPreferences::class.java,
+        named(WALLET_PREFERENCES),
     )
     val nodeRepository: NodesRepository by inject(NodesRepository::class.java)
 
@@ -96,7 +98,10 @@ object BackupHelper {
      * files, re-keys the copy to [seedPassphrase], clears the cache, and leaves the live
      * wallet untouched. The returned file is in `cache/backup/`.
      */
-    suspend fun createBackUp(seedPassphrase: String, context: Context): String {
+    suspend fun createBackUp(
+        seedPassphrase: String,
+        context: Context,
+    ): String {
         if (AnonConfig.viewOnly) {
             require(seedPassphrase.length >= 8) { "Backup passphrase is too short" }
         }
@@ -109,36 +114,40 @@ object BackupHelper {
         val wallet = WalletManager.instance?.wallet ?: throw Exception("Wallet not found")
         val prefs = provideWalletSharedPrefs(context)
 
+        val walletPayload =
+            WalletBackup(
+                address = wallet.address,
+                seed = wallet.getSeed(seedPassphrase),
+                restoreHeight = wallet.getRestoreHeight(),
+                balanceAll = wallet.getBalanceAll(),
+                numSubaddresses = wallet.numSubAddresses,
+                numAccounts = wallet.getNumAccounts(),
+                primaryAddress = wallet.address,
+                isWatchOnly = wallet.isWatchOnly(),
+                isSynchronized = wallet.isSynchronized,
+                neroPayload = NeroKeyPayload.fromWallet(wallet),
+            )
 
-        val walletPayload = WalletBackup(
-            address = wallet.address,
-            seed = wallet.getSeed(seedPassphrase),
-            restoreHeight = wallet.getRestoreHeight(),
-            balanceAll = wallet.getBalanceAll(),
-            numSubaddresses = wallet.numSubAddresses,
-            numAccounts = wallet.getNumAccounts(),
-            primaryAddress = wallet.address,
-            isWatchOnly = wallet.isWatchOnly(),
-            isSynchronized = wallet.isSynchronized,
-            neroPayload = NeroKeyPayload.fromWallet(wallet),
-        );
-
-
-        val nodeBackup = NodeBackup(
-            host = prefs.getString(NodeFields.RPC_HOST.value, "") ?: "",
-            password = prefs.getString(NodeFields.RPC_PASSWORD.value, "") ?: "",
-            username = prefs.getString(NodeFields.RPC_USERNAME.value, "") ?: "",
-            rpcPort = prefs.getInt(NodeFields.RPC_PORT.value, Node.defaultRpcPort),
-            networkType = AnonConfig.getNetworkType().toString(),
-            isOnion = false
-        )
-        val backup = Backup(
-            meta = BackupMeta(
-                timestamp = System.currentTimeMillis(),
-                network = AnonConfig.getNetworkType().toStringForBackUp(),
-            ), node = nodeBackup, wallet = walletPayload,
-            nodes = nodeRepository.getAll()
-        )
+        val nodeBackup =
+            NodeBackup(
+                host = prefs.getString(NodeFields.RPC_HOST.value, "") ?: "",
+                password = prefs.getString(NodeFields.RPC_PASSWORD.value, "") ?: "",
+                username = prefs.getString(NodeFields.RPC_USERNAME.value, "") ?: "",
+                rpcPort = prefs.getInt(NodeFields.RPC_PORT.value, Node.defaultRpcPort),
+                networkType = AnonConfig.getNetworkType().toString(),
+                isOnion = false,
+            )
+        val backup =
+            Backup(
+                meta =
+                    BackupMeta(
+                        timestamp = System.currentTimeMillis(),
+                        network = AnonConfig.getNetworkType().toStringForBackUp(),
+                    ),
+                node = nodeBackup,
+                wallet = walletPayload,
+                nodes = nodeRepository.getAll(),
+            )
 
         // The version tells restore which key opens the wallet files. A keystore-bound
         // wallet's copy is re-keyed to the passphrase below (v3); a wallet that never
@@ -147,10 +156,11 @@ object BackupHelper {
         // cannot be loaded, fail the export rather than write a backup nothing can open.
         val walletName = WalletProfileStore.activeWalletName(context)
         val w = if (WalletKey.exists(context, walletName)) WalletKey.load(context, walletName) else null
-        val backUpPayload = BackupPayload(
-            version = if (w != null) BACKUP_VERSION else BACKUP_VERSION_PIN_KEYED,
-            backup = backup,
-        )
+        val backUpPayload =
+            BackupPayload(
+                version = if (w != null) BACKUP_VERSION else BACKUP_VERSION_PIN_KEYED,
+                backup = backup,
+            )
         val json = Json.encodeToString(backUpPayload)
 
         // Clear only transient backup/airgapped artifacts. Deleting the whole cache would
@@ -186,13 +196,17 @@ object BackupHelper {
                 // Copy only the active wallet's files. Copying the whole directory would
                 // put the decoy wallet (if configured) inside a backup of the legitimate
                 // wallet, which destroys the separation between the two profiles.
-                val walletFiles = walletDir.listFiles()
-                    ?: throw java.io.IOException("Could not list wallet files")
-                walletFiles.filter {
-                    it.isFile && (it.name == walletName ||
-                        it.name == "$walletName.keys" ||
-                        it.name == "$walletName.address.txt")
-                }.forEach { it.copyTo(File(tmpBackupDir, it.name), overwrite = true) }
+                val walletFiles =
+                    walletDir.listFiles()
+                        ?: throw java.io.IOException("Could not list wallet files")
+                walletFiles
+                    .filter {
+                        it.isFile && (
+                            it.name == walletName ||
+                                it.name == "$walletName.keys" ||
+                                it.name == "$walletName.address.txt"
+                        )
+                    }.forEach { it.copyTo(File(tmpBackupDir, it.name), overwrite = true) }
                 // The live wallet is keyed to the device secret W, which exists only in this
                 // phone's Keystore, so a raw copy opens nowhere else. Re-key the COPY to the seed
                 // passphrase -- the same one that decrypts the zip -- so the backup restores on
@@ -222,8 +236,9 @@ object BackupHelper {
             if (!testBackUp(tmpBackupDir)) {
                 throw java.io.IOException("Backup is missing required wallet files")
             }
-            val files = tmpBackupDir.listFiles()?.map { it.absolutePath }?.toTypedArray()
-                ?: throw java.io.IOException("Could not list backup files")
+            val files =
+                tmpBackupDir.listFiles()?.map { it.absolutePath }?.toTypedArray()
+                    ?: throw java.io.IOException("Could not list backup files")
             val backupCacheDir = File(context.cacheDir, "backup")
             if (!backupCacheDir.exists()) {
                 backupCacheDir.mkdirs()
@@ -241,11 +256,12 @@ object BackupHelper {
         }
     }
 
-    fun testBackUp(destinationDir: File): Boolean {
-        return BackupArchive.isValidDirectory(destinationDir, WalletProfile.MAIN.walletName)
-    }
+    fun testBackUp(destinationDir: File): Boolean = BackupArchive.isValidDirectory(destinationDir, WalletProfile.MAIN.walletName)
 
-    private fun zip(files: Array<String>, zipFileName: String) {
+    private fun zip(
+        files: Array<String>,
+        zipFileName: String,
+    ) {
         ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFileName))).use { output ->
             files.forEach { path ->
                 File(path).inputStream().buffered(BUFFER).use { input ->
@@ -257,10 +273,12 @@ object BackupHelper {
         }
     }
 
-    fun unZip(toUnzip: File, destinationDir: File) {
+    fun unZip(
+        toUnzip: File,
+        destinationDir: File,
+    ) {
         BackupArchive.extract(toUnzip, destinationDir, WalletProfile.MAIN.walletName)
     }
-
 
     /*
      * Binds freshly-restored wallet files to this device. A version-3 backup's files are
@@ -269,7 +287,10 @@ object BackupHelper {
      * re-encrypt to a fresh device secret, wrap it in the Keystore, and set the PIN gate.
      * The full snapshot (tx history, sync state) is preserved -- no re-scan.
      */
-    private fun bindRestoredWallet(passPhrase: String, pin: String): Boolean {
+    private fun bindRestoredWallet(
+        passPhrase: String,
+        pin: String,
+    ): Boolean {
         val context = AnonConfig.context!!
         val walletFile = AnonConfig.getDefaultWalletFile(context)
         val walletName = walletFile.name
@@ -279,9 +300,11 @@ object BackupHelper {
             Timber.tag(TAG).e("restore: PIN collides with the configured duress PIN")
             return false
         }
-        val decoyPass = prefs.getString(
-            io.anonero.util.PREFS_DECOY_PASSPHRASE_HASH, ""
-        )
+        val decoyPass =
+            prefs.getString(
+                io.anonero.util.PREFS_DECOY_PASSPHRASE_HASH,
+                "",
+            )
         if (!decoyPass.isNullOrEmpty() &&
             KeyStoreHelper.getCrazyPass(context, passPhrase) == decoyPass
         ) {
@@ -315,9 +338,11 @@ object BackupHelper {
                 throw Exception("store failed after re-key")
             }
             WalletKey.store(context, walletName, w)
-            val committed = prefs.edit()
-                .putString(PREFS_PIN_HASH, PinHash.hash(pin))
-                .commit()
+            val committed =
+                prefs
+                    .edit()
+                    .putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                    .commit()
             if (!committed) throw Exception("could not persist the restored PIN hash")
             bound = true
             true
@@ -326,14 +351,20 @@ object BackupHelper {
             // Best effort: put the in-memory wallet back on the credential that opened it
             // so a later store cannot leave the file keyed to an unrecorded secret.
             val original = if (openedWithPin) pin else passPhrase
-            runCatching { wallet.setPassword(original); wallet.store() }
+            runCatching {
+                wallet.setPassword(original)
+                wallet.store()
+            }
             false
         } finally {
             if (!bound) runCatching { manager.close(wallet) }
         }
     }
 
-    fun extractBackUp(backupPath: String, passPhrase: String): BackupPayload? {
+    fun extractBackUp(
+        backupPath: String,
+        passPhrase: String,
+    ): BackupPayload? {
         val context = requireNotNull(AnonConfig.context)
         val destFile = File(context.cacheDir, "backup.anon")
         val decryptedDestFile = File(context.cacheDir, "backup.zip")
@@ -343,8 +374,9 @@ object BackupHelper {
         try {
             // A retry must not combine files from an earlier or partially extracted backup.
             BackupArchive.removeExtractionDirectory(extractDestination)
-            val input = context.contentResolver.openInputStream(backupPath.toUri())
-                ?: throw java.io.IOException("Could not open backup")
+            val input =
+                context.contentResolver.openInputStream(backupPath.toUri())
+                    ?: throw java.io.IOException("Could not open backup")
             input.use { source ->
                 destFile.outputStream().use { source.copyTo(it) }
             }
@@ -354,8 +386,8 @@ object BackupHelper {
             val anonJson = File(extractDestination, "anon.json")
             val json = anonJson.readText()
             backup = Json.decodeFromString<BackupPayload>(json)
-            if(backup.backup.meta.network != AnonConfig.getNetworkType().toStringForBackUp()){
-                 throw NetworkMismatchException()
+            if (backup.backup.meta.network != AnonConfig.getNetworkType().toStringForBackUp()) {
+                throw NetworkMismatchException()
             }
             extracted = true
         } catch (e: Exception) {
@@ -369,7 +401,7 @@ object BackupHelper {
             decryptedDestFile.delete()
             if (!extracted) BackupArchive.removeExtractionDirectory(extractDestination)
         }
-        return backup;
+        return backup
     }
 
     /**
@@ -379,15 +411,20 @@ object BackupHelper {
      * configured decoy survives. The restored wallet is re-keyed to a fresh device secret
      * and bound to [pin]; the caller must have verified the passphrase and PIN.
      */
-    suspend fun restoreBackUp(backupPayload: BackupPayload, passPhrase: String, pin: String): Boolean {
+    suspend fun restoreBackUp(
+        backupPayload: BackupPayload,
+        passPhrase: String,
+        pin: String,
+    ): Boolean {
         try {
             val context = requireNotNull(AnonConfig.context)
             RestoreTarget.requireEmpty(
                 directory = File(context.filesDir, "wallets"),
                 walletName = WalletProfile.MAIN.walletName,
                 hasWrappedSecret = WalletKey.exists(context, WalletProfile.MAIN.walletName),
-                hasCredentials = walletPrefs.contains(PREFS_PIN_HASH) ||
-                    walletPrefs.contains(PREFS_PASSPHRASE_HASH) || walletPrefs.contains(RESTORE_HEIGHT),
+                hasCredentials =
+                    walletPrefs.contains(PREFS_PIN_HASH) ||
+                        walletPrefs.contains(PREFS_PASSPHRASE_HASH) || walletPrefs.contains(RESTORE_HEIGHT),
             )
 
             val extractDestination = File(context.cacheDir, "tmp_extract")
@@ -406,7 +443,7 @@ object BackupHelper {
             walletPrefs.edit(commit = true) {
                 putString(
                     PREFS_PASSPHRASE_HASH,
-                    KeyStoreHelper.getCrazyPass(context, passPhrase)
+                    KeyStoreHelper.getCrazyPass(context, passPhrase),
                 )
                 putLong(RESTORE_HEIGHT, restoreHeight)
             }
@@ -417,18 +454,20 @@ object BackupHelper {
                 if (entry.name == decoyName || entry.name.startsWith("$decoyName.")) return@forEach
                 entry.copyTo(File(anonDir, entry.name), true)
             }
-            val bound = try {
-                bindRestoredWallet(passPhrase, pin)
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "restore: failed to bind restored wallet")
-                false
-            }
+            val bound =
+                try {
+                    bindRestoredWallet(passPhrase, pin)
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "restore: failed to bind restored wallet")
+                    false
+                }
             if (bound) {
                 val restored = WalletManager.instance?.wallet
                 val expectedAddress = wallet.primaryAddress.ifEmpty { wallet.address }
-                val identityMatches = restored != null &&
-                    (expectedAddress.isEmpty() || restored.address == expectedAddress) &&
-                    restored.isWatchOnly() == AnonConfig.viewOnly
+                val identityMatches =
+                    restored != null &&
+                        (expectedAddress.isEmpty() || restored.address == expectedAddress) &&
+                        restored.isWatchOnly() == AnonConfig.viewOnly
                 if (!identityMatches) {
                     Timber.tag(TAG).e("restore: restored wallet identity does not match backup")
                     restored?.let { runCatching { WalletManager.instance?.close(it) } }
@@ -447,13 +486,14 @@ object BackupHelper {
                     }
                     nodes.forEach { nodeRepository.addItem(it) }
                     if (nodes.isEmpty() && v1Node.host.isNotEmpty()) {
-                        val node = Node().apply {
-                            host = v1Node.host
-                            rpcPort = v1Node.rpcPort
-                            username = v1Node.username
-                            password = v1Node.password
-                            networkType = AnonConfig.getNetworkType()
-                        }
+                        val node =
+                            Node().apply {
+                                host = v1Node.host
+                                rpcPort = v1Node.rpcPort
+                                username = v1Node.username
+                                password = v1Node.password
+                                networkType = AnonConfig.getNetworkType()
+                            }
                         nodeRepository.addItem(node)
                     }
                 } catch (e: Exception) {
@@ -466,7 +506,9 @@ object BackupHelper {
             // Copied but unbound files open nowhere. Remove only the main profile: a
             // configured decoy wallet must survive a failed main restore.
             WalletProfileStore.removeProfile(
-                AnonConfig.context!!, walletPrefs, WalletProfile.MAIN
+                AnonConfig.context!!,
+                walletPrefs,
+                WalletProfile.MAIN,
             )
             return false
         } catch (e: RestoreTargetNotEmptyException) {

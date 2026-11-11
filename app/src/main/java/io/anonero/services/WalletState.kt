@@ -28,19 +28,19 @@ import io.anonero.model.TransactionInfo
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
 import io.anonero.model.node.DaemonInfo
+import io.anonero.ui.home.LockScreenShortCut
 import io.anonero.ui.util.getAllUsedSubAddresses
 import io.anonero.ui.util.getLatestSubAddress
-import io.anonero.ui.home.LockScreenShortCut
+import io.anonero.util.SecureClipboard
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
-import io.anonero.util.SecureClipboard
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -50,7 +50,10 @@ import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-data class SyncProgress(val progress: Float, val left: Long)
+data class SyncProgress(
+    val progress: Float,
+    val left: Long,
+)
 
 private const val TAG = "WalletState"
 
@@ -73,8 +76,10 @@ class WalletState {
     private val _isLoading = MutableStateFlow(false)
     private var _isSyncing = AtomicBoolean(false)
     private val _backgroundSync = MutableStateFlow(false)
+
     @Volatile
     private var backgroundSyncActive = false
+
     // ANON with no node set: the offline signer
     private val _offline = MutableStateFlow(false)
     private val _incomingTx = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
@@ -101,11 +106,11 @@ class WalletState {
     val balanceInfo: Flow<Long?> = _balanceInfo
     val unLockedBalance: Flow<Long?> = _unLockedBalance
     val isLoading: Flow<Boolean> = _isLoading
-    val isSyncing get():Boolean = _isSyncing.get()
-    val backgroundSync get():Boolean = _backgroundSync.value
+    val isSyncing get(): Boolean = _isSyncing.get()
+    val backgroundSync get(): Boolean = _backgroundSync.value
     val backgroundSyncRunning get(): Boolean = backgroundSyncActive
     val backgroundSyncFlow: Flow<Boolean> = _backgroundSync
-    val offline get():Boolean = _offline.value
+    val offline get(): Boolean = _offline.value
     val offlineFlow: Flow<Boolean> = _offline
 
     val walletStatus: Flow<Wallet.Status?> = _walletStatus
@@ -119,9 +124,10 @@ class WalletState {
     val profile: Flow<WalletProfile> = _profile
     val isDecoySession: Boolean get() = _profile.value.isDecoy
 
-    val walletConnectionStatus: Flow<Wallet.ConnectionStatus?> = _walletStatus.map {
-        it?.connectionStatus
-    }
+    val walletConnectionStatus: Flow<Wallet.ConnectionStatus?> =
+        _walletStatus.map {
+            it?.connectionStatus
+        }
 
     val daemonInfo: Flow<DaemonInfo?> = _connectedDaemon
     val connectionStatus: Flow<Wallet.ConnectionStatus?> = _connectionStatus
@@ -145,33 +151,39 @@ class WalletState {
                 if (wallet.status.errorString.isNotEmpty()) {
                     Timber.tag(TAG).i("StatusError %s", wallet.status.errorString)
                 }
-                val address = try {
-                    WalletManager.instance?.getDaemonAddress()
-                } catch (_: Exception) {
-                    null
-                }
+                val address =
+                    try {
+                        WalletManager.instance?.getDaemonAddress()
+                    } catch (_: Exception) {
+                        null
+                    }
                 address?.let {
                     _connectedDaemon.update {
                         DaemonInfo(
                             address,
-                            connectionStatus = wallet.fullStatus.connectionStatus
-                                ?: Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
-                            WalletManager.instance?.getBlockchainHeight() ?: -1L
+                            connectionStatus =
+                                wallet.fullStatus.connectionStatus
+                                    ?: Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
+                            WalletManager.instance?.getBlockchainHeight() ?: -1L,
                         )
                     }
                 }
             }
             val oldTxCount = _transactions.value.size
-            val updatedTxs = (wallet.history?.all?.sortedWith(comparator = { o1, o2 ->
-                o2.timestamp.compareTo(o1.timestamp)
-            }) ?: listOf()).fastDistinctBy {
-                it.getListKey()
-            }
+            val updatedTxs =
+                (
+                    wallet.history?.all?.sortedWith(comparator = { o1, o2 ->
+                        o2.timestamp.compareTo(o1.timestamp)
+                    }) ?: listOf()
+                ).fastDistinctBy {
+                    it.getListKey()
+                }
             _transactions.update { updatedTxs }
             if (oldTxCount > 0 && updatedTxs.size > oldTxCount) {
-                val hasNewIncoming = updatedTxs.take(updatedTxs.size - oldTxCount).any {
-                    it.direction == TransactionInfo.Direction.Direction_In
-                }
+                val hasNewIncoming =
+                    updatedTxs.take(updatedTxs.size - oldTxCount).any {
+                        it.direction == TransactionInfo.Direction.Direction_In
+                    }
                 if (hasNewIncoming) {
                     _incomingTx.tryEmit(Unit)
                 }
@@ -207,22 +219,24 @@ class WalletState {
                     index = index,
                     label = wallet.getAccountLabelFor(index),
                     address = wallet.getAddress(index),
-                    balance = if (AnonConfig.viewOnly) {
-                        wallet.viewOnlyBalanceFor(index)
-                    } else {
-                        wallet.getBalanceFor(index)
-                    },
-                    unlockedBalance = if (AnonConfig.viewOnly) {
-                        wallet.viewOnlyBalanceFor(index)
-                    } else {
-                        wallet.getUnlockedBalanceFor(index)
-                    },
+                    balance =
+                        if (AnonConfig.viewOnly) {
+                            wallet.viewOnlyBalanceFor(index)
+                        } else {
+                            wallet.getBalanceFor(index)
+                        },
+                    unlockedBalance =
+                        if (AnonConfig.viewOnly) {
+                            wallet.viewOnlyBalanceFor(index)
+                        } else {
+                            wallet.getUnlockedBalanceFor(index)
+                        },
                 )
             }.getOrNull()
         }
     }
 
-    /* Called after a PIN has selected a wallet profile, before the service starts. */
+    // Called after a PIN has selected a wallet profile, before the service starts.
     fun setProfile(profile: WalletProfile) {
         if (_profile.value != profile) {
             _profile.value = profile
@@ -275,7 +289,10 @@ class WalletState {
     }
 
     @Synchronized
-    fun updateAccountLabel(accountIndex: Int, label: String): Boolean {
+    fun updateAccountLabel(
+        accountIndex: Int,
+        label: String,
+    ): Boolean {
         val wallet = getWallet ?: return false
         return try {
             wallet.setAccountLabelFor(accountIndex, label)
@@ -288,9 +305,12 @@ class WalletState {
         }
     }
 
-    /* Freeze/thaw a wallet output. The native coin-control layer also enforces this. */
+    // Freeze/thaw a wallet output. The native coin-control layer also enforces this.
     @Synchronized
-    fun setOutputFrozen(publicKey: String, frozen: Boolean): Boolean {
+    fun setOutputFrozen(
+        publicKey: String,
+        frozen: Boolean,
+    ): Boolean {
         val wallet = getWallet ?: return false
         return try {
             val coins = wallet.coins ?: return false
@@ -316,33 +336,34 @@ class WalletState {
         _unlockShortcut.trySend(shortcut)
     }
 
-    suspend fun enterBackgroundSync(): Boolean = bgSyncMutex.withLock {
-        val wallet = getWallet ?: return false
-        if (!wallet.isInitialized || backgroundSync) return false
-        // A copied address or signature must not survive the lock transition.
-        AnonConfig.context?.applicationContext?.let { SecureClipboard.clear(it) }
-        emitUnlockShortcut(LockScreenShortCut.HOME)
-        _backgroundSync.value = true
-        backgroundSyncActive = false
-        if (AnonConfig.viewOnly) return true
-        _blockUpdates.set(true)
-        try {
-            if (wallet.startBackgroundSync()) {
-                backgroundSyncActive = true
-                Timber.tag(TAG).i("Entered background sync")
-                return true
+    suspend fun enterBackgroundSync(): Boolean =
+        bgSyncMutex.withLock {
+            val wallet = getWallet ?: return false
+            if (!wallet.isInitialized || backgroundSync) return false
+            // A copied address or signature must not survive the lock transition.
+            AnonConfig.context?.applicationContext?.let { SecureClipboard.clear(it) }
+            emitUnlockShortcut(LockScreenShortCut.HOME)
+            _backgroundSync.value = true
+            backgroundSyncActive = false
+            if (AnonConfig.viewOnly) return true
+            _blockUpdates.set(true)
+            try {
+                if (wallet.startBackgroundSync()) {
+                    backgroundSyncActive = true
+                    Timber.tag(TAG).i("Entered background sync")
+                    return true
+                }
+                // Keep the lock overlay up, but record that no native background sync is
+                // active so a PIN-verified exit does not require a stop that cannot succeed.
+                Timber.tag(TAG).e("startBackgroundSync returned false")
+                return false
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "startBackgroundSync error")
+                return false
+            } finally {
+                _blockUpdates.set(false)
             }
-            // Keep the lock overlay up, but record that no native background sync is
-            // active so a PIN-verified exit does not require a stop that cannot succeed.
-            Timber.tag(TAG).e("startBackgroundSync returned false")
-            return false
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "startBackgroundSync error")
-            return false
-        } finally {
-            _blockUpdates.set(false)
         }
-    }
 
     /*
      * Leaves background sync and restores the spend key. [pin] must already have been
@@ -350,51 +371,53 @@ class WalletState {
      * which for a keystore-bound wallet is the device secret, not the PIN; only a legacy
      * wallet that never migrated is still keyed to the PIN.
      */
-    suspend fun exitBackgroundSync(pin: String): Boolean = bgSyncMutex.withLock {
-        val wallet = getWallet ?: return false
-        // Native background sync may never have started (for example, Tor/init failed).
-        // The PIN was already verified by the lock screen; release the overlay without
-        // pretending stopBackgroundSync succeeded.
-        if (!backgroundSyncActive) {
-            _backgroundSync.value = false
-            update()
-            return true
-        }
-        if (AnonConfig.viewOnly) {
-            _backgroundSync.value = false
-            backgroundSyncActive = false
-            update()
-            return true
-        }
-        _blockUpdates.set(true)
-        try {
-            val context = AnonConfig.context ?: return false
-            val walletName = WalletProfileStore.activeWalletName(context)
-            val password =
-                if (WalletKey.exists(context, walletName)) WalletKey.load(context, walletName) else pin
-            if (wallet.stopBackgroundSync(password)) {
+    suspend fun exitBackgroundSync(pin: String): Boolean =
+        bgSyncMutex.withLock {
+            val wallet = getWallet ?: return false
+            // Native background sync may never have started (for example, Tor/init failed).
+            // The PIN was already verified by the lock screen; release the overlay without
+            // pretending stopBackgroundSync succeeded.
+            if (!backgroundSyncActive) {
+                _backgroundSync.value = false
+                update()
+                return true
+            }
+            if (AnonConfig.viewOnly) {
                 _backgroundSync.value = false
                 backgroundSyncActive = false
                 update()
-                wallet.startRefresh()
-                Timber.tag(TAG).i("Exited background sync")
                 return true
             }
-            Timber.tag(TAG).e("stopBackgroundSync returned false")
-            return false
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "stopBackgroundSync error")
-            return false
-        } finally {
-            _blockUpdates.set(false)
+            _blockUpdates.set(true)
+            try {
+                val context = AnonConfig.context ?: return false
+                val walletName = WalletProfileStore.activeWalletName(context)
+                val password =
+                    if (WalletKey.exists(context, walletName)) WalletKey.load(context, walletName) else pin
+                if (wallet.stopBackgroundSync(password)) {
+                    _backgroundSync.value = false
+                    backgroundSyncActive = false
+                    update()
+                    wallet.startRefresh()
+                    Timber.tag(TAG).i("Exited background sync")
+                    return true
+                }
+                Timber.tag(TAG).e("stopBackgroundSync returned false")
+                return false
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "stopBackgroundSync error")
+                return false
+            } finally {
+                _blockUpdates.set(false)
+            }
         }
-    }
 
     fun setConnectionStatus(status: Wallet.ConnectionStatus) {
         val previous = _previousConnectionStatus.getAndSet(status)
         _connectionStatus.update { status }
         if (previous == Wallet.ConnectionStatus.ConnectionStatus_Disconnected &&
-            status == Wallet.ConnectionStatus.ConnectionStatus_Connected) {
+            status == Wallet.ConnectionStatus.ConnectionStatus_Connected
+        ) {
             setLoading(true)
             getWallet?.startRefresh()
         }
@@ -444,7 +467,10 @@ class WalletState {
         return true
     }
 
-    fun setTransactionNote(note: String, transactionInfo: TransactionInfo): Boolean {
+    fun setTransactionNote(
+        note: String,
+        transactionInfo: TransactionInfo,
+    ): Boolean {
         val wallet = getWallet ?: return false
         wallet.setUserNote(transactionInfo.hash, note)
         if (!wallet.store()) return false
@@ -453,7 +479,10 @@ class WalletState {
         return true
     }
 
-    fun updateAddressLabel(label: String, addressIndex: Int): Boolean {
+    fun updateAddressLabel(
+        label: String,
+        addressIndex: Int,
+    ): Boolean {
         val wallet = getWallet ?: return false
         wallet.setSubaddressLabel(addressIndex, label)
         if (!wallet.store()) return false
@@ -468,18 +497,18 @@ class WalletState {
     }
 
     fun refresh() {
-        if(getWallet?.isInitialized != true) {
-            return;
+        if (getWallet?.isInitialized != true) {
+            return
         }
         if (getWallet?.fullStatus?.connectionStatus == Wallet.ConnectionStatus.ConnectionStatus_Connected) {
-            setLoading(true);
-            getWallet?.startRefresh();
-        };
+            setLoading(true)
+            getWallet?.startRefresh()
+        }
         getWallet?.refreshHistory()
     }
 
     fun resyncBlockchain(): Result<Boolean> {
-        setLoading(true);
+        setLoading(true)
         try {
             if (getWallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                 return Result.failure(Exception("Please connect to daemon for resync"))
@@ -490,7 +519,7 @@ class WalletState {
             Timber.tag(TAG).e(e)
             return Result.failure(e)
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
     }
 

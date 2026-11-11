@@ -18,10 +18,6 @@
 
 package io.anonero.util.backup
 
-import java.io.File
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.params.KeyParameter
@@ -31,19 +27,25 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 class EncryptUtilTest {
-
     @get:Rule val tmp = TemporaryFolder()
 
-    private fun file(name: String, bytes: ByteArray): File =
-        tmp.newFile(name).apply { writeBytes(bytes) }
+    private fun file(
+        name: String,
+        bytes: ByteArray,
+    ): File = tmp.newFile(name).apply { writeBytes(bytes) }
 
     @Test
     fun `v2 roundtrips`() {
         val payload = "the seed and everything else".toByteArray()
         val input = file("in", payload)
-        val enc = tmp.newFile("enc"); val dec = tmp.newFile("dec")
+        val enc = tmp.newFile("enc")
+        val dec = tmp.newFile("dec")
         EncryptUtil.encryptFile("passphrase", input, enc)
         assertTrue(enc.readBytes().decodeToString().startsWith("ANONBAK2"))
         EncryptUtil.decryptFile("passphrase", enc, dec)
@@ -75,7 +77,7 @@ class EncryptUtilTest {
         }
     }
 
-    /* A file produced by the OLD code (v1: Salted__ + 11k CBC) must restore forever. */
+    // A file produced by the OLD code (v1: Salted__ + 11k CBC) must restore forever.
     @Test
     fun `v1 backups still restore`() {
         val payload = "legacy backup content, PKCS5 padded".toByteArray()

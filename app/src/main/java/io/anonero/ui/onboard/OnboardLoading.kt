@@ -37,33 +37,33 @@ import androidx.compose.ui.unit.dp
 import io.anonero.R
 import io.anonero.ui.onboard.graph.OnboardLoading
 
-
 @Composable
 fun OnboardLoadingComposable(
     modifier: Modifier = Modifier,
-    loadingState: OnboardLoading = OnboardLoading(
-        message = stringResource(R.string.loading)
-    )
+    loadingState: OnboardLoading =
+        OnboardLoading(
+            message = stringResource(R.string.loading),
+        ),
 ) {
-
     Card(
         modifier = modifier.size(width = 300.dp, height = 250.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onBackground
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onBackground,
+            ),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .align(Alignment.CenterHorizontally),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .align(Alignment.CenterHorizontally),
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(
                 strokeCap = StrokeCap.Round,
                 modifier = Modifier.size(200.dp),
-
-                )
+            )
             Text(loadingState.message, style = MaterialTheme.typography.labelSmall)
         }
     }

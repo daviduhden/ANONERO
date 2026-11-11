@@ -40,9 +40,12 @@ object PinThrottle {
 
     private fun waitFor(attempts: Int) = (attempts - 4).coerceIn(0, 10) * 30_000L
 
-    /* Ms until the next attempt is allowed, 0 if it is allowed now. */
+    // Ms until the next attempt is allowed, 0 if it is allowed now.
     @Synchronized
-    fun waitLeft(prefs: SharedPreferences, now: Long = SystemClock.elapsedRealtime()): Long {
+    fun waitLeft(
+        prefs: SharedPreferences,
+        now: Long = SystemClock.elapsedRealtime(),
+    ): Long {
         var last = prefs.getLong(LAST, 0)
         // boot clock went backwards: the phone rebooted, so the wait starts over from now
         if (now < last) {
@@ -52,9 +55,12 @@ object PinThrottle {
         return (last + waitFor(prefs.getInt(ATTEMPTS, 0)) - now).coerceAtLeast(0)
     }
 
-    /* Call before checking the PIN: counts the attempt and returns 0, or returns the wait left. */
+    // Call before checking the PIN: counts the attempt and returns 0, or returns the wait left.
     @Synchronized
-    fun tryAttempt(prefs: SharedPreferences, now: Long = SystemClock.elapsedRealtime()): Long {
+    fun tryAttempt(
+        prefs: SharedPreferences,
+        now: Long = SystemClock.elapsedRealtime(),
+    ): Long {
         val left = waitLeft(prefs, now)
         if (left > 0) return left
         prefs.edit(commit = true) {
@@ -64,8 +70,11 @@ object PinThrottle {
         return 0
     }
 
-    /* Clears the count after a correct PIN. */
+    // Clears the count after a correct PIN.
     @Synchronized
     fun reset(prefs: SharedPreferences) =
-        prefs.edit(commit = true) { remove(ATTEMPTS); remove(LAST) }
+        prefs.edit(commit = true) {
+            remove(ATTEMPTS)
+            remove(LAST)
+        }
 }

@@ -44,10 +44,8 @@ private const val TAG = "QrCodeAnalyzerBoofcv"
  * cancellation/lifecycle state.
  */
 class QrCodeAnalyzerBoofcv(
-    private val onQrCodesDetected: (qrCode: Result) -> Unit
+    private val onQrCodesDetected: (qrCode: Result) -> Unit,
 ) : ImageAnalysis.Analyzer {
-
-
     private fun ByteBuffer.toByteArray(): ByteArray {
         rewind()
         val data = ByteArray(remaining())
@@ -62,11 +60,10 @@ class QrCodeAnalyzerBoofcv(
             listOf(
                 ImageFormat.YUV_422_888,
                 ImageFormat.YUV_444_888,
-                ImageFormat.JPEG
-            )
+                ImageFormat.JPEG,
+            ),
         )
     }
-
 
     private val detector = FactoryFiducial.qrcode(null, GrayU8::class.java)
 
@@ -148,7 +145,7 @@ class QrCodeAnalyzerBoofcv(
             image.height,
             false
         )
-        */
+         */
         if (imageProxy.image == null) {
             return
         }
@@ -165,7 +162,6 @@ class QrCodeAnalyzerBoofcv(
 //            Timber.tag(TAG).e(e)
         }
         for (det in detector.detections) {
-
             onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
         }
 
@@ -181,7 +177,6 @@ class QrCodeAnalyzerBoofcv(
         } catch (e: Exception) {
 //            Timber.tag(TAG).e(e)
         }
-
 
         for (det in detector.detections) {
             Timber.tag(TAG).d(det.message)

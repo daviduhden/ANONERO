@@ -120,13 +120,14 @@ import java.io.File
 
 private const val TAG = "Send"
 
-
 enum class SpendType {
     NORMAL,
-    SWEEP
+    SWEEP,
 }
 
-enum class SendError(@StringRes val messageRes: Int) {
+enum class SendError(
+    @StringRes val messageRes: Int,
+) {
     NOT_CONNECTED(R.string.wallet_not_connected_to_node_please_check_network),
     CONSTRUCTION_FAILED(R.string.transaction_construction_failed),
 }
@@ -156,8 +157,9 @@ class SendViewModel : ViewModel() {
     val txComposeError = _txComposeError as LiveData<SendError?>
 
     private fun writeUnsignedTransaction(pendingTx: PendingTransaction) {
-        val cacheDir = AnonConfig.context?.cacheDir
-            ?: throw IllegalStateException("cache directory unavailable")
+        val cacheDir =
+            AnonConfig.context?.cacheDir
+                ?: throw IllegalStateException("cache directory unavailable")
         val unsignedTxFile = File(cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE)
         // A fixed cache name means a failed write could leave the previous transaction
         // in place and a later QR export would sign a different payment. Clear it first
@@ -170,30 +172,35 @@ class SendViewModel : ViewModel() {
         }
     }
 
-    suspend fun prepareTransaction(addressField: String, amount: String): PendingTransaction? {
+    suspend fun prepareTransaction(
+        addressField: String,
+        amount: String,
+    ): PendingTransaction? {
         val wallet = WalletManager.instance?.wallet
         val isSweep = spendType.value == SpendType.SWEEP
         return withContext(Dispatchers.IO) {
             try {
                 // Sweep ignores the amount; a normal send must never pass through Double or
                 // the native parser, which can accept values the review screen did not show.
-                val amountAtomic = if (isSweep) {
-                    0L
-                } else {
-                    MoneroAmount.parseExact(amount)
-                        ?: throw IllegalArgumentException("invalid amount")
-                }
+                val amountAtomic =
+                    if (isSweep) {
+                        0L
+                    } else {
+                        MoneroAmount.parseExact(amount)
+                            ?: throw IllegalArgumentException("invalid amount")
+                    }
                 _txComposeError.postValue(null)
                 if (isSweep && _coinsSelected.value.isNullOrEmpty()) {
                     if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
                     }
-                    val pendingTx = wallet.createSweepTransaction(
-                        dstAddr = addressField,
-                        priority = PendingTransaction.Priority.Priority_Default,
-                        keyImages = arrayListOf()
-                    )
+                    val pendingTx =
+                        wallet.createSweepTransaction(
+                            dstAddr = addressField,
+                            priority = PendingTransaction.Priority.Priority_Default,
+                            keyImages = arrayListOf(),
+                        )
                     if (!pendingTx?.getErrorString().isNullOrEmpty()) {
                         throw Exception(pendingTx.getErrorString())
                     }
@@ -205,12 +212,13 @@ class SendViewModel : ViewModel() {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
                     }
-                    val pendingTx = wallet.createTransaction(
-                        dst_addr = addressField,
-                        amount = amountAtomic,
-                        sweepAll = isSweep,
-                        selectedUtxos = _coinsSelected.value?.toList() ?: listOf()
-                    )
+                    val pendingTx =
+                        wallet.createTransaction(
+                            dst_addr = addressField,
+                            amount = amountAtomic,
+                            sweepAll = isSweep,
+                            selectedUtxos = _coinsSelected.value?.toList() ?: listOf(),
+                        )
 
                     if (!pendingTx.getErrorString().isNullOrEmpty()) {
                         Timber.tag(TAG).e("transaction error: %s", pendingTx.getErrorString())
@@ -240,7 +248,7 @@ class SendViewModel : ViewModel() {
 
     fun processUrCode(
         urResult: URDecoder.Result,
-        onSuccess: (path: String) -> Unit
+        onSuccess: (path: String) -> Unit,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             if (urResult.type == ResultType.SUCCESS) {
@@ -284,34 +292,40 @@ class SendViewModel : ViewModel() {
     }
 
     // Computed balance based on selected coins or unlocked balance
-    val balance = MediatorLiveData<Long>().apply {
-        addSource(walletState.unLockedBalance.asLiveData()) { updateComputedBalance() }
-        addSource(_coinsSelected) { updateComputedBalance() }
-    }
+    val balance =
+        MediatorLiveData<Long>().apply {
+            addSource(walletState.unLockedBalance.asLiveData()) { updateComputedBalance() }
+            addSource(_coinsSelected) { updateComputedBalance() }
+        }
 
     private fun MediatorLiveData<Long>.updateComputedBalance() {
         val selectedCoins = _coinsSelected.value
         val unlockedBal = _balance.value ?: 0L
-        value = if (selectedCoins.isNullOrEmpty()) {
-            unlockedBal
-        } else {
-            selectedCoins.sumOf { it.amount }
-        }
+        value =
+            if (selectedCoins.isNullOrEmpty()) {
+                unlockedBal
+            } else {
+                selectedCoins.sumOf { it.amount }
+            }
     }
 
     fun setCoins(coins: List<String>) {
-        val walletCoins = WalletManager.instance?.wallet?.coins?.all ?: listOf()
+        val walletCoins =
+            WalletManager.instance
+                ?.wallet
+                ?.coins
+                ?.all ?: listOf()
         // Frozen outputs must never be preselected, even if a stale route or QR payload
         // names one. wallet2 also refuses them, but silently letting the UI show a
         // spendable selection would be misleading.
-        val selectedCoins = walletCoins
-            .filter {
-                coins.contains(it.pub_key) && !it.frozen && !it.spent &&
-                    it.subaddrAccount == (WalletManager.instance?.wallet?.getAccountIndex() ?: 0)
-            }
-            .toSet()
+        val selectedCoins =
+            walletCoins
+                .filter {
+                    coins.contains(it.pub_key) && !it.frozen && !it.spent &&
+                        it.subaddrAccount == (WalletManager.instance?.wallet?.getAccountIndex() ?: 0)
+                }.toSet()
         _coinsSelected.postValue(
-            selectedCoins
+            selectedCoins,
         )
     }
 }
@@ -326,7 +340,6 @@ fun SendScreen(
     onPayToMany: () -> Unit = {},
     paymentUri: SendScreenRoute? = null,
 ) {
-
     val snackbarHostState = remember { SnackbarHostState() }
     var addressField by rememberSaveable { mutableStateOf("") }
     var amountField by rememberSaveable { mutableStateOf("") }
@@ -349,17 +362,18 @@ fun SendScreen(
 
     val showIndefiniteLoading by walletState.isLoading.asLiveData().observeAsState(false)
 
-
-    val unLockedAmount = Formats.getDisplayAmount(
-        unlockedBalance ?: 0L
-    )
+    val unLockedAmount =
+        Formats.getDisplayAmount(
+            unlockedBalance ?: 0L,
+        )
     val offline by walletState.offlineFlow.asLiveData().observeAsState(walletState.offline)
     val hideAmounts by walletState.hideAmountsFlow.asLiveData().observeAsState(false)
-    val shownAmount = if (offline || hideAmounts) {
-        Formats.maskAmount(unlockedBalance ?: 0L)
-    } else {
-        unLockedAmount
-    }
+    val shownAmount =
+        if (offline || hideAmounts) {
+            Formats.maskAmount(unlockedBalance ?: 0L)
+        } else {
+            unLockedAmount
+        }
 
     LaunchedEffect(paymentUri) {
         if (paymentUri != null && paymentUri.coins.isNotEmpty()) {
@@ -369,41 +383,47 @@ fun SendScreen(
 
     LaunchedEffect(paymentUriFromScanner) {
         paymentUriFromScanner?.let {
-            if (it.address.isNotEmpty())
+            if (it.address.isNotEmpty()) {
                 addressField = it.address
-            if (it.amount > 0L)
+            }
+            if (it.amount > 0L) {
                 amountField = MoneroAmount.format(it.amount)
+            }
         }
     }
 
     LaunchedEffect(paymentUri) {
         paymentUri?.let {
-            if (it.address.isNotEmpty())
+            if (it.address.isNotEmpty()) {
                 addressField = it.address
-            if (it.amount > 0L)
+            }
+            if (it.amount > 0L) {
                 amountField = MoneroAmount.format(it.amount)
+            }
         }
     }
     val sweep = spendType == SpendType.SWEEP
 
     LaunchedEffect(addressField, amountField) {
-        scope.launch {
-            unlockedBalance?.let { maxSpendableBalance ->
-                val amountAtomic = MoneroAmount.parseExact(amountField)
+        scope
+            .launch {
+                unlockedBalance?.let { maxSpendableBalance ->
+                    val amountAtomic = MoneroAmount.parseExact(amountField)
 
-                validSpend = when {
-                    inValidAddress == true -> false
-                    spendType == SpendType.SWEEP -> true
-                    amountAtomic == null || maxSpendableBalance == 0L -> false
-                    amountAtomic >= maxSpendableBalance -> false
-                    else -> true
+                    validSpend =
+                        when {
+                            inValidAddress == true -> false
+                            spendType == SpendType.SWEEP -> true
+                            amountAtomic == null || maxSpendableBalance == 0L -> false
+                            amountAtomic >= maxSpendableBalance -> false
+                            else -> true
+                        }
+                }
+            }.invokeOnCompletion {
+                if (it != null) {
+                    Timber.tag(TAG).e(it)
                 }
             }
-        }.invokeOnCompletion {
-            if (it != null) {
-                Timber.tag(TAG).e(it)
-            }
-        }
     }
 
     fun prepare() {
@@ -415,7 +435,7 @@ fun SendScreen(
                 if (pendingTx != null) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         view.performHapticFeedback(
-                            HapticFeedbackConstants.CONFIRM
+                            HapticFeedbackConstants.CONFIRM,
                         )
                     }
                     if (!pendingTx.getErrorString().isNullOrEmpty()) {
@@ -424,7 +444,7 @@ fun SendScreen(
                     navigateToReview.invoke(ReviewTransactionRoute(addressField))
                 } else {
                     Timber.tag(TAG).i("prepare: Pending tx is null")
-                    //show error
+                    // show error
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -436,24 +456,23 @@ fun SendScreen(
         }
     }
 
-
     val context = LocalContext.current
     val resources = LocalResources.current
 
-
-    if (showCoinSelection)
+    if (showCoinSelection) {
         ModalBottomSheet(
             scrimColor = MaterialTheme.colorScheme.background,
             contentColor = Color.Transparent,
-            sheetState = rememberModalBottomSheetState(
-                skipPartiallyExpanded = true
-            ),
+            sheetState =
+                rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                ),
             contentWindowInsets = {
                 WindowInsets(
                     left = 0.dp,
                     top = 0.dp,
                     right = 0.dp,
-                    bottom = 0.dp
+                    bottom = 0.dp,
                 )
             },
             shape = MaterialTheme.shapes.large,
@@ -462,7 +481,7 @@ fun SendScreen(
             },
             onDismissRequest = {
                 showCoinSelection = false
-            }
+            },
         ) {
             CoinsScreen(
                 // CoinsScreen and setCoins identify coins by pub_key; passing the key image
@@ -475,10 +494,10 @@ fun SendScreen(
                 navigateToSpend = {
                     showCoinSelection = false
                     sendViewModel.setCoins(it.coins)
-                }
+                },
             )
         }
-
+    }
 
     Scaffold(
         modifier = modifier,
@@ -489,7 +508,7 @@ fun SendScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
@@ -498,15 +517,16 @@ fun SendScreen(
                     TextButton(onClick = onPayToMany) {
                         Text(stringResource(R.string.multi))
                     }
-                }
+                },
             )
         },
         snackbarHost = {
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.padding(
-                    bottom = 12.dp
-                )
+                modifier =
+                    Modifier.padding(
+                        bottom = 12.dp,
+                    ),
             )
         },
     ) { padding ->
@@ -514,39 +534,41 @@ fun SendScreen(
             Column(
                 Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
-                horizontalAlignment = CenterHorizontally
+                horizontalAlignment = CenterHorizontally,
             ) {
                 Box(
-                    contentAlignment = Alignment.Center
-                ){
+                    contentAlignment = Alignment.Center,
+                ) {
                     Image(
                         painter = painterResource(R.drawable.ic_anon),
                         contentDescription = stringResource(R.string.app_logo),
-                        modifier = Modifier
-                            .size(110.dp)
+                        modifier =
+                            Modifier
+                                .size(110.dp),
                     )
                     CircularProgressIndicator(
                         modifier = Modifier.size(300.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 }
                 Text(
                     stringResource(R.string.constructing_transaction),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 12.dp)
+                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
         } else {
             Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(bottom = 0.dp),
+                modifier =
+                    Modifier
+                        .padding(padding)
+                        .padding(bottom = 0.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.Start
+                horizontalAlignment = Alignment.Start,
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     WalletProgressIndicator()
                     ListItem(
@@ -554,13 +576,12 @@ fun SendScreen(
                             Text(
                                 text = stringResource(R.string.address),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         },
                         supportingContent = {
                             OutlinedTextField(
                                 value = addressField,
-
                                 shape = MaterialTheme.shapes.medium,
                                 minLines = 4,
                                 isError = inValidAddress == true,
@@ -573,32 +594,33 @@ fun SendScreen(
                                 onValueChange = {
                                     addressField = it.trim()
                                 },
-                                keyboardOptions = KeyboardOptions(
-                                    imeAction = ImeAction.Next,
-                                ),
+                                keyboardOptions =
+                                    KeyboardOptions(
+                                        imeAction = ImeAction.Next,
+                                    ),
                                 placeholder = {
                                     Text(
                                         text = "",
-                                        color = labelColor
+                                        color = labelColor,
                                     )
                                 },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .onFocusChanged {
-                                        if (!it.hasFocus && addressField.isNotEmpty()) {
-                                            scope.launch(Dispatchers.Default) {
-                                                inValidAddress =
-                                                    WalletManager.instance?.wallet?.validateAddress(
-                                                        addressField
-                                                    ) != true
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged {
+                                            if (!it.hasFocus && addressField.isNotEmpty()) {
+                                                scope.launch(Dispatchers.Default) {
+                                                    inValidAddress =
+                                                        WalletManager.instance?.wallet?.validateAddress(
+                                                            addressField,
+                                                        ) != true
+                                                }
+                                            } else {
+                                                if (addressField.isEmpty()) {
+                                                    inValidAddress = null
+                                                }
                                             }
-                                        } else {
-                                            if (addressField.isEmpty())
-                                                inValidAddress = null
-                                        }
-
-                                    }
-                                    .focusable()
+                                        }.focusable(),
                             )
                         },
                     )
@@ -608,7 +630,7 @@ fun SendScreen(
                             Text(
                                 text = stringResource(R.string.amount),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(start = 4.dp),
                             )
                         },
                         supportingContent = {
@@ -618,45 +640,50 @@ fun SendScreen(
                                 placeholder = {
                                     Text(
                                         text = "",
-                                        color = labelColor
+                                        color = labelColor,
                                     )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(
-                                    imeAction = ImeAction.Next,
-                                    keyboardType = KeyboardType.Decimal
-                                ),
+                                keyboardOptions =
+                                    KeyboardOptions(
+                                        imeAction = ImeAction.Next,
+                                        keyboardType = KeyboardType.Decimal,
+                                    ),
                                 enabled = !showIndefiniteLoading,
                                 onValueChange = {
                                     amountField = it.trim()
                                 },
-
-                                )
+                            )
                         },
                     )
                     Text(
-                        if (sweep) stringResource(R.string.sweeping_balance_amount, shownAmount)
-                        else stringResource(R.string.available_balance_amount, shownAmount),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !offline) {
-                                amountField = if (!sweep) {
-                                    sendViewModel.setSpendType(SpendType.SWEEP)
-                                    unLockedAmount
-                                } else {
-                                    sendViewModel.setSpendType(SpendType.NORMAL)
-                                    ""
-                                }
-                            },
+                        if (sweep) {
+                            stringResource(R.string.sweeping_balance_amount, shownAmount)
+                        } else {
+                            stringResource(R.string.available_balance_amount, shownAmount)
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !offline) {
+                                    amountField =
+                                        if (!sweep) {
+                                            sendViewModel.setSpendType(SpendType.SWEEP)
+                                            unLockedAmount
+                                        } else {
+                                            sendViewModel.setSpendType(SpendType.NORMAL)
+                                            ""
+                                        }
+                                },
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
                     )
                     IconButton(
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                         onClick = {
                             showScanner = true
                             qrScannerParam = null
-                        }
+                        },
                     ) {
                         Icon(AnonIcons.Scan, contentDescription = "")
                     }
@@ -664,70 +691,77 @@ fun SendScreen(
                     txComposeError?.let { sendError ->
                         Text(
                             text = stringResource(sendError.messageRes),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
 
-                    if (coins.isNotEmpty())
+                    if (coins.isNotEmpty()) {
                         Text(
-                            text = pluralStringResource(
-                                R.plurals.coins_selected_count,
-                                coins.size,
-                                coins.size
-                            ),
-                            modifier = Modifier
-                                .align(CenterHorizontally)
-                                .padding(
-                                    horizontal = 16.dp,
-                                    vertical = 8.dp
-                                )
-                                .clickable {
-                                    showCoinSelection = true;
-                                }
-                                .padding(horizontal = 16.dp),
+                            text =
+                                pluralStringResource(
+                                    R.plurals.coins_selected_count,
+                                    coins.size,
+                                    coins.size,
+                                ),
+                            modifier =
+                                Modifier
+                                    .align(CenterHorizontally)
+                                    .padding(
+                                        horizontal = 16.dp,
+                                        vertical = 8.dp,
+                                    ).clickable {
+                                        showCoinSelection = true
+                                    }.padding(horizontal = 16.dp),
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xfffb8500)
+                            color = Color(0xfffb8500),
                         )
+                    }
                 }
                 AnonOutlineButton(
                     enabled = validSpend,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 16.dp,
-                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = 16.dp,
+                            ),
                     onClick = {
                         val wallet = WalletManager.instance?.wallet ?: return@AnonOutlineButton
                         val isSweep = spendType == SpendType.SWEEP
-                        val spendAmount = if (isSweep) {
-                            0L
-                        } else {
-                            MoneroAmount.parseExact(amountField) ?: return@AnonOutlineButton
-                        }
-                        if (AnonConfig.viewOnly) {
-                            val needsKeyImages = if (isSweep) {
-                                wallet.hasUnknownKeyImages()
+                        val spendAmount =
+                            if (isSweep) {
+                                0L
                             } else {
-                                // Reserve a fee for the key-image check without letting a
-                                // near-Long.MAX amount wrap negative.
-                                val withFee = runCatching {
-                                    Math.addExact(spendAmount, 1_000_000_000L)
-                                }.getOrDefault(Long.MAX_VALUE)
-                                withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
+                                MoneroAmount.parseExact(amountField) ?: return@AnonOutlineButton
                             }
+                        if (AnonConfig.viewOnly) {
+                            val needsKeyImages =
+                                if (isSweep) {
+                                    wallet.hasUnknownKeyImages()
+                                } else {
+                                    // Reserve a fee for the key-image check without letting a
+                                    // near-Long.MAX amount wrap negative.
+                                    val withFee =
+                                        runCatching {
+                                            Math.addExact(spendAmount, 1_000_000_000L)
+                                        }.getOrDefault(Long.MAX_VALUE)
+                                    withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
+                                }
 
                             if (needsKeyImages) {
-                                qrScannerParam = SpendQRExchangeParam(
-                                    exportType = ExportType.OUTPUT,
-                                    title = resources.getString(R.string.outputs),
-                                    ctaText = resources.getString(R.string.scan_key_images),
-                                )
+                                qrScannerParam =
+                                    SpendQRExchangeParam(
+                                        exportType = ExportType.OUTPUT,
+                                        title = resources.getString(R.string.outputs),
+                                        ctaText = resources.getString(R.string.scan_key_images),
+                                    )
                             } else {
                                 prepare()
                             }
@@ -737,15 +771,14 @@ fun SendScreen(
                             prepare()
                         }
                     },
-                ){
+                ) {
                     Text(stringResource(R.string.next))
                 }
             }
-
         }
     }
 
-    if (showScanner)
+    if (showScanner) {
         URQRScanner(
             onQRCodeScanned = {
                 showScanner = false
@@ -758,11 +791,12 @@ fun SendScreen(
                 when (it.getOrNull()) {
                     ImportEvents.IMPORT_OUTPUTS -> {
                         showScanner = false
-                        qrScannerParam = SpendQRExchangeParam(
-                            exportType = ExportType.IMAGE,
-                            title = resources.getString(R.string.key_images),
-                            ctaText = resources.getString(R.string.scan_unsigned_tx),
-                        )
+                        qrScannerParam =
+                            SpendQRExchangeParam(
+                                exportType = ExportType.IMAGE,
+                                title = resources.getString(R.string.key_images),
+                                ctaText = resources.getString(R.string.scan_unsigned_tx),
+                            )
                     }
 
                     ImportEvents.IMPORT_KEY_IMAGES -> {
@@ -774,7 +808,7 @@ fun SendScreen(
                             navigateToReview.invoke(
                                 ReviewTransactionRoute(
                                     addressField,
-                                )
+                                ),
                             )
                         }
                     }
@@ -784,19 +818,19 @@ fun SendScreen(
                             navigateToReview.invoke(
                                 ReviewTransactionRoute(
                                     addressField,
-                                )
+                                ),
                             )
                         }
                     }
 
                     null -> {
-
                     }
                 }
                 showScanner = false
             },
-            showScanner = showScanner
+            showScanner = showScanner,
         )
+    }
 
     if (qrScannerParam != null) {
         QRExchangeScreen(
@@ -813,11 +847,9 @@ fun SendScreen(
                 qrScannerParam = null
                 showScanner = true
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
     }
-
-
 }
 
 @Preview(device = "id:pixel_5")

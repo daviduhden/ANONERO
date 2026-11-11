@@ -23,7 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SendScreenRouteTest {
-
     @Test
     fun `omitted, empty and zero URI amounts mean no prefilled amount`() {
         assertEquals(0L, SendScreenRoute.parseAmountParameter(null))

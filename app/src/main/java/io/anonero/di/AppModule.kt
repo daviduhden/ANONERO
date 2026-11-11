@@ -39,7 +39,6 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
-
 /** Provides the single named preference file used by the wallet layer. */
 fun provideWalletSharedPrefs(app: Context): SharedPreferences =
     // The Koin qualifier is WALLET_PREFERENCES; the actual file name is AnonConfig.PREFS.
@@ -54,18 +53,19 @@ fun provideWalletSharedPrefs(app: Context): SharedPreferences =
  * qualifier for the shared preference file; do not create a second preference file for
  * those values.
  */
-val appModule = module {
-    single(named(WALLET_PREFERENCES)) { provideWalletSharedPrefs(androidApplication()) }
-    single { TorService(get(named(WALLET_PREFERENCES))) }
-    single { WalletState() }
-    single { AnonWalletHandler(get(named(WALLET_PREFERENCES)), get(), get()) }
-    single { LogRepository(get()) }
-    single { NodesRepository(get()) }
-    viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { OnboardViewModel(get(named(WALLET_PREFERENCES))) }
-    viewModel { LogViewModel(get()) }
-    viewModel { SendViewModel() }
-    viewModel { SecureWipeViewModel(get(), get(named(WALLET_PREFERENCES)), get(), get()) }
-    viewModel { NodeSettingsViewModel(get(named(WALLET_PREFERENCES)), get<NodesRepository>()) }
-    viewModel { ProxySettingsViewModel(get(), get(), get(named(WALLET_PREFERENCES))) }
-}
+val appModule =
+    module {
+        single(named(WALLET_PREFERENCES)) { provideWalletSharedPrefs(androidApplication()) }
+        single { TorService(get(named(WALLET_PREFERENCES))) }
+        single { WalletState() }
+        single { AnonWalletHandler(get(named(WALLET_PREFERENCES)), get(), get()) }
+        single { LogRepository(get()) }
+        single { NodesRepository(get()) }
+        viewModel { AppViewModel(get(), get(), get()) }
+        viewModel { OnboardViewModel(get(named(WALLET_PREFERENCES))) }
+        viewModel { LogViewModel(get()) }
+        viewModel { SendViewModel() }
+        viewModel { SecureWipeViewModel(get(), get(named(WALLET_PREFERENCES)), get(), get()) }
+        viewModel { NodeSettingsViewModel(get(named(WALLET_PREFERENCES)), get<NodesRepository>()) }
+        viewModel { ProxySettingsViewModel(get(), get(), get(named(WALLET_PREFERENCES))) }
+    }

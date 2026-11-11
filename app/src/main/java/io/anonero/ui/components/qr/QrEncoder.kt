@@ -35,15 +35,15 @@ interface QrEncoder {
  * This is just a small wrapper around the ZXing library with sane defaults.
  */
 class ZxingQrEncoder : QrEncoder {
-    override fun encode(qrData: String): ByteMatrix? {
-        return Encoder.encode(
-            qrData,
-            ErrorCorrectionLevel.M,
-            mapOf(
-                EncodeHintType.CHARACTER_SET to "UTF-8",
-                EncodeHintType.MARGIN to 16,
-                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H,
-            )
-        ).matrix
-    }
+    override fun encode(qrData: String): ByteMatrix? =
+        Encoder
+            .encode(
+                qrData,
+                ErrorCorrectionLevel.M,
+                mapOf(
+                    EncodeHintType.CHARACTER_SET to "UTF-8",
+                    EncodeHintType.MARGIN to 16,
+                    EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H,
+                ),
+            ).matrix
 }

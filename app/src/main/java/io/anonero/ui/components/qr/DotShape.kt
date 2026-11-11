@@ -23,5 +23,6 @@ package io.anonero.ui.components.qr
  * rounded rects to fit the style better.
  */
 enum class DotShape {
-    Circle, Square
+    Circle,
+    Square,
 }

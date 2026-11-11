@@ -35,8 +35,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -55,21 +55,31 @@ import java.util.Locale
 fun networkConnected(): State<Boolean> {
     val context = LocalContext.current
     return produceState(
-        initialValue = run {
-            val cm = ContextCompat.getSystemService(context, ConnectivityManager::class.java)
-            val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
-            caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-        }
+        initialValue =
+            run {
+                val cm = ContextCompat.getSystemService(context, ConnectivityManager::class.java)
+                val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+                caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+            },
     ) {
-        val cm = ContextCompat.getSystemService(context, ConnectivityManager::class.java)
-            ?: return@produceState
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            .build()
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { value = true }
-            override fun onLost(network: Network) { value = false }
-        }
+        val cm =
+            ContextCompat.getSystemService(context, ConnectivityManager::class.java)
+                ?: return@produceState
+        val request =
+            NetworkRequest
+                .Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                .build()
+        val callback =
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    value = true
+                }
+
+                override fun onLost(network: Network) {
+                    value = false
+                }
+            }
         cm.registerNetworkCallback(request, callback)
         awaitDispose { cm.unregisterNetworkCallback(callback) }
     }
@@ -77,7 +87,10 @@ fun networkConnected(): State<Boolean> {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WalletProgressIndicator(modifier: Modifier = Modifier, refreshIndicatorProgress: Float = 0.0f) {
+fun WalletProgressIndicator(
+    modifier: Modifier = Modifier,
+    refreshIndicatorProgress: Float = 0.0f,
+) {
     val walletState: WalletState by inject(WalletState::class.java)
 
     val showIndefiniteLoading by walletState.isLoading.asLiveData().observeAsState(false)
@@ -88,29 +101,34 @@ fun WalletProgressIndicator(modifier: Modifier = Modifier, refreshIndicatorProgr
     val isSyncing = syncProgress != null && syncProgress!!.left > 0L
     val offline by walletState.offlineFlow.asLiveData().observeAsState(walletState.offline)
     AnimatedVisibility(
-        !offline && (showIndefiniteLoading || syncProgress != null || !isConnected || !isNetworkConnected || refreshIndicatorProgress != 0.0f),
-        modifier = modifier
-            .animateContentSize()
+        !offline &&
+            (showIndefiniteLoading || syncProgress != null || !isConnected || !isNetworkConnected || refreshIndicatorProgress != 0.0f),
+        modifier =
+            modifier
+                .animateContentSize(),
     ) {
         if (isSyncing) {
             val progress = syncProgress ?: return@AnimatedVisibility
             Column(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(
-                    vertical = 12.dp
-                )
+                modifier =
+                    Modifier.padding(
+                        vertical = 12.dp,
+                    ),
             ) {
                 LinearProgressIndicator(
                     progress = {
                         progress.progress
                     },
-                    trackColor = MaterialTheme.colorScheme.primary.copy(
-                        alpha = 0.2f
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    trackColor =
+                        MaterialTheme.colorScheme.primary.copy(
+                            alpha = 0.2f,
+                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                 )
                 if (progress.left > 50) {
                     Text(
@@ -118,37 +136,39 @@ fun WalletProgressIndicator(modifier: Modifier = Modifier, refreshIndicatorProgr
                             R.plurals.blocks_left_count,
                             progress.left.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                             Formats.convertNumber(progress.left, Locale.getDefault())
-                                ?: progress.left.toString()
+                                ?: progress.left.toString(),
                         ),
                         modifier = Modifier.padding(top = 8.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
         } else if (refreshIndicatorProgress != 0.0f && !showIndefiniteLoading && isConnected && isNetworkConnected) {
             LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
                 progress = {
                     refreshIndicatorProgress
                 },
-                trackColor = MaterialTheme.colorScheme.primary.copy(
-                    alpha = 0.2f
-                ),
+                trackColor =
+                    MaterialTheme.colorScheme.primary.copy(
+                        alpha = 0.2f,
+                    ),
             )
         } else {
             LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                trackColor = MaterialTheme.colorScheme.primary.copy(
-                    alpha = 0.2f
-                ),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                trackColor =
+                    MaterialTheme.colorScheme.primary.copy(
+                        alpha = 0.2f,
+                    ),
             )
         }
-
     }
-
 }

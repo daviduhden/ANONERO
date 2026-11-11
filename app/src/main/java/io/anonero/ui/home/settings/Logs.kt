@@ -51,8 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -81,21 +81,21 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-
 private const val TAG = "Logs"
 
-class LogViewModel(private val logRepository: LogRepository) : ViewModel() {
-    val logLines: StateFlow<List<AnonLog>> = logRepository
-        .logFlow
-        .map {
-            it.reversed()
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Lazily,
-            initialValue = emptyList()
-        )
-
+class LogViewModel(
+    private val logRepository: LogRepository,
+) : ViewModel() {
+    val logLines: StateFlow<List<AnonLog>> =
+        logRepository
+            .logFlow
+            .map {
+                it.reversed()
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Lazily,
+                initialValue = emptyList(),
+            )
 
     fun clearLogs() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -104,61 +104,62 @@ class LogViewModel(private val logRepository: LogRepository) : ViewModel() {
     }
 
     private fun logDeviceInfo(): String {
-        val deviceInfo = """
-        Model          : ${Build.MODEL}
-        Manufacturer   : ${Build.MANUFACTURER}
-        Brand          : ${Build.BRAND}
-        Device         : ${Build.DEVICE}
-        OS Version     : ${Build.VERSION.RELEASE}
-        SDK Version    : ${Build.VERSION.SDK_INT}
-        Product        : ${Build.PRODUCT}
-        Hardware       : ${Build.HARDWARE}
-        Board          : ${Build.BOARD}
-        Host           : ${Build.HOST}
-    """.trimIndent()
+        val deviceInfo =
+            """
+            Model          : ${Build.MODEL}
+            Manufacturer   : ${Build.MANUFACTURER}
+            Brand          : ${Build.BRAND}
+            Device         : ${Build.DEVICE}
+            OS Version     : ${Build.VERSION.RELEASE}
+            SDK Version    : ${Build.VERSION.SDK_INT}
+            Product        : ${Build.PRODUCT}
+            Hardware       : ${Build.HARDWARE}
+            Board          : ${Build.BOARD}
+            Host           : ${Build.HOST}
+            """.trimIndent()
         return deviceInfo
     }
 
-
-    fun prePareForShare(): Job {
-        return viewModelScope.launch {
-            val logsAsString = logLines.map { list ->
-                list.joinToString(separator = "\n") {
-                    val instant =
-                        Instant.ofEpochMilli(it.date)
-                    val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
-                    val formatter = DateTimeFormatter.ofPattern("MMM dd hh:mm:ssa")
-                    val level = when (it.priority) {
-                        Log.VERBOSE -> "VERBOSE"
-                        Log.DEBUG -> "DEBUG"
-                        Log.INFO -> "INFO"
-                        Log.WARN -> "WARN"
-                        Log.ERROR -> "ERROR"
-                        Log.ASSERT -> "ASSERT"
-                        else -> "UNKNOWN"
-                    }
-                    "${formatter.format(dateTime)} | $level | ${it.tag} | ${it.message}"
-                }
-            }.stateIn(viewModelScope).value
+    fun prePareForShare(): Job =
+        viewModelScope.launch {
+            val logsAsString =
+                logLines
+                    .map { list ->
+                        list.joinToString(separator = "\n") {
+                            val instant =
+                                Instant.ofEpochMilli(it.date)
+                            val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+                            val formatter = DateTimeFormatter.ofPattern("MMM dd hh:mm:ssa")
+                            val level =
+                                when (it.priority) {
+                                    Log.VERBOSE -> "VERBOSE"
+                                    Log.DEBUG -> "DEBUG"
+                                    Log.INFO -> "INFO"
+                                    Log.WARN -> "WARN"
+                                    Log.ERROR -> "ERROR"
+                                    Log.ASSERT -> "ASSERT"
+                                    else -> "UNKNOWN"
+                                }
+                            "${formatter.format(dateTime)} | $level | ${it.tag} | ${it.message}"
+                        }
+                    }.stateIn(viewModelScope)
+                    .value
             val logFile = AnonConfig.context?.let { AnonConfig.getLogFile(it) }
             if (logFile?.exists() == true) {
                 logFile.writeText("")
                 logFile.writeText(
                     "${'-'.toString().repeat(100)}\n\n" +
-                            "${logDeviceInfo()}\n\n" +
-                            "${'-'.toString().repeat(100)}\n" +
-                            logsAsString
+                        "${logDeviceInfo()}\n\n" +
+                        "${'-'.toString().repeat(100)}\n" +
+                        logsAsString,
                 )
             }
         }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogViewer(
-    onBackPress: () -> Unit = {}
-) {
+fun LogViewer(onBackPress: () -> Unit = {}) {
     val viewModel = koinViewModel<LogViewModel>()
     val logLines by viewModel.logLines.collectAsState(emptyList())
     val listState = rememberLazyListState()
@@ -173,114 +174,117 @@ fun LogViewer(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackPress
+                        onClick = onBackPress,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                    ),
                 actions = {
                     IconButton(
                         onClick = {
-                            viewModel.prePareForShare()
+                            viewModel
+                                .prePareForShare()
                                 .invokeOnCompletion {
                                     Timber.tag(TAG).i(it)
                                     if (it == null) {
-                                        val fileUri: Uri = try {
-                                            FileProvider.getUriForFile(
-                                                context, // Context
-                                                "${context.packageName}.shareProvider", // Authority
-                                                AnonConfig.getLogFile(context)
-                                            )
-                                        } catch (e: Exception) {
-                                            Timber.tag(TAG).e(e)
-                                            return@invokeOnCompletion
-                                        }
+                                        val fileUri: Uri =
+                                            try {
+                                                FileProvider.getUriForFile(
+                                                    context, // Context
+                                                    "${context.packageName}.shareProvider", // Authority
+                                                    AnonConfig.getLogFile(context),
+                                                )
+                                            } catch (e: Exception) {
+                                                Timber.tag(TAG).e(e)
+                                                return@invokeOnCompletion
+                                            }
                                         // Create the share intent
-                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                            type = "*/*"
-                                            putExtra(Intent.EXTRA_STREAM, fileUri)
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) // Grant permission to the receiving app
-                                        }
+                                        val shareIntent =
+                                            Intent(Intent.ACTION_SEND).apply {
+                                                type = "*/*"
+                                                putExtra(Intent.EXTRA_STREAM, fileUri)
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) // Grant permission to the receiving app
+                                            }
                                         context.startActivity(
                                             Intent.createChooser(
                                                 shareIntent,
-                                                resources.getString(R.string.share_logs)
-                                            )
+                                                resources.getString(R.string.share_logs),
+                                            ),
                                         )
                                     }
                                 }
-                        }
+                        },
                     ) {
                         Icon(AnonIcons.Share_log, contentDescription = stringResource(R.string.share_logs))
                     }
                     IconButton(
                         onClick = {
                             viewModel.clearLogs()
-                        }
+                        },
                     ) {
                         Icon(AnonIcons.Clear_all, contentDescription = stringResource(R.string.clear_logs))
                     }
                 },
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
             )
-        }
+        },
     ) {
         LazyColumn(
             state = listState,
             reverseLayout = true,
-            modifier = Modifier
-                .padding(it)
-                .padding(
-                    horizontal = 8.dp
-                )
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(it)
+                    .padding(
+                        horizontal = 8.dp,
+                    ).fillMaxSize(),
             contentPadding = PaddingValues(0.dp),
-            verticalArrangement = Arrangement.Bottom
+            verticalArrangement = Arrangement.Bottom,
         ) {
             items(logLines.size) { index ->
                 LogLine(logLines[index])
             }
         }
     }
-
 }
 
 @Composable
 private fun LogLine(text: AnonLog) {
-
-    val color = when (text.priority) {
-        Log.VERBOSE -> Color(0xFF4FC3F7)
-        Log.DEBUG -> Color(0xFF81C784)
-        Log.INFO -> Color(0xFFB0BEC5)
-        Log.WARN -> Color(0xFFFFD54F)
-        Log.ERROR -> Color(0xFFE57373)
-        Log.ASSERT -> Color(0xFFA1887F)
-        else -> Color(0xFF757575)
-    }
-
+    val color =
+        when (text.priority) {
+            Log.VERBOSE -> Color(0xFF4FC3F7)
+            Log.DEBUG -> Color(0xFF81C784)
+            Log.INFO -> Color(0xFFB0BEC5)
+            Log.WARN -> Color(0xFFFFD54F)
+            Log.ERROR -> Color(0xFFE57373)
+            Log.ASSERT -> Color(0xFFA1887F)
+            else -> Color(0xFF757575)
+        }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                vertical = 0.dp,
-                horizontal = 0.dp
-            ),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    vertical = 0.dp,
+                    horizontal = 0.dp,
+                ),
         Arrangement.Start,
-
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.Top,
     ) {
         Text(
             "${Formats.formatLogTime(text.date)}:  ",
             color = Color.Gray,
             fontSize = 8.sp,
             letterSpacing = 0.sp,
-            modifier = Modifier
-                .width(70.dp)
-                .padding(0.dp)
+            modifier =
+                Modifier
+                    .width(70.dp)
+                    .padding(0.dp),
         )
         Text(
             text.message,
@@ -291,14 +295,13 @@ private fun LogLine(text: AnonLog) {
             maxLines = 30,
             lineHeight = 12.sp,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(0.dp)
-                .background(Color.Transparent),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(0.dp)
+                    .background(Color.Transparent),
         )
     }
-
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -313,17 +316,19 @@ private fun LogViewerPrev() {
                         Text(stringResource(R.string.logs))
                     },
                 )
-            }
+            },
         ) {
             LazyColumn(
                 reverseLayout = true,
                 contentPadding = PaddingValues(0.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(it)
-                    .padding(
-                        horizontal = 8.dp, vertical = 0.dp
-                    )
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(it)
+                        .padding(
+                            horizontal = 8.dp,
+                            vertical = 0.dp,
+                        ),
             ) {
                 item {
                     LogLine(
@@ -331,8 +336,8 @@ private fun LogViewerPrev() {
                             1734877537,
                             "Test",
                             "Compat change id reported: 171228096; UID 10452; state: ENABLED\n                                                                                                    Local Branch                     : \n                                                                                                    Remote Branch                    : \n                                                                                                    Remote Branch                    : ",
-                            4
-                        )
+                            4,
+                        ),
                     )
                 }
                 item {
@@ -341,8 +346,8 @@ private fun LogViewerPrev() {
                             1734877537,
                             "Test",
                             " setDaemonAddressJ(): end",
-                            4
-                        )
+                            4,
+                        ),
                     )
                 }
                 item {
@@ -351,12 +356,11 @@ private fun LogViewerPrev() {
                             1734877537,
                             "Test",
                             "Installing profile for io.anonero.anon",
-                            2
-                        )
+                            2,
+                        ),
                     )
                 }
             }
         }
-
     }
 }

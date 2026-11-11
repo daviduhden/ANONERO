@@ -58,11 +58,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import io.anonero.util.SecureClipboard
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
@@ -78,13 +77,13 @@ import io.anonero.model.TransactionInfo
 import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.util.Formats
+import io.anonero.util.SecureClipboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.KoinApplication
-import org.koin.dsl.koinConfiguration
 import org.koin.compose.koinInject
-
+import org.koin.dsl.koinConfiguration
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -93,7 +92,7 @@ fun TransactionDetailScreen(
     transactionId: String,
     onBackPress: () -> Unit = {},
     sharedTransitionScope: SharedTransitionScope,
-    animatedContentScope: AnimatedContentScope
+    animatedContentScope: AnimatedContentScope,
 ) {
 //    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var transactionInfo: TransactionInfo? by remember { mutableStateOf(null) }
@@ -114,7 +113,7 @@ fun TransactionDetailScreen(
         scope.launch(Dispatchers.IO) {
             notesDialog = false
             view.performHapticFeedback(
-                HapticFeedbackConstants.CONTEXT_CLICK
+                HapticFeedbackConstants.CONTEXT_CLICK,
             )
             walletState.setTransactionNote(notes.text, transactionInfo!!)
         }
@@ -122,31 +121,33 @@ fun TransactionDetailScreen(
 
     LaunchedEffect(transactionId, transactions) {
         val found = transactions.find { it.hash == transactionId }
-        val details = withContext(Dispatchers.IO) {
-            val wallet = WalletManager.instance?.wallet
-            var destination = ""
-            var key = "____"
-            if (found != null) {
-                found.transfers.orEmpty().forEach {
-                    destination = "${it.address}\n$destination"
-                }
-                if (wallet != null) {
-                    if (found.direction == TransactionInfo.Direction.Direction_In) {
-                        destination = wallet.getSubaddress(0, found.addressIndex)
+        val details =
+            withContext(Dispatchers.IO) {
+                val wallet = WalletManager.instance?.wallet
+                var destination = ""
+                var key = "____"
+                if (found != null) {
+                    found.transfers.orEmpty().forEach {
+                        destination = "${it.address}\n$destination"
                     }
-                    key = wallet.getTxKey(found.hash) ?: "____"
+                    if (wallet != null) {
+                        if (found.direction == TransactionInfo.Direction.Direction_In) {
+                            destination = wallet.getSubaddress(0, found.addressIndex)
+                        }
+                        key = wallet.getTxKey(found.hash) ?: "____"
+                    }
                 }
+                destination.trim() to key
             }
-            destination.trim() to key
-        }
         transactionInfo = found
         destinations = details.first
         transactionKey = details.second
         found?.notes?.let {
-            notes = notes.copy(
-                text = it,
-                selection = TextRange(it.length)
-            )
+            notes =
+                notes.copy(
+                    text = it,
+                    selection = TextRange(it.length),
+                )
         }
     }
 
@@ -156,52 +157,60 @@ fun TransactionDetailScreen(
         }
     }
 
-    if (notesDialog)
+    if (notesDialog) {
         AlertDialog(
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(
-                        alpha = .2f
+            modifier =
+                Modifier
+                    .border(
+                        1.dp,
+                        color =
+                            MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = .2f,
+                            ),
+                        shape = MaterialTheme.shapes.medium,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                ),
             containerColor = MaterialTheme.colorScheme.secondary,
-            properties = DialogProperties(
-                dismissOnBackPress = true
-            ),
+            properties =
+                DialogProperties(
+                    dismissOnBackPress = true,
+                ),
             title = {
                 Text(
                     text = stringResource(R.string.set_transaction_description),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 16.sp
-                    )
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 16.sp,
+                        ),
                 )
             },
             text = {
                 OutlinedTextField(
                     value = notes,
                     shape = MaterialTheme.shapes.small,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    ),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        ),
                     minLines = 3,
                     maxLines = 5,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                        .padding(
-                            top = 8.dp
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .padding(
+                                top = 8.dp,
+                            ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
                         ),
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            saveNote()
-                        }
-                    ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                                saveNote()
+                            },
+                        ),
                     onValueChange = {
                         if (it.text.length <= 24) {
                             notes = it
@@ -215,17 +224,19 @@ fun TransactionDetailScreen(
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onBackground,
-
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground,
                         ),
                     onClick = {
                         saveNote()
-                    }) { Text(stringResource(R.string.save)) }
+                    },
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
                 Button(
@@ -233,31 +244,35 @@ fun TransactionDetailScreen(
                         notesDialog = false
                     },
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(
-                        1.dp,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    )
+                    border =
+                        BorderStroke(
+                            1.dp,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
                 ) {
                     Text(
                         stringResource(R.string.dismiss),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = 0.8f
-                            )
-                        )
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color =
+                                    MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = 0.8f,
+                                    ),
+                            ),
                     )
                 }
-            }
+            },
         )
-
+    }
 
     Scaffold(topBar = {
         TopAppBar(navigationIcon = {
             IconButton(
-                onClick = onBackPress
+                onClick = onBackPress,
             ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
             }
@@ -273,16 +288,15 @@ fun TransactionDetailScreen(
                     with(sharedTransitionScope) {
                         TransactionItem(
                             tx = transactionInfo!!,
-                            modifier = Modifier
-                                .clickable {
-
-                                }
-                                .sharedElement(
-                                    sharedTransitionScope.rememberSharedContentState(
-                                        key = "${transactionInfo!!.hash}",
+                            modifier =
+                                Modifier
+                                    .clickable {
+                                    }.sharedElement(
+                                        sharedTransitionScope.rememberSharedContentState(
+                                            key = "${transactionInfo!!.hash}",
+                                        ),
+                                        animatedVisibilityScope = animatedContentScope,
                                     ),
-                                    animatedVisibilityScope = animatedContentScope
-                                )
                         )
                     }
                 }
@@ -290,7 +304,7 @@ fun TransactionDetailScreen(
                     DetailItem(
                         title = stringResource(R.string.destination),
                         subtitle = destinations,
-                        copyable = true
+                        copyable = true,
                     )
                 }
                 item {
@@ -301,52 +315,54 @@ fun TransactionDetailScreen(
                             IconButton(onClick = {
                                 notesDialog = true
                                 view.performHapticFeedback(
-                                    HapticFeedbackConstants.CONTEXT_CLICK
+                                    HapticFeedbackConstants.CONTEXT_CLICK,
                                 )
                             }) {
                                 Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
                             }
-                        }
+                        },
                     )
                 }
                 item {
                     DetailItem(
                         title = stringResource(R.string.transaction_id),
                         subtitle = transactionInfo?.hash ?: "____",
-                        copyable = true
+                        copyable = true,
                     )
                 }
                 item {
                     DetailItem(
                         title = stringResource(R.string.transaction_fee),
-                        subtitle = if (transactionInfo?.fee != null) {
-                            Formats.getExactDisplayAmount(transactionInfo?.fee!!)
-                        } else {
-                            "____"
-                        }
+                        subtitle =
+                            if (transactionInfo?.fee != null) {
+                                Formats.getExactDisplayAmount(transactionInfo?.fee!!)
+                            } else {
+                                "____"
+                            },
                     )
                 }
                 item {
                     DetailItem(
                         title = stringResource(R.string.transaction_key),
                         subtitle = transactionKey,
-                        copyable = true
+                        copyable = true,
                     )
                 }
                 item {
                     DetailItem(
                         title = stringResource(R.string.confirmation_block),
-                        subtitle = "${transactionInfo?.blockheight ?: "____"}"
+                        subtitle = "${transactionInfo?.blockheight ?: "____"}",
                     )
                 }
                 item {
                     DetailItem(
                         modifier = Modifier.padding(bottom = 24.dp),
                         title = stringResource(R.string.time),
-                        subtitle = Formats.formatTransactionTime(
-                            transactionInfo!!.timestamp,
-                            "HH:mm dd/MM/yyy"
-                        )
+                        subtitle =
+                            Formats.formatTransactionTime(
+                                transactionInfo!!.timestamp,
+                                "HH:mm dd/MM/yyy",
+                            ),
                     )
                 }
                 item { Spacer(Modifier.height(44.dp)) }
@@ -366,39 +382,47 @@ fun DetailItem(
     val context = LocalContext.current
     val view = LocalView.current
     ListItem(
-        modifier = modifier
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .then(
-                if (copyable && subtitle.isNotEmpty() && subtitle != "____") {
-                    Modifier.clickable {
-                        SecureClipboard.copy(context, subtitle)
-                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    }
-                } else Modifier
-            ),
+        modifier =
+            modifier
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .then(
+                    if (copyable && subtitle.isNotEmpty() && subtitle != "____") {
+                        Modifier.clickable {
+                            SecureClipboard.copy(context, subtitle)
+                            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
         trailingContent = trailing,
         headlineContent = {
             Text(
-                title, style = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.W500
-                )
+                title,
+                style =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.W500,
+                    ),
             )
-        }, supportingContent = {
+        },
+        supportingContent = {
             Text(
                 subtitle,
                 modifier = Modifier.padding(top = 8.dp),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.W400
-                )
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.W400,
+                    ),
             )
-        })
+        },
+    )
 }
 
 @Preview(device = "id:pixel_7_pro")
 @Composable
-private fun TransactionDetailsScreenPreview() = KoinApplication(configuration = koinConfiguration { }) {
-    AnonNeroTheme {
-
+private fun TransactionDetailsScreenPreview() =
+    KoinApplication(configuration = koinConfiguration { }) {
+        AnonNeroTheme {
+        }
     }
-}
