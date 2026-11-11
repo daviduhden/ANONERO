@@ -98,6 +98,14 @@ The instrumented job installs Android platform 37.2, Build Tools 37.0.0, NDK
 30.0.16248370, and CMake 4.1.2, assembles both flavors with ABI splits disabled for test
 installation, checks the API 29 floor and `libanonero.so`, then runs connected tests.
 
+The hosted `ubuntu-24.04` runner does not expose `/dev/kvm`; the x86_64 emulator runs with
+`-accel off` and can take 12-16 minutes to boot. In run `43108046671` the guest lost
+`system_server` during install and produced zero-test reports. `.github/scripts/run-instrumented.sh`
+now gates on the `package`/`activity` services, writes crash/memory/disk diagnostics, and
+retries only attach/zero-test failures. The XML and exit-code checks are mandatory. A
+self-hosted KVM runner or a device farm is required for deterministic instrumented
+execution; do not relax the test gate to make the job green.
+
 Manual test run, from the GitHub Actions UI or CLI:
 
 ```sh

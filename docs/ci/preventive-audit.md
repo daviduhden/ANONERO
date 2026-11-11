@@ -2,11 +2,12 @@
 
 ## Status
 
-This is a static audit followed by manual CI validation. Run `42700250719` passes JVM
-unit tests, Android Lint (zero errors and zero warnings for both flavors), JNI symbol
-parity, localization, and the architecture policy. The wallet-API patch series is now
-checked in and applies to the pinned Monero commit; the native job must still compile it,
-so `assemble` and `instrumented` remain unverified.
+This is a static audit followed by manual CI validation. Run `42874760135` passed every
+job, including one API 35 smoke test per flavor. Run `43108046671` passed every code,
+native, and assemble gate but lost `system_server` in the KVM-less emulator and produced
+zero-test XML reports. The formatting/lint commits `a487cf5`..`32d8c1a` have no CI run.
+Native archives and APK assembly build; deterministic instrumented execution still
+requires a KVM runner or device farm.
 
 ## Warning policy
 
@@ -36,10 +37,12 @@ so `assemble` and `instrumented` remain unverified.
 | JNI object factories | Every `GetMethodID`/`NewObject` in the adapter | Checked; failures return `nullptr` instead of aborting |
 | Restore-height tests | Tests vs `MAX_RESTORE_HEIGHT` | Stale assertion corrected |
 | Resource parity/placeholders | `python3 scripts/check-i18n.py` | Passes |
-| JNI symbol names | `python3 scripts/check-jni-contract.py` | Passes names; signatures/linkage require build |
+| JNI symbol names | `python3 scripts/check-jni-contract.py` | Passes names; matching is suffix-based, not class-aware; signatures/linkage require build |
 | Workflow syntax | `actionlint` (including shellcheck), `yamllint` with relaxed rules | Pass |
-| Workflow security | `zizmor` | One known low self-repository finding |
+| Workflow security | `zizmor` | 0 findings; one inline `self-repository` ignore because actionlint 1.x lacks `$/` |
 | Workflow shell | Every embedded `run:` block parsed with `bash -n` | Pass |
+| Formatting/lint | `ktlint`, `clang-format`, `ruff`, `shfmt`, `shellcheck` | Pass locally; no CI gate yet |
+| Instrumented health | boot/package/activity gate and crash diagnostics | Implemented; next run must validate |
 
 ## Build-system gaps
 
@@ -70,11 +73,12 @@ so `assemble` and `instrumented` remain unverified.
 
 - The instrumented job is skipped whenever native fails; native now passes.
 - A separate `assemble` job links the JNI library and checks the API 29 floor even when
-  instrumented tests are skipped. It passes on `42847493558`.
-- The instrumented job boots the API 35 emulator but has not yet completed a test run;
-  the runner script was fixed after run `42847493558`.
-- The API 35 emulator smoke test passes for both flavors. Lock/unlock, background sync,
-  decoy, duress, wipe, Tor, LWS, and JNI callbacks still have no device coverage.
+  instrumented tests are skipped; it passes in current runs.
+- The API 35 smoke test passed for both flavors on `42874760135`, but the KVM-less
+  emulator lost `system_server` on `43108046671` and produced zero-test reports. The job
+  is not stable on hosted runners; a KVM runner or device farm is required.
+- Lock/unlock, background sync, decoy, duress, wipe, Tor, LWS, and JNI callbacks still
+  have no device coverage.
 - The emulator matrix is API 35 x86_64 only; API 29 compile/manifest checks are separated
   in the assemble step. No ARM64 hardware run exists.
 - `app/src/androidTest/` contains a single package-name smoke test; wallet, Tor, and LWS
@@ -95,6 +99,37 @@ so `assemble` and `instrumented` remain unverified.
 - Lint now covers release variants in the release build job; unverified.
 - A release publish now requires `run_instrumented == true`.
 
+## Preventive fixes from the post-format audit
+
+These issues were found by static review after the formatting commits; none had a CI run
+of its own.
+
+- **Node store corruption was fail-open.** `NodeListSerializer.readFrom` caught every
+  exception and returned `emptyList()`. A corrupt `nodes_store` therefore looked empty, and
+  the next `updateData` replaced the user's saved nodes. It now treats an empty file as the
+  default, throws `CorruptionException` for unreadable content, keeps the file untouched,
+  and returns `false` from add/remove so the settings screen can report
+  `node_storage_unavailable`. `getAll()` (used by backup export) surfaces corruption
+  instead of producing an archive without nodes. `LogsDataStore` deliberately keeps the
+  empty fallback because logs are capped, cleared on unlock, and must never break logging.
+- **Backup version parsing was fail-open.** `VersionAsIntSerializer` converted any
+  unrecognised version encoding to `0`, which selects the legacy PIN key. It now accepts
+  integers, numeric strings, and `"3.0"`, and throws `SerializationException` otherwise, so
+  a malformed version fails the restore instead of using the wrong key.
+- **Airgapped import state was publicly mutable.** `QRScannerVM._currentImportState` and
+  `_loaderState` were public `var`s; the import state machine is now private and only the
+  read-only `loaderState` is exposed.
+- **Onboarding accepted an invalid node URL.** `NodeSetup` marked the field as invalid but
+  still persisted a null host and advanced to the next screen. It now returns before
+  persisting or navigating, and the previously empty catch logs a redacted warning.
+- **Naming rules were disabled without a remaining reason.** `property-naming` is enabled
+  again after renaming mutable caches/constants and converting fixed `var` log levels to
+  `const val`. `backing-property-naming` stays disabled because the codebase uses `_` for
+  private state without a public counterpart; the comment in `.editorconfig` now says so.
+- **Recursive clang-format could reformat Monero.** `external-libs/.clang-format` now sets
+  `DisableFormat: true`, and the root configuration uses `Standard: c++17` and keeps the
+  `CoinsInfo` constructor descriptor on one greppable line.
+
 ## Regression checks added or prepared
 
 1. `scripts/check-i18n.py` now rejects unescaped apostrophes and invalid backslash escapes
@@ -114,6 +149,12 @@ so `assemble` and `instrumented` remain unverified.
 10. Sanitizer/fuzz jobs after the native build is reproducible; platform limits must be
     documented.
 11. Pin the release certificate fingerprint and verify all six APKs (pending).
+12. `BackupVersionTest` fixes the accepted version encodings and rejects malformed ones
+    (JVM unit test; CI authoritative).
+13. `NodeDataStoreTest` fixes the empty-store default and the fail-closed
+    `CorruptionException` path (JVM unit test; CI authoritative).
+14. `ktlint` now enforces `property-naming`; `.editorconfig` documents the single remaining
+    naming exception.
 
 ## Repository configuration still required
 
@@ -132,7 +173,12 @@ These are settings, not workflow code, and cannot be supplied by this audit:
   workflow syntax/shell/security checks, `git diff --check`.
 - **Validated in CI:** JVM unit tests, Android Lint (0/0), Kotlin compilation (0 warnings),
   JNI symbol parity, localization, architecture policy, native archives, and debug APK
-  assembly/link.
-- **Unverified:** instrumented tests, sanitizers, release signing and publication.
-- **Blocked:** release environment, branch protection, certificate
-  pinning, instrumented/sanitizer execution.
+  assembly/link on the pre-formatting commits.
+- **Not yet validated:** the formatting/lint commits `a487cf5`..`32d8c1a`; they have no
+  CI run. Linters pass locally, but compilation and linking remain unverified.
+- **Validated once, not stable:** the API 35 smoke test passed on `42874760135` and failed
+  on `43108046671` when the guest lost `system_server`.
+- **Unverified:** sanitizers, release signing and publication, broader wallet/Tor/LWS
+  instrumented coverage.
+- **Blocked:** release environment, branch protection, certificate pinning, deterministic
+  instrumented execution without KVM/device farm.

@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43108046671` | `02b97b8` | `workflow_dispatch` | failure | instrumented | Guest lost `system_server` during install/uninstall; both XML `tests=0`; all other jobs pass |
 | `43058769285` | `76fcb79` | `workflow_dispatch` | failure | instrumented | Gradle ran both flavors successfully and XML validation passed; the inline retry loop failed because the emulator runner executes `script` line by line |
 | `43045996049` | `452f4b6` | `workflow_dispatch` | failure | instrumented | 3 GB + 60 s settle: first flavor (anon) still failed to attach; XML validation correctly failed the job |
 | `43034549647` | `9fa5c8e` | `workflow_dispatch` | failure | instrumented | All code gates, native, and assemble pass; the first instrumented flavor (anon) failed to attach, the second (nero) passed |
@@ -85,7 +86,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** changed the literal to `wallet\'s`.
 - **Regression check:** `scripts/check-i18n.py` now rejects unescaped apostrophes and
   invalid backslash escapes in Android string resources (implemented; CI pending).
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-004 — Missing `CancellationException` import
 
@@ -99,7 +100,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `withContext`, and `Dispatchers` were checked for the corresponding imports.
 - **Correction:** added the import and retained the rethrow.
 - **Regression check:** static import scan in `docs/ci/preventive-audit.md`; Kotlin CI.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-005 — Nullable manual proxy host
 
@@ -113,7 +114,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** use `isNullOrEmpty()` and bind a non-null `host` before constructing the
   endpoint.
 - **Regression check:** Kotlin compilation in the JVM job.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-006 — Nullable compact number in a plural resource
 
@@ -128,7 +129,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** fall back to the exact atomic value string when the compact formatter
   returns null.
 - **Regression check:** Kotlin compilation in the JVM job.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-007 — Nullable transaction transfer list
 
@@ -141,7 +142,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Pattern search:** reviewed all `.transfers` consumers and the `TransactionInfo` contract.
 - **Correction:** use `orEmpty()` before iterating.
 - **Regression check:** Kotlin compilation and the existing transaction model tests.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-008 — Missing `SharedPreferences.edit` KTX import
 
@@ -155,7 +156,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Pattern search:** every file using `edit(commit = true)` now has the KTX import.
 - **Correction:** import `androidx.core.content.edit`.
 - **Regression check:** import scan and Kotlin CI.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-009 — ViewModel property resolution inside `launch`
 
@@ -169,7 +170,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   in coroutine bodies.
 - **Correction:** qualify the assignments with `this@ReviewTransactionViewModel`.
 - **Regression check:** Kotlin compilation in the JVM job.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-010 — Stale test contradicts the restore-height cap
 
@@ -185,7 +186,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** the test now accepts `MAX_RESTORE_HEIGHT`, rejects `Long.MAX_VALUE`, and
   asserts `requireValid` throws above the cap.
 - **Regression check:** the JVM test itself, once CI runs it.
-- **Status:** implemented; CI pending.
+- **Status:** validated in `42874760135`: compilation, JVM unit tests, and Android Lint pass.
 
 ### CI-011 — Coroutine cancellation swallowed by generic catches
 
@@ -213,7 +214,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Pattern search:** scanned every `JNIEXPORT void` export for `return <expression>`.
 - **Correction:** guard `mixin < 0` and the wallet handle, call the method, return.
 - **Regression check:** native compilation with `-Wall -Wextra -Wpedantic`.
-- **Status:** implemented; native CI blocked.
+- **Status:** validated in `42874760135`: the native archives build and the adapter links. Runtime JNI behavior remains unverified.
 
 ### CI-013 — Handle and JNI-string paths missing fail-closed guards
 
@@ -233,7 +234,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   checked `GetMethodID`/`NewObject` in the object factories.
 - **Regression check:** `scripts/check-jni-contract.py` (names only) plus the native build;
   signature/link validation still requires a real build.
-- **Status:** implemented; native CI blocked.
+- **Status:** validated in `42874760135`: the native archives build and the adapter links. Runtime JNI behavior remains unverified.
 
 ### CI-014 — Android Lint: 35 errors from Compose context rules
 
@@ -323,7 +324,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   Android UI localization is unaffected.
 - **Regression check:** the seven patches apply with `git apply --index --3way` on the
   pinned base; the `native` job must pass the translations stage.
-- **Status:** implemented; native compile validation pending the next run.
+- **Status:** validated in `42874760135`: the native archives build in CI.
 
 ### CI-019 — Android command-line tools download timeout
 
@@ -355,7 +356,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   call site and makes CMake use `CMAKE_CURRENT_SOURCE_DIR` for submodule builds.
 - **Regression check:** all seven patches apply with `git apply --index --3way`; the
   `native` job must compile `wallet_rpc_server.cpp`.
-- **Status:** implemented; native compile validation pending the next run.
+- **Status:** validated in `42874760135`: the native archives build in CI.
 
 ### CI-021 — C++ JNI array-region calls compared against an int
 
@@ -371,7 +372,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   exception. `SetByteArrayRegion` is not compared.
 - **Regression check:** the new `assemble` job compiles both ABIs; native unit tests alone
   would not have caught it because they did not link the adapter.
-- **Status:** implemented; assemble/link validation pending the next run.
+- **Status:** validated in `42874760135`: assemble/link passes for both ABIs.
 
 ### CI-022 — Debug APK names changed under AGP 9
 
@@ -433,7 +434,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `cmake_minimum_required`.
 - **Regression check:** the assemble job's CMake configure output must be free of this
   warning.
-- **Status:** implemented; assemble validation pending the next run.
+- **Status:** validated in `42874760135`: the assemble CMake configure is warning-free.
 
 ### CI-026 — API 35 emulator dies after boot without KVM
 
@@ -447,12 +448,14 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   emulator process died immediately after boot.
 - **Pattern search:** the instrumented job is the only emulator consumer; API 29 and ARM64
   images are not viable on this runner either.
-- **Correction:** reduce the guest to 2 GB and 2 cores, and raise the boot timeout to
-  1200 seconds. This does not replace KVM; if the emulator still dies, the job needs a
-  self-hosted KVM runner or a device farm.
-- **Regression check:** the next run must reach `connectedAnonDebugAndroidTest` instead of
-  dying during the post-boot adb calls.
-- **Status:** validated in CI.
+- **Correction:** the RAM experiments are 4096M (boot/post-boot crash), 2048M (one full
+  green run), and 3072M (four failures). 2048M is the only configuration with a green
+  run, but the sample is small and each run changed code. The diagnostics step now
+  captures guest memory and `system_server` state before choosing a new value.
+- **Regression check:** the next run must reach the tests and either pass both XML files
+  or produce the guest diagnostics. This does not replace KVM; a self-hosted KVM runner
+  or device farm is required for deterministic results.
+- **Status:** mitigated but not deterministic without KVM.
 
 ### CI-027 — Instrumented job green while the NERO report had a failure
 
@@ -490,7 +493,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `docs/architecture/dependencies.md`.
 - **Regression check:** the next lint report must remain 0/0; a code warning is still
   reported.
-- **Status:** implemented; lint validation pending the final run.
+- **Status:** validated in `42874760135`: Android Lint remains 0/0 with the targeted ignore.
 
 ### CI-029 — First instrumented flavor fails to attach on the KVM-less runner
 
@@ -502,12 +505,15 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   instrumentation attach times out while ART/package work is still settling. The failure
   alternates with task order, so it is not tied to one flavor's code.
 - **Pattern search:** both flavors and both runs; only the first task fails.
-- **Correction:** raise the guest to 3 GB, wait 60 seconds after `adb wait-for-device`,
-  and retry only a flavor whose XML contains `failed to attach`. Assertion, crash, and
-  test failures are not retried; the XML validation remains mandatory.
+- **Correction:** keep 2048M (the only configuration with a green run), replace the fixed
+  sleep with a `system_server`/package/activity health gate, and retry only a flavor
+  whose XML contains `failed to attach`, `tests="0"`, or `Failed to install` while the
+  guest services remain healthy. Assertion, crash, and test failures are not retried; the
+  XML, exit-code, and health checks remain mandatory.
 - **Regression check:** the next run must show one passing test for each flavor; if the
   retry also fails, the emulator job needs a KVM-capable runner or a device farm.
-- **Status:** implemented with a targeted cold-start retry; validation pending.
+- **Status:** retry implemented; run `43108046671` failed before it because the guest lost
+  `system_server`; validation pending.
 
 ### CI-030 — Emulator runner executes `script` line by line
 
@@ -526,7 +532,37 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   line.
 - **Regression check:** `bash -n` and actionlint validate the script; the XML validation
   remains mandatory.
-- **Status:** implemented; final orchestration validation pending.
+- **Status:** validated in `43108046671`: the script ran as one line without a shell syntax
+  error; the XML gate then caught the zero-test run.
+
+### CI-031 — `system_server` lost during connected tests without KVM
+
+- **Run:** `43108046671` (`02b97b8`).
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** both `TEST-*.xml` files contain `tests=0`; the log shows
+  `Failed to uninstall package io.anonero.nero.debug: Can't find service: package`,
+  `adb: failed to install ... Broken pipe (32)`, `Failed to set debug app:
+  Can't find service: activity`, and `Failed to get current user ID`. Gradle still
+  printed `BUILD SUCCESSFUL`; only the XML gate failed the job. Boot took 945 s of the
+  1200 s timeout.
+- **Root cause:** the x86_64 guest runs with `-accel off` because the hosted runner has no
+  `/dev/kvm`. `system_server` disappeared after boot and never returned. The exact
+  trigger (watchdog kill vs guest OOM vs installd crash) is **not verified**: the job
+  does not capture logcat or guest memory. The APK is 128 MiB with 24 dex files and
+  46 MB of native libraries, and `jniLibs.useLegacyPackaging = true` extracts them at
+  install time.
+- **Pattern search:** prior runs show attach timeouts, `Broken pipe`, adb 224, and a
+  script-splitting failure; `42874760135` passed both flavors with 2048M, proving the
+  smoke test itself is valid.
+- **Correction:** add a core-service health gate, capture crash logcat/meminfo/df on
+  failure, extend the XML gate to `skipped`, exit-code files, and failure markers, retry
+  attach/zero-test only while the guest is healthy, free host disk without deleting the
+  Android SDK, and return to the 2048M configuration.
+- **Regression check:** the next instrumented run must either pass both flavors or fail
+  with guest diagnostics; deterministic success requires a KVM-capable runner or device
+  farm.
+- **Status:** diagnostic/stability changes implemented; root trigger requires the next
+  run's diagnostics. No CI run was executed for this change.
 
 ## Warning inventory
 
@@ -563,7 +599,7 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** none required.
 - **Status:** external/runner noise.
 
-## Missing evidence
+## CI evidence recorded
 
 - JVM tests pass on `dd692a8` and later.
 - Android Lint passes with zero errors and zero warnings on `0006659` and later.

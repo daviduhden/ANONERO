@@ -9,12 +9,17 @@ validation.
 - Repository: `daviduhden/ANONERO`, default branch `main`.
 - Workflows: `Tests` (`test.yml`) and `Build and publish APKs` (`release.yml`); both are
   manual-only and owner-gated.
-- Accessible runs at the time of the audit:
-  - `42686398569` — `workflow_dispatch`, `52d67d4`, failure.
-  - `42552892586` — historical `push`, `ed8b097`, failure.
-  - `42547686992` — historical `push`, `c385630`, failure.
-- No successful run, release run, instrumented run, sanitizer run, lint run, or emulator
-  run is available. Absence of evidence is recorded as unverified, not as success.
+- Current evidence:
+  - `42874760135` (`c228e36`) — all jobs pass; anon and nero each ran one instrumented
+    smoke test with zero failures.
+  - `43108046671` (`02b97b8`) — all jobs pass except instrumented; the KVM-less emulator
+    lost `system_server` and both reports had `tests=0`.
+  - `a487cf5`…`32d8c1a` — formatting/lint commits; no CI run exists for them.
+  - The post-format audit fixes (instrumented health/diagnostics, node-store and backup
+    fail-closed parsing, lint-rule changes) are in the working tree and also have no CI
+    run. Local static checks pass; compilation and tests remain unverified.
+  - No release, sanitizer, fuzz, or device-farm run exists. Absence of evidence is
+    recorded as unverified, not as success.
 - Logs were read with `gh run view --log` and `--log-failed`. No workflow was executed,
   rerun, or cancelled during this audit.
 

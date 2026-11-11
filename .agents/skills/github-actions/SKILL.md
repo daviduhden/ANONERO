@@ -112,11 +112,28 @@ grep -n "uses:\|permissions:\|environment:\|secrets\.\|pull_request_target" .git
 grep -nE '^  (push|pull_request|pull_request_target|schedule|release|workflow_run|repository_dispatch):' .github/workflows/*.yml
 grep -n "authorize\|github.repository_owner\|triggering_actor" .github/workflows/*.yml
 actionlint .github/workflows/*.yml
+yamllint -c .yamllint .github/workflows/*.yml
 zizmor --format plain .github/workflows
+bash -n .github/scripts/*.sh
 git diff --check
 ```
 
 If PyYAML is unavailable, do not install it; inspect the YAML manually and say so.
+
+### Instrumented orchestration
+
+`ReactiveCircus/android-emulator-runner` executes the `script` input line by line. Do not
+put loops or backslash continuations there. Keep the logic in
+`.github/scripts/run-instrumented.sh` and call it with `bash` on one line. The script must:
+
+- wait for `sys.boot_completed` and for the `package` and `activity` services;
+- capture crash logcat, guest memory, and disk on failure;
+- retry only instrumentation attach/zero-test failures while the guest is healthy;
+- leave the XML and `test-result-exit-code.txt` validation as the final authority.
+
+Hosted Linux runners have no `/dev/kvm`; the x86_64 emulator runs under software
+emulation. Treat instrumented stability as an infrastructure decision (self-hosted KVM or
+device farm), not as a reason to relax the test gate.
 
 ## Completion criteria
 

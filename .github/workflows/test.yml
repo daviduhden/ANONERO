@@ -534,6 +534,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Free runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep /usr/local/lib/android: this job needs the SDK, emulator and NDK.
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            /usr/share/swift \
+            /usr/local/.ghcup
+          docker system prune -af || true
+          df -h /
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
 
@@ -616,7 +631,7 @@ jobs:
           arch: ${{ matrix.arch }}
           profile: ${{ matrix.profile }}
           cores: 2
-          ram-size: 3072M
+          ram-size: 2048M
           disable-animations: true
           emulator-boot-timeout: 1200
           emulator-options: >-
@@ -650,11 +665,49 @@ jobs:
               tests = int(root.get("tests", "0"))
               failures = int(root.get("failures", "0"))
               errors = int(root.get("errors", "0"))
-              print(f"{path}: tests={tests} failures={failures} errors={errors}")
+              skipped = int(root.get("skipped", "0"))
+              print(
+                  f"{path}: tests={tests} failures={failures} errors={errors} "
+                  f"skipped={skipped}"
+              )
               if "flavors/" in path:
                   flavors.add(path.split("flavors/", 1)[1].split("/", 1)[0])
-              if failures or errors or tests == 0:
+              if failures or errors or skipped or tests == 0:
                   failed.append(path)
+              for testcase in root.iter("testcase"):
+                  for failure in testcase.findall("failure"):
+                      text = (failure.text or "").lower()
+                      if any(
+                          marker in text
+                          for marker in (
+                              "failed to attach",
+                              "failed to install",
+                              "test run failed",
+                              "testrunfailed",
+                              "process crashed",
+                              "broken pipe",
+                              "can't find service",
+                              "failure calling service package",
+                          )
+                      ):
+                          failed.append(path)
+
+          for flavor in ("anon", "nero"):
+              codes = glob.glob(
+                  f"app/build/outputs/androidTest-results/**/flavors/{flavor}/"
+                  "**/test-result-exit-code.txt",
+                  recursive=True,
+              )
+              if not codes:
+                  print(f"::error::missing test-result-exit-code.txt for {flavor}")
+                  failed.append(flavor)
+                  continue
+              for code_path in codes:
+                  with open(code_path, encoding="utf-8") as code_file:
+                      code = code_file.read().strip()
+                  print(f"{code_path}: exit={code}")
+                  if code != "0":
+                      failed.append(code_path)
 
           if flavors != {"anon", "nero"}:
               print(f"::error::expected anon and nero reports, got {sorted(flavors)}")
@@ -672,5 +725,6 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/**
             app/build/reports/androidTests/**
+            ci-diagnostics/**
           if-no-files-found: warn
           retention-days: 14
