@@ -25,9 +25,12 @@ set -euo pipefail
 mkdir -p ci-diagnostics
 
 core_services_ok() {
-    [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] || return 1
-    adb shell service check package 2>/dev/null | grep -q "Service package: found" || return 1
-    adb shell service check activity 2>/dev/null | grep -q "Service activity: found" || return 1
+    [ "$(timeout 20 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] ||
+        return 1
+    timeout 20 adb shell service check package 2>/dev/null |
+        grep -q "Service package: found" || return 1
+    timeout 20 adb shell service check activity 2>/dev/null |
+        grep -q "Service activity: found" || return 1
 }
 
 wait_for_core_services() {
@@ -51,10 +54,10 @@ capture_diagnostics() {
         nproc || true
         uptime || true
         echo "== guest =="
-        adb shell getprop sys.boot_completed 2>&1 || true
-        adb shell cat /proc/meminfo 2>&1 || true
-        adb shell df -h /data 2>&1 || true
-        adb shell service list 2>&1 | grep -E 'package|activity' || true
+        timeout 20 adb shell getprop sys.boot_completed 2>&1 || true
+        timeout 20 adb shell cat /proc/meminfo 2>&1 || true
+        timeout 20 adb shell df -h /data 2>&1 || true
+        timeout 20 adb shell service list 2>&1 | grep -E 'package|activity' || true
         timeout 60 adb logcat -d -b crash -v threadtime 2>&1 || true
         # system_server aborts and watchdog messages live in the system buffer.
         timeout 60 adb logcat -d -b system -v threadtime 2>&1 | tail -n 2000 || true
@@ -110,7 +113,11 @@ sys.exit(1 if bad else 0)
 PY
 }
 
-adb wait-for-device
+if ! timeout 300 adb wait-for-device; then
+    capture_diagnostics
+    echo "::error::adb device did not become available"
+    exit 1
+fi
 if ! wait_for_core_services; then
     capture_diagnostics
     echo "::error::device lost system_server after boot"
