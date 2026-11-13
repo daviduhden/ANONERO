@@ -55,11 +55,11 @@ capture_diagnostics() {
         adb shell cat /proc/meminfo 2>&1 || true
         adb shell df -h /data 2>&1 || true
         adb shell service list 2>&1 | grep -E 'package|activity' || true
-        adb logcat -d -b crash -v threadtime 2>&1 || true
+        timeout 60 adb logcat -d -b crash -v threadtime 2>&1 || true
         # system_server aborts and watchdog messages live in the system buffer.
-        adb logcat -d -b system -v threadtime 2>&1 | tail -n 2000 || true
-        adb logcat -d -b main -v threadtime 2>&1 | tail -n 2000 || true
-        adb logcat -d -b events -v threadtime 2>&1 | tail -n 2000 || true
+        timeout 60 adb logcat -d -b system -v threadtime 2>&1 | tail -n 2000 || true
+        timeout 60 adb logcat -d -b main -v threadtime 2>&1 | tail -n 2000 || true
+        timeout 60 adb logcat -d -b events -v threadtime 2>&1 | tail -n 2000 || true
     } >ci-diagnostics/instrumented-diagnostics.txt 2>&1
 }
 

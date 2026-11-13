@@ -594,7 +594,7 @@ jobs:
           cache-provider: basic
           validate-wrappers: true
 
-      - name: Assemble debug APKs and verify the API 29 floor
+      - name: Assemble app and test APKs and verify the API 29 floor
         shell: bash
         run: |
           set -euo pipefail
@@ -623,6 +623,12 @@ jobs:
             }
             unzip -l "$apk" | grep -q 'lib/.*/libanonero\.so' || {
               echo "::error::$apk has no libanonero.so"
+              exit 1
+            }
+            test_apk="$(find app/build/outputs/apk -type f \
+              -path "*${flavor}*" -name "*androidTest*.apk" | head -n 1)"
+            [[ -s "$test_apk" ]] || {
+              echo "::error::missing AndroidTest APK for $flavor"
               exit 1
             }
           done
