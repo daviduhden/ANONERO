@@ -64,8 +64,10 @@ farm.
 ### C++/JNI
 
 - `app/CMakeLists.txt` enables `-Wall -Wextra -Wpedantic -Werror` for the `anonero` target
-  and marks external include trees as SYSTEM. The adapter compiled without warnings in
-  `43122308945`; the `-Werror` flag needs the next CI run to validate.
+  and marks external include trees as SYSTEM. No `anonero.cpp`/`anonero.h` warning line
+  appears in the `43122308945` job log; the `-Werror` flag needs the next CI run to
+  validate. If it surfaces a warning, revert only `-Werror`, record the offending API, and
+  do not suppress it globally.
 - The JNI contract script checks exact class/method names; it cannot validate JNI
   signatures, constructor descriptors, or link-time symbol availability.
 - The native compile and link run in CI: the archives build and the adapter links. The

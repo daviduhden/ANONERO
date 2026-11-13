@@ -127,9 +127,9 @@ records progress; it is not a release note and does not claim CI validation.
 - Added an Android Lint job for both flavors with HTML/XML report uploads, and included
   Gradle problems reports in unit-test artifact uploads.
 - Enabled `-Wall -Wextra -Wpedantic` for the project-owned C++ target and marked external
-  include trees as SYSTEM so third-party headers do not pollute project warnings. The
-  adapter compiled without warnings in `43122308945`; `-Werror` is now enabled and awaits
-  the next native/assemble run.
+  include trees as SYSTEM so third-party headers do not pollute project warnings. No
+  `anonero.cpp`/`anonero.h` warning line appears in the `43122308945` job log; `-Werror` is
+  now enabled and awaits the next native/assemble run.
 - Added the permanent policy that every compile error, warning, test failure, crash, JNI
   or sanitizer diagnostic requires root-cause analysis, a global pattern search, a
   regression check, and a `docs/ci/` entry.
@@ -191,8 +191,9 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## Pending validation
 
-- **Native build:** the archives build and the adapter links in CI. The adapter compiled
-  without warnings in `43122308945`; the newly enabled `-Werror` needs the next run.
+- **Native build:** the archives build and the adapter links in CI. No
+  `anonero.cpp`/`anonero.h` warning line appears in the `43122308945` job log; the newly
+  enabled `-Werror` needs the next run.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
   CI. The API 35 smoke tests passed once (`42874760135`) but are not stable on hosted
   runners without KVM.
