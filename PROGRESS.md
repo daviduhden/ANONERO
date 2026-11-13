@@ -127,9 +127,9 @@ records progress; it is not a release note and does not claim CI validation.
 - Added an Android Lint job for both flavors with HTML/XML report uploads, and included
   Gradle problems reports in unit-test artifact uploads.
 - Enabled `-Wall -Wextra -Wpedantic` for the project-owned C++ target and marked external
-  include trees as SYSTEM so third-party headers do not pollute project warnings. No
-  `anonero.cpp`/`anonero.h` warning line appears in the `43122308945` job log; `-Werror` is
-  now enabled and awaits the next native/assemble run.
+  include trees as SYSTEM so third-party headers do not pollute project warnings. Run
+  `43521054641` compiles the adapter with `-Werror` and has no `anonero.cpp`/`anonero.h`
+  warning line.
 - Added the permanent policy that every compile error, warning, test failure, crash, JNI
   or sanitizer diagnostic requires root-cause analysis, a global pattern search, a
   regression check, and a `docs/ci/` entry.
@@ -172,7 +172,13 @@ records progress; it is not a release note and does not claim CI validation.
   available) and disk (5 GB free) were healthy. The instrumented job now builds the app and
   test APKs before the emulator starts and limits the connected Gradle to two workers.
   This fix has no CI run yet.
-- The same run surfaced two `NewerVersionAvailable` lint advisories per flavor.
+- Run `43521054641` (`feb985e`) validated the follow-up changes: `-Werror` compiles the
+  adapter without warnings, the serialization/BouncyCastle updates resolve, the exact JNI
+  gate passes, lint is 0/0, and both flavors run 62 JVM tests. Instrumented failed after a
+  630 s boot when the emulator runner's post-boot `input`/`overlay` adb calls hit broken
+  pipes, before `run-instrumented.sh` started. The prebuild step itself passed; the
+  remaining blocker is the KVM-less hosted emulator.
+- Run `43122308945` surfaced two `NewerVersionAvailable` lint advisories per flavor.
   kotlinx.serialization is updated to 1.13.0 (Kotlin 2.4.x, reverts the 1.12 exception
   wrapping) and Bouncy Castle to 1.87 (security release, twelve CVEs). ANONERO uses only
   the stable digest/PBKDF2/Base64 APIs affected neither by the 1.86-incompatible areas nor
@@ -191,12 +197,11 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## Pending validation
 
-- **Native build:** the archives build and the adapter links in CI. No
-  `anonero.cpp`/`anonero.h` warning line appears in the `43122308945` job log; the newly
-  enabled `-Werror` needs the next run.
+- **Native build:** the archives build and the adapter links in CI. `43521054641` compiles
+  the adapter under `-Werror` with no warning line.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
   CI. The API 35 smoke tests passed once (`42874760135`) but are not stable on hosted
-  runners without KVM.
+  runners without KVM; `43521054641` failed before the test script.
 - **Runtime behavior:** lock/unlock, background sync, decoy switching, Tor transitions,
   LWS reconnect, notifications, and wipe still need dedicated device tests.
 - **Cryptography:** no independent side-channel or Keystore audit has been performed.

@@ -57,8 +57,8 @@ then maintainability.
 - Keep Actions pinned to full SHAs and release signing isolated.
 - Keep `docs/ci/` current; every compile error, warning, crash, test failure, and sanitizer
   diagnosis requires a root cause, a global pattern search, and a regression check.
-- Keep Android Lint green and validate the newly enabled project-owned C++ `-Werror`
-  gate, then add sanitizer/fuzz coverage only with a working native matrix.
+- Keep Android Lint green and the project-owned C++ `-Werror` gate green (validated in
+  `43521054641`), then add sanitizer/fuzz coverage only with a working native matrix.
 - Move instrumented tests to a KVM-capable runner or a device farm; the hosted Linux
   runner cannot run the x86_64 emulator deterministically under TCG.
 - Add a pinned format/lint gate for Kotlin, C++, Python, shell, and workflows.

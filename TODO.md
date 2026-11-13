@@ -29,14 +29,11 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
-- [ ] Rerun the manual Tests workflow after the test-APK prebuild fix and confirm the
-      emulator survives the connected tests; collect the new system/main logcat.
+- [ ] Move instrumented tests to a self-hosted KVM runner or a device farm. The hosted
+      emulator failed before the test script on `43521054641`; do not keep tuning
+      RAM/timeouts or add blind retries.
 - [ ] Device-test the corrupt `nodes_store` path: add/remove must fail visibly, must not
       overwrite the file, and backup export must fail instead of omitting nodes.
-- [ ] Decide the instrumented runner from the captured logcat/meminfo: self-hosted KVM or
-      device farm. Do not keep tuning RAM/timeouts without data.
-- [ ] Validate the newly enabled `-Werror` for the project-owned C++ target in the next
-      native/assemble run.
 - [ ] Add a format/lint CI gate with pinned ktlint, clang-format, Ruff, shfmt, shellcheck,
       yamllint, zizmor, and actionlint versions.
 - [ ] Add sanitizer/fuzz jobs (ASan/UBSan/TSan/LeakSanitizer) after native inputs are
