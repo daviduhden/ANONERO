@@ -29,7 +29,7 @@ add_library( anonero
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     # Project-owned code only. Third-party include trees below are marked SYSTEM.
-    target_compile_options(anonero PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(anonero PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 set(EXTERNAL_LIBS_DIR ${CMAKE_SOURCE_DIR}/../external-libs)
