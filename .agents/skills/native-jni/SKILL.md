@@ -36,8 +36,9 @@ Do not use for wallet policy (use `monero-wallet`) or pure C++ upstream work
 
 - No alternate native runtime or FFI layer. No new C++ file unless the JNI boundary
   truly requires it.
-- Kotlin `external` name and `Java_io_anonero_*` export must match. The static script
-  checks names only; signatures and linkage require CI.
+- Kotlin `external` name and `Java_io_anonero_<package>_<Class>_<method>` export must
+  match exactly. The static script checks class/method names, not signatures; signatures
+  and linkage require CI.
 - JNI class names and constructor signatures are binary contracts. Update Kotlin and
   C++ together:
   - `io/anonero/model/TransactionInfo`
