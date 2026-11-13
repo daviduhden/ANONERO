@@ -1,6 +1,7 @@
 # Dependency inventory and update record
 
-Audit date: 2026-11-09. Base commit: `ed8b097`.
+Audit date: 2026-11-09. Refresh: 2026-11-13 (lint-driven serialization and Bouncy Castle
+updates). Base commit: `ed8b097`.
 
 This record covers direct and relevant transitive dependencies, toolchains, native
 pins, GitHub Actions, and container inputs. Versions were checked against official
@@ -40,7 +41,7 @@ enumerated; `kotlinx.coroutines` was promoted to a direct declaration.
 | Espresso | 3.7.0 | 3.7.0 | 3.7.0 (3.8.0-alpha03 excluded) | Already latest stable |
 | JUnit 4 | 4.13.2 | 4.13.2 | 4.13.2 | Already latest stable |
 | Koin BOM | 4.2.2 | 4.2.2 | 4.2.2 (4.3.0-Beta1 excluded) | Already latest stable |
-| kotlinx.serialization JSON | 1.12.0 | 1.12.0 | 1.12.0 | Already latest stable |
+| kotlinx.serialization JSON | 1.12.0 | **1.13.0** | 1.13.0 | Updated; built on Kotlin 2.4.10 (project uses 2.4.21) and reverts the 1.12 exception-wrapping change |
 | kotlinx.coroutines | transitive | **1.11.0 (explicit)** | 1.11.0 | Declared directly; was previously resolved transitively |
 | kmp-tor runtime | 2.6.0 | 2.6.0 | 2.6.0 | Already latest stable |
 | kmp-tor resource-exec-tor | 409.5.0 | 409.5.0 | 409.5.0 | Already latest stable |
@@ -50,7 +51,7 @@ enumerated; `kotlinx.coroutines` was promoted to a direct declaration.
 | BoofCV core | 1.6.0 | 1.6.0 | 1.6.0 | Already latest stable |
 | ZXing core | 3.5.4 | 3.5.4 | 3.5.4 | Already latest stable |
 | Timber | 5.0.1 | 5.0.1 | 5.0.1 | Already latest stable |
-| Bouncy Castle `bcprov-jdk18on` | 1.86 | 1.86 | 1.86 | Already latest stable |
+| Bouncy Castle `bcprov-jdk18on` | 1.86 | **1.87** | 1.87 | Security release (12 CVEs); ANONERO uses only `SHA256Digest`, `PKCS5S2ParametersGenerator`, `KeyParameter`, and `Base64` |
 | Accompanist Permissions | 0.37.3 | 0.37.3 | 0.37.3 | Maintained but in maintenance mode; not replaced without device validation |
 
 ### Android SDK and toolchain
@@ -167,6 +168,14 @@ invocation cannot reformat the vendored Monero tree.
 - Expat 2.10.0 is a security release (four vulnerabilities fixed).
 - Unbound 1.26.2 is a security release (CVE-2026-35501, CVE-2026-50106,
   CVE-2026-96405, CVE-2026-97206, CVE-2026-109125).
+- Bouncy Castle 1.87 (2026-11-11) is a security release fixing twelve CVEs in OpenPGP,
+  RFC 3161, X.500 name handling, CMS/MIME, PKIX revocation, and the NTRU-family KEMs.
+  The 1.86-incompatible areas listed upstream (HQC, Merkle Tree Certificates, C509,
+  ML-KEM key derivation, removed XMSS/LMS) are not used by ANONERO; the project imports
+  only `SHA256Digest`, `PKCS5S2ParametersGenerator`, `KeyParameter`, and `Base64`.
+- kotlinx.serialization 1.13.0 is built on Kotlin 2.4.10 and reverts the exception
+  wrapping introduced in 1.12.0; the project uses Kotlin 2.4.21 and still catches
+  `SerializationException` in the node and backup serializers.
 - No connection, proxy, LWS, Keystore, or Monero protocol behavior was changed by
   these dependency updates.
 
