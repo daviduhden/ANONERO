@@ -56,6 +56,10 @@ capture_diagnostics() {
         adb shell df -h /data 2>&1 || true
         adb shell service list 2>&1 | grep -E 'package|activity' || true
         adb logcat -d -b crash -v threadtime 2>&1 || true
+        # system_server aborts and watchdog messages live in the system buffer.
+        adb logcat -d -b system -v threadtime 2>&1 | tail -n 2000 || true
+        adb logcat -d -b main -v threadtime 2>&1 | tail -n 2000 || true
+        adb logcat -d -b events -v threadtime 2>&1 | tail -n 2000 || true
     } >ci-diagnostics/instrumented-diagnostics.txt 2>&1
 }
 
@@ -117,7 +121,9 @@ fi
 sleep 30
 
 set +e
-./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
+# Leave cores for the software-emulated guest; host-side dexing has killed
+# system_server while the tests were starting.
+./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true \
     :app:connectedAnonDebugAndroidTest \
     :app:connectedNeroDebugAndroidTest
 status=$?
@@ -145,7 +151,7 @@ for flavor in anon nero; do
         esac
         echo "Retrying ${flavor} after an instrumentation attach timeout"
         set +e
-        ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true "$task"
+        ./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true "$task"
         retry_status=$?
         set -e
         if [ "$retry_status" -eq 0 ]; then

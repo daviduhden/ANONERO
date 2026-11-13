@@ -127,7 +127,9 @@ put loops or backslash continuations there. Keep the logic in
 `.github/scripts/run-instrumented.sh` and call it with `bash` on one line. The script must:
 
 - wait for `sys.boot_completed` and for the `package` and `activity` services;
-- capture crash logcat, guest memory, and disk on failure;
+- build the app and AndroidTest APKs before the emulator starts, and keep the connected
+  Gradle invocation at `--max-workers=2` so host-side dexing cannot starve the guest;
+- capture crash/system/main/events logcat, guest memory, and disk on failure;
 - retry only instrumentation attach/zero-test failures while the guest is healthy;
 - leave the XML and `test-result-exit-code.txt` validation as the final authority.
 

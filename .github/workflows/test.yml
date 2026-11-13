@@ -600,9 +600,13 @@ jobs:
           set -euo pipefail
           AAPT2="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
           test -x "$AAPT2"
+          # Build the test APKs before the emulator starts. Compiling and dexing them
+          # while the software-emulated guest runs starves system_server and can kill it.
           ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
             :app:assembleAnonDebug \
-            :app:assembleNeroDebug
+            :app:assembleNeroDebug \
+            :app:assembleAnonDebugAndroidTest \
+            :app:assembleNeroDebugAndroidTest
           for flavor in anon nero; do
             apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
             [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
