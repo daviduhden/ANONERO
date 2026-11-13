@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43122308945` | `381d8ab` | `workflow_dispatch` | failure | instrumented | All code gates plus native and assemble pass; `system_server` SIGABRT while Gradle dexed the test APKs; both XML `tests=0`; health gate failed closed |
 | `43108046671` | `02b97b8` | `workflow_dispatch` | failure | instrumented | Guest lost `system_server` during install/uninstall; both XML `tests=0`; all other jobs pass |
 | `43058769285` | `76fcb79` | `workflow_dispatch` | failure | instrumented | Gradle ran both flavors successfully and XML validation passed; the inline retry loop failed because the emulator runner executes `script` line by line |
 | `43045996049` | `452f4b6` | `workflow_dispatch` | failure | instrumented | 3 GB + 60 s settle: first flavor (anon) still failed to attach; XML validation correctly failed the job |
@@ -67,7 +68,8 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   `bc-ur`, `polyseed`, and `utf8proc` gitlinks resolve.
 - **Regression check:** native preflight requires an initialized submodule and at least one
   patch file; `assemble` now links the JNI library even when instrumented tests are skipped.
-- **Status:** patch series restored; native archives, adapter link, and the API 35 smoke tests pass in CI.
+- **Status:** patch series restored; native archives and adapter link build in CI. The API
+  35 smoke test passed on `42874760135` but is unstable on the KVM-less runner.
 
 ### CI-003 — Invalid resource string / apostrophe escaping
 
@@ -537,32 +539,35 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 
 ### CI-031 — `system_server` lost during connected tests without KVM
 
-- **Run:** `43108046671` (`02b97b8`).
+- **Runs:** `43108046671` (`02b97b8`), `43122308945` (`381d8ab`).
 - **Job:** Instrumented tests (API 35).
-- **Diagnostic:** both `TEST-*.xml` files contain `tests=0`; the log shows
-  `Failed to uninstall package io.anonero.nero.debug: Can't find service: package`,
-  `adb: failed to install ... Broken pipe (32)`, `Failed to set debug app:
-  Can't find service: activity`, and `Failed to get current user ID`. Gradle still
-  printed `BUILD SUCCESSFUL`; only the XML gate failed the job. Boot took 945 s of the
-  1200 s timeout.
+- **Diagnostic:** both `TEST-*.xml` files contain `tests=0` while Gradle prints
+  `BUILD SUCCESSFUL` and writes `test-result-exit-code.txt` with `0`. In
+  `43108046671` the log shows `Can't find service: package`, `Broken pipe (32)`, and
+  `Can't find service: activity`. In `43122308945` the guest diagnostics show
+  `Fatal signal 6 (SIGABRT)` in `system_server` (`binder:2000_2`) at 00:37:30, while
+  Gradle was running `compile*DebugAndroidTestJavaWithJavac`, `dexBuilder*DebugAndroidTest`,
+  and `package*DebugAndroidTest`. Guest `MemAvailable` was about 1.9 GB, `/data` had
+  5 GB free, and the host had 92 GB free, so memory and disk exhaustion are ruled out.
 - **Root cause:** the x86_64 guest runs with `-accel off` because the hosted runner has no
-  `/dev/kvm`. `system_server` disappeared after boot and never returned. The exact
-  trigger (watchdog kill vs guest OOM vs installd crash) is **not verified**: the job
-  does not capture logcat or guest memory. The APK is 128 MiB with 24 dex files and
-  46 MB of native libraries, and `jniLibs.useLegacyPackaging = true` extracts them at
-  install time.
+  `/dev/kvm`. The test-APK build is CPU-heavy on the four-core host and starves the
+  software-emulated guest; the leading hypothesis is a `system_server` watchdog abort, but
+  the system buffer was not captured. The APK is 128 MiB with 24 dex files and 46 MB of
+  native libraries, and `jniLibs.useLegacyPackaging = true` extracts them at install time.
 - **Pattern search:** prior runs show attach timeouts, `Broken pipe`, adb 224, and a
   script-splitting failure; `42874760135` passed both flavors with 2048M, proving the
   smoke test itself is valid.
-- **Correction:** add a core-service health gate, capture crash logcat/meminfo/df on
-  failure, extend the XML gate to `skipped`, exit-code files, and failure markers, retry
-  attach/zero-test only while the guest is healthy, free host disk without deleting the
-  Android SDK, and return to the 2048M configuration.
+- **Correction:** build the app and AndroidTest APKs before the emulator starts, limit the
+  connected Gradle invocation to two workers, keep the core-service health gate, capture
+  crash/system/main logcat plus meminfo/df on failure, extend the XML gate to `skipped`,
+  exit-code files, and failure markers, retry attach/zero-test only while the guest is
+  healthy, free host disk without deleting the Android SDK, and return to the 2048M
+  configuration.
 - **Regression check:** the next instrumented run must either pass both flavors or fail
-  with guest diagnostics; deterministic success requires a KVM-capable runner or device
-  farm.
-- **Status:** diagnostic/stability changes implemented; root trigger requires the next
-  run's diagnostics. No CI run was executed for this change.
+  with guest diagnostics; deterministic success still requires a KVM-capable runner or
+  device farm.
+- **Status:** the diagnostic/stability changes are committed; the prebuild and worker-limit
+  fix is implemented in the working tree and needs the next run for validation.
 
 ## Warning inventory
 
@@ -599,15 +604,60 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Correction:** none required.
 - **Status:** external/runner noise.
 
+### W-004 — `NewerVersionAvailable` lint advisories
+
+- **Run:** `43122308945` (`381d8ab`), both flavors.
+- **Diagnostic:** `kotlinx-serialization-json` 1.12.0 → 1.13.0 and
+  `bcprov-jdk18on` 1.86 → 1.87 in `gradle/libs.versions.toml`.
+- **Origin:** Android Lint release metadata, not project code.
+- **Root cause:** upstream releases after the previous lint baseline.
+- **Correction:** update to kotlinx.serialization 1.13.0 (Kotlin 2.4.x, reverts the 1.12
+  exception wrapping) and Bouncy Castle 1.87 (security release, twelve CVEs). The project
+  uses only `SHA256Digest`, `PKCS5S2ParametersGenerator`, `KeyParameter`, and `Base64`
+  from Bouncy Castle, none in the documented 1.86-incompatible areas.
+- **Regression check:** the next lint run must return to zero errors and zero warnings;
+  compilation and unit tests validate the new artifacts.
+- **Status:** implemented in the working tree; CI pending.
+
+### W-005 — Runner, action, and emulator warnings
+
+- **Runs:** all accessible runs.
+- **Diagnostic:** `actions/download-artifact` emits Node
+  `DeprecationWarning: Buffer() is deprecated`; the emulator emits
+  `QuickbootFileBacked is disabled`, missing `libX11`/`libX11-xcb`, an unmap warning, and
+  an `emu-update-last-check.ini` parse warning.
+- **Origin:** third-party JavaScript actions and the Android emulator, not project code.
+- **Impact:** log noise; no observed failure. The `Buffer()` warning is fixed only by an
+  upstream action release.
+- **Correction:** none applied; keep actions SHA-pinned and review upgrades through CI.
+- **Status:** external; monitored, not suppressed.
+
+### W-006 — Vendored native dependency warnings
+
+- **Runs:** all runs that build the native archives.
+- **Diagnostic:** about 3,000 warning lines from Boost, OpenSSL, ICU/Unicode, and b2
+  ("No best alternative for ... install-libraries-shared"), plus `__ANDROID_API__`
+  redefinition and cross-toolchain configure warnings.
+- **Origin:** vendored third-party build systems and headers, not `app/src/main/cpp`.
+- **Impact:** noisy native log; the archives build and the project-owned adapter compiles
+  without warnings under `-Wall -Wextra -Wpedantic`.
+- **Correction:** do not impose project `-Werror` on third-party headers; the adapter keeps
+  `SYSTEM` includes and now uses `-Werror` only for its own target. Upstream fixes are the
+  correct route for the vendored warnings.
+- **Status:** external; monitored, not suppressed.
+
 ## CI evidence recorded
 
-- JVM tests pass on `dd692a8` and later.
-- Android Lint passes with zero errors and zero warnings on `0006659` and later.
-- Kotlin compilation emits zero `w:` diagnostics on `e0afc7f`.
+- JVM tests pass on `dd692a8` and later, including 62 tests per flavor on `43122308945`.
+- Android Lint had zero errors and zero warnings through the previous baseline;
+  `43122308945` reports two `NewerVersionAvailable` advisories per flavor (W-004), fixed by
+  the pending dependency update.
+- Kotlin compilation emits zero `w:` diagnostics; `43122308945` has none in the unit,
+  lint, or assemble logs.
 - The native archives build successfully on `42743643959` and later.
 - The assemble/link job passes on `42847493558`; it caught the JNI array-region compile
   error, AGP 9 APK naming, and minSdk extraction issues along the way.
 - Instrumented smoke tests pass for both flavors on `42874760135` (1 test, 0 failures each).
-- No C++ warning report beyond the compiler output; the adapter compiles without warnings
-  under `-Wall -Wextra -Wpedantic`.
+- No `anonero.cpp`/`anonero.h` warning appears in `43122308945`; the adapter compiled under
+  `-Wall -Wextra -Wpedantic`, so `-Werror` is now enabled for its target.
 - No release, signing, sanitizer, or fuzz run.

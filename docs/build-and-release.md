@@ -72,8 +72,9 @@ dependency.
 
 **Current state:** the seven wallet-API patches are checked in under
 `external-libs/patches/` and apply cleanly to the pinned commit, but the local Monero
-submodule is uninitialized locally; CI builds the native archives, assembles both debug
-APKs, and runs the API 35 smoke tests.
+submodule is uninitialized locally; CI builds the native archives and assembles both debug
+APKs. The API 35 smoke test passed on `42874760135` but is not stable on the KVM-less
+hosted runner.
 
 ## 4. GitHub Actions: test pipeline
 
@@ -88,7 +89,7 @@ an `authorize` job that requires the repository owner as both `github.actor` and
 | `unit` | `:app:testAnonDebugUnitTest` and `:app:testNeroDebugUnitTest` |
 | `lint` | Android Lint for both flavors; uploads HTML/XML reports |
 | `assemble` | Links `libanonero.so` and checks the API 29 floor without an emulator |
-| `jni-contract` | `python3 scripts/check-jni-contract.py` (names only, not signatures) |
+| `jni-contract` | `python3 scripts/check-jni-contract.py` (exact class/method names, not signatures) |
 | `i18n` | `python3 scripts/check-i18n.py` (parity, placeholders, unresolved resources, hardcoded text) |
 | `native-language-policy` | Rejects project-owned Java sources |
 | `native` | Verifies the Monero submodule/patch series, then builds the pinned archives |
@@ -99,12 +100,14 @@ The instrumented job installs Android platform 37.2, Build Tools 37.0.0, NDK
 installation, checks the API 29 floor and `libanonero.so`, then runs connected tests.
 
 The hosted `ubuntu-24.04` runner does not expose `/dev/kvm`; the x86_64 emulator runs with
-`-accel off` and can take 12-16 minutes to boot. In run `43108046671` the guest lost
-`system_server` during install and produced zero-test reports. `.github/scripts/run-instrumented.sh`
-now gates on the `package`/`activity` services, writes crash/memory/disk diagnostics, and
-retries only attach/zero-test failures. The XML and exit-code checks are mandatory. A
-self-hosted KVM runner or a device farm is required for deterministic instrumented
-execution; do not relax the test gate to make the job green.
+`-accel off` and can take 12-16 minutes to boot. Run `43108046671` lost `system_server`
+during install, and `43122308945` caught a SIGABRT in `system_server` while Gradle was
+dexing the test APKs; both produced zero-test reports. The instrumented job now builds the
+app and test APKs before the emulator starts, limits connected Gradle to two workers, and
+`.github/scripts/run-instrumented.sh` gates on the `package`/`activity` services, writes
+crash/system/main diagnostics, and retries only attach/zero-test failures. The XML and
+exit-code checks are mandatory. A self-hosted KVM runner or a device farm is required for
+deterministic instrumented execution; do not relax the test gate to make the job green.
 
 Manual test run, from the GitHub Actions UI or CLI:
 

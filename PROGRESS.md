@@ -127,8 +127,9 @@ records progress; it is not a release note and does not claim CI validation.
 - Added an Android Lint job for both flavors with HTML/XML report uploads, and included
   Gradle problems reports in unit-test artifact uploads.
 - Enabled `-Wall -Wextra -Wpedantic` for the project-owned C++ target and marked external
-  include trees as SYSTEM so third-party headers do not pollute project warnings. Native
-  compilation and `-Werror` remain pending a reproducible native build.
+  include trees as SYSTEM so third-party headers do not pollute project warnings. The
+  adapter compiled without warnings in `43122308945`; `-Werror` is now enabled and awaits
+  the next native/assemble run.
 - Added the permanent policy that every compile error, warning, test failure, crash, JNI
   or sanitizer diagnostic requires root-cause analysis, a global pattern search, a
   regression check, and a `docs/ci/` entry.
@@ -163,8 +164,19 @@ records progress; it is not a release note and does not claim CI validation.
 - Run `43108046671` (`02b97b8`) passed every job except instrumented: the KVM-less
   emulator lost `system_server` during install and produced `tests=0` XML reports. Added
   a guest health gate, crash diagnostics, stricter XML/exit-code validation, disk cleanup,
-  and returned to the only configuration with a green run (2048M). The root trigger is
-  still unverified without logcat.
+  and returned to the only configuration with a green run (2048M).
+- Run `43122308945` (`381d8ab`) validated the post-format audit commits: authorization,
+  unit tests, lint, localization, JNI parity, native archives, and assemble all pass.
+  Instrumented still failed: the new diagnostics caught `system_server` aborting with
+  SIGABRT while Gradle compiled and dexed the AndroidTest APKs; guest memory (1.9 GB
+  available) and disk (5 GB free) were healthy. The instrumented job now builds the app and
+  test APKs before the emulator starts and limits the connected Gradle to two workers.
+  This fix has no CI run yet.
+- The same run surfaced two `NewerVersionAvailable` lint advisories per flavor.
+  kotlinx.serialization is updated to 1.13.0 (Kotlin 2.4.x, reverts the 1.12 exception
+  wrapping) and Bouncy Castle to 1.87 (security release, twelve CVEs). ANONERO uses only
+  the stable digest/PBKDF2/Base64 APIs affected neither by the 1.86-incompatible areas nor
+  by the serializer change. CI must still resolve and compile the new versions.
 - The post-format static audit found and fixed two fail-open data paths: a corrupt
   `nodes_store` no longer reads as an empty list (writes fail closed and the settings screen
   reports the error), and a malformed backup version now fails the restore instead of
@@ -173,12 +185,14 @@ records progress; it is not a release note and does not claim CI validation.
   `external-libs/.clang-format` prevents recursive formatting of vendored Monero.
   Onboarding now refuses an invalid node URL instead of persisting it and advancing, and a
   dead exception-swallowing block in proxy settings was removed. New JVM regressions cover
-  both serializers.
+  both serializers. `check-jni-contract.py` now matches the exact
+  `Java_package_Class_method` export instead of a method-name suffix, so a
+  `Wallet_getStatusJ`/`PendingTransaction_getStatusJ` class mismatch cannot pass.
 
 ## Pending validation
 
-- **Native build:** the archives build and the adapter links in CI. `-Werror` and a
-  warning-free native report are still pending.
+- **Native build:** the archives build and the adapter links in CI. The adapter compiled
+  without warnings in `43122308945`; the newly enabled `-Werror` needs the next run.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
   CI. The API 35 smoke tests passed once (`42874760135`) but are not stable on hosted
   runners without KVM.

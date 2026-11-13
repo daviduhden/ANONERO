@@ -3,11 +3,14 @@
 ## Status
 
 This is a static audit followed by manual CI validation. Run `42874760135` passed every
-job, including one API 35 smoke test per flavor. Run `43108046671` passed every code,
-native, and assemble gate but lost `system_server` in the KVM-less emulator and produced
-zero-test XML reports. The formatting/lint commits `a487cf5`..`32d8c1a` have no CI run.
-Native archives and APK assembly build; deterministic instrumented execution still
-requires a KVM runner or device farm.
+job, including one API 35 smoke test per flavor. Run `43122308945` (`381d8ab`) passed every
+code, native, and assemble gate, including the formatting/lint commits and the new JVM
+regressions. Lint reported two dependency-update advisories (W-004), addressed by the
+pending serialization/BouncyCastle bump. Its instrumented job still failed: the diagnostics
+caught `system_server` aborting while Gradle dexed the test APKs, with guest memory and disk
+healthy. The job now prebuilds app and test APKs before boot and limits connected Gradle to
+two workers. Deterministic instrumented execution still requires a KVM runner or device
+farm.
 
 ## Warning policy
 
@@ -37,12 +40,12 @@ requires a KVM runner or device farm.
 | JNI object factories | Every `GetMethodID`/`NewObject` in the adapter | Checked; failures return `nullptr` instead of aborting |
 | Restore-height tests | Tests vs `MAX_RESTORE_HEIGHT` | Stale assertion corrected |
 | Resource parity/placeholders | `python3 scripts/check-i18n.py` | Passes |
-| JNI symbol names | `python3 scripts/check-jni-contract.py` | Passes names; matching is suffix-based, not class-aware; signatures/linkage require build |
+| JNI symbol names | `python3 scripts/check-jni-contract.py` | Exact `Java_package_Class_method` matching; signatures/linkage still require build |
 | Workflow syntax | `actionlint` (including shellcheck), `yamllint` with relaxed rules | Pass |
 | Workflow security | `zizmor` | 0 findings; one inline `self-repository` ignore because actionlint 1.x lacks `$/` |
 | Workflow shell | Every embedded `run:` block parsed with `bash -n` | Pass |
 | Formatting/lint | `ktlint`, `clang-format`, `ruff`, `shfmt`, `shellcheck` | Pass locally; no CI gate yet |
-| Instrumented health | boot/package/activity gate and crash diagnostics | Implemented; next run must validate |
+| Instrumented health | boot/package/activity gate and crash diagnostics | Validated on `43122308945`: gate and diagnostics fired; test-APK prebuild fix pending |
 
 ## Build-system gaps
 
@@ -51,21 +54,22 @@ requires a KVM runner or device farm.
 - The JVM job compiles both `anonDebug` and `neroDebug`; it is the first gate that exposed
   CI-003 through CI-009.
 - `app/build.gradle.kts` uses AGP 9.5.1, Kotlin 2.4.21, compileSdk 37.2, NDK 30.0.16248370,
-  CMake 4.1.2, and Gradle 9.9.0. These pins have not been validated by a successful run.
-- An Android Lint job has been added for both flavors, but it has not run yet. Lint
-  warnings, manifest/resource issues, and Compose diagnostics remain unverified.
+  CMake 4.1.2, and Gradle 9.9.0. Run `43122308945` compiled both flavors, passed JVM tests
+  and Android Lint, and assembled/linked the APKs with these pins.
+- Android Lint runs for both flavors. It reports zero errors and, after the pending W-004
+  version update, no project-code warnings; the only findings were two dependency-update
+  advisories.
 - No dependency lockfile or verification metadata exists.
 
 ### C++/JNI
 
-- `app/CMakeLists.txt` now enables `-Wall -Wextra -Wpedantic` for the `anonero` target and
-  marks external include trees as SYSTEM. No successful native compile exists, so the
-  resulting warnings and `-Werror` readiness are unverified.
-- The JNI contract script checks symbol names only; it cannot validate JNI signatures,
-  constructor descriptors, or link-time symbol availability.
-- The native compile and link have not run. The patch series is present and applies to
-  the pinned commit; the last two runs stopped at the Debian snapshot 503 before compiling
-  Monero.
+- `app/CMakeLists.txt` enables `-Wall -Wextra -Wpedantic -Werror` for the `anonero` target
+  and marks external include trees as SYSTEM. The adapter compiled without warnings in
+  `43122308945`; the `-Werror` flag needs the next CI run to validate.
+- The JNI contract script checks exact class/method names; it cannot validate JNI
+  signatures, constructor descriptors, or link-time symbol availability.
+- The native compile and link run in CI: the archives build and the adapter links. The
+  patch series is present and applies to the pinned commit.
 - No AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or LeakSanitizer run
   exists.
 
@@ -75,8 +79,9 @@ requires a KVM runner or device farm.
 - A separate `assemble` job links the JNI library and checks the API 29 floor even when
   instrumented tests are skipped; it passes in current runs.
 - The API 35 smoke test passed for both flavors on `42874760135`, but the KVM-less
-  emulator lost `system_server` on `43108046671` and produced zero-test reports. The job
-  is not stable on hosted runners; a KVM runner or device farm is required.
+  emulator lost `system_server` on `43108046671` and `43122308945`, producing zero-test
+  reports. The job is not stable on hosted runners; a KVM runner or device farm is
+  required.
 - Lock/unlock, background sync, decoy, duress, wipe, Tor, LWS, and JNI callbacks still
   have no device coverage.
 - The emulator matrix is API 35 x86_64 only; API 29 compile/manifest checks are separated
@@ -136,12 +141,13 @@ of its own.
    in Android string resources (passes in CI).
 2. Kotlin import/static scan for the CI-004/CI-006/CI-008/CI-009 patterns (prepared in the
    audit; CI compilation is authoritative).
-3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (passes with
-   zero errors and zero warnings).
-4. Project-owned C++ warning flags (`-Wall -Wextra -Wpedantic`) with system include trees.
-   Native archives build and the adapter compiles without warnings; `-Werror` remains
-   deferred.
-5. JNI signature/constructor parity checks where derivable statically (pending).
+3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (zero errors;
+   the W-004 dependency advisories are cleared by the pending version update).
+4. Project-owned C++ warning flags (`-Wall -Wextra -Wpedantic -Werror`) with system include
+   trees. Native archives build and the adapter compiled without warnings in
+   `43122308945`; the next run validates the new `-Werror`.
+5. JNI exact class/method symbol parity (implemented); signature and constructor
+   descriptors still require a real build/link check.
 6. Gradle problems report paths in unit-test artifacts (unit job passes).
 7. Assemble/link job independent of `run_instrumented` (passes on `42847493558`).
 8. Artifact names include `run_attempt`, so a rerun cannot collide (implemented).
@@ -174,10 +180,10 @@ These are settings, not workflow code, and cannot be supplied by this audit:
 - **Validated in CI:** JVM unit tests, Android Lint (0/0), Kotlin compilation (0 warnings),
   JNI symbol parity, localization, architecture policy, native archives, and debug APK
   assembly/link on the pre-formatting commits.
-- **Not yet validated:** the formatting/lint commits `a487cf5`..`32d8c1a`; they have no
-  CI run. Linters pass locally, but compilation and linking remain unverified.
+- **Validated in `43122308945`:** the formatting/lint commits and audit fixes compile,
+  pass JVM tests, lint, localization, JNI parity, native archives, and assemble/link.
 - **Validated once, not stable:** the API 35 smoke test passed on `42874760135` and failed
-  on `43108046671` when the guest lost `system_server`.
+  on `43108046671` and `43122308945` when the guest lost `system_server`.
 - **Unverified:** sanitizers, release signing and publication, broader wallet/Tor/LWS
   instrumented coverage.
 - **Blocked:** release environment, branch protection, certificate pinning, deterministic

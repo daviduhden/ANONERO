@@ -12,12 +12,15 @@ validation.
 - Current evidence:
   - `42874760135` (`c228e36`) — all jobs pass; anon and nero each ran one instrumented
     smoke test with zero failures.
+  - `43122308945` (`381d8ab`) — the post-format audit fixes compile and pass unit tests,
+    lint, localization, JNI parity, native archives, and assemble. Instrumented still fails:
+    `system_server` aborted while Gradle dexed the test APKs, and both reports had
+    `tests=0`. Guest memory and disk were not exhausted.
   - `43108046671` (`02b97b8`) — all jobs pass except instrumented; the KVM-less emulator
     lost `system_server` and both reports had `tests=0`.
   - `a487cf5`…`32d8c1a` — formatting/lint commits; no CI run exists for them.
-  - The post-format audit fixes (instrumented health/diagnostics, node-store and backup
-    fail-closed parsing, lint-rule changes) are in the working tree and also have no CI
-    run. Local static checks pass; compilation and tests remain unverified.
+  - The prebuild/worker-limit fix for the test APKs is in the working tree and has no CI
+    run yet.
   - No release, sanitizer, fuzz, or device-farm run exists. Absence of evidence is
     recorded as unverified, not as success.
 - Logs were read with `gh run view --log` and `--log-failed`. No workflow was executed,

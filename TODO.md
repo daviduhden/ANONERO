@@ -29,20 +29,18 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
-- [ ] Run the manual Tests workflow on the audit commit (formatting, lint, and CI changes)
-      and collect the new instrumented diagnostics.
+- [ ] Rerun the manual Tests workflow after the test-APK prebuild fix and confirm the
+      emulator survives the connected tests; collect the new system/main logcat.
 - [ ] Device-test the corrupt `nodes_store` path: add/remove must fail visibly, must not
       overwrite the file, and backup export must fail instead of omitting nodes.
 - [ ] Decide the instrumented runner from the captured logcat/meminfo: self-hosted KVM or
       device farm. Do not keep tuning RAM/timeouts without data.
-- [ ] Turn on `-Werror` for the project-owned C++ target once the formatted tree builds
-      warning-free in CI.
+- [ ] Validate the newly enabled `-Werror` for the project-owned C++ target in the next
+      native/assemble run.
 - [ ] Add a format/lint CI gate with pinned ktlint, clang-format, Ruff, shfmt, shellcheck,
       yamllint, zizmor, and actionlint versions.
 - [ ] Add sanitizer/fuzz jobs (ASan/UBSan/TSan/LeakSanitizer) after native inputs are
       restored; document emulator/runtime limits.
-- [ ] Make `check-jni-contract.py` class-aware; suffix matching can pair
-      `Wallet_getStatusJ` with `PendingTransaction.getStatusJ` and hide a class mismatch.
 - [ ] Extend JNI contract checks to signatures/constructor descriptors where derivable
       statically.
 - [ ] Add a restore fixture for a v2 PIN-keyed backup whose external passphrase differs
