@@ -100,14 +100,15 @@ The instrumented job installs Android platform 37.2, Build Tools 37.0.0, NDK
 installation, checks the API 29 floor and `libanonero.so`, then runs connected tests.
 
 The hosted `ubuntu-24.04` runner does not expose `/dev/kvm`; the x86_64 emulator runs with
-`-accel off` and can take 12-16 minutes to boot. Run `43108046671` lost `system_server`
-during install, and `43122308945` caught a SIGABRT in `system_server` while Gradle was
-dexing the test APKs; both produced zero-test reports. The instrumented job now builds the
-app and test APKs before the emulator starts, limits connected Gradle to two workers, and
-`.github/scripts/run-instrumented.sh` gates on the `package`/`activity` services, writes
-crash/system/main diagnostics, and retries only attach/zero-test failures. The XML and
-exit-code checks are mandatory. A self-hosted KVM runner or a device farm is required for
-deterministic instrumented execution; do not relax the test gate to make the job green.
+`-accel off` and can take 10-16 minutes to boot. Run `43108046671` lost `system_server`
+during install, `43122308945` caught a SIGABRT while Gradle dexed the test APKs, and
+`43521054641` lost the `input`/`overlay` services immediately after a 630 s boot, before
+the test script. The instrumented job builds the app and test APKs before the emulator
+starts, limits connected Gradle to two workers, and `.github/scripts/run-instrumented.sh`
+gates on the `package`/`activity` services, writes crash/system/main diagnostics, and
+retries only attach/zero-test failures. The XML and exit-code checks are mandatory. A
+self-hosted KVM runner or a device farm is required for deterministic instrumented
+execution; do not relax the test gate to make the job green.
 
 Manual test run, from the GitHub Actions UI or CLI:
 
@@ -215,6 +216,6 @@ Agent work must not execute these commands; use CI.
 
 ## 9. What is not validated by documentation
 
-No CI run, build, emulator test, signing operation, or release publication was performed
-during this documentation pass. The AGP/Gradle/NDK/CMake and native dependency updates are
-statically reviewed only. Treat all build claims as pending CI.
+Run `43521054641` validated the AGP/Gradle/NDK/CMake build, unit tests, lint 0/0, JNI
+parity, native archives, assemble/link, and `-Werror`. Instrumented execution, signing, and
+release publication remain unverified; treat those claims as pending CI.

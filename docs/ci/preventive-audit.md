@@ -3,14 +3,12 @@
 ## Status
 
 This is a static audit followed by manual CI validation. Run `42874760135` passed every
-job, including one API 35 smoke test per flavor. Run `43122308945` (`381d8ab`) passed every
-code, native, and assemble gate, including the formatting/lint commits and the new JVM
-regressions. Lint reported two dependency-update advisories (W-004), addressed by the
-pending serialization/BouncyCastle bump. Its instrumented job still failed: the diagnostics
-caught `system_server` aborting while Gradle dexed the test APKs, with guest memory and disk
-healthy. The job now prebuilds app and test APKs before boot and limits connected Gradle to
-two workers. Deterministic instrumented execution still requires a KVM runner or device
-farm.
+job, including one API 35 smoke test per flavor. Run `43521054641` (`feb985e`) passed every
+code, native, assemble, lint, and JNI gate: `-Werror` compiles the adapter without warnings,
+serialization/BouncyCastle resolve, lint is 0/0, and both flavors run 62 JVM tests. Its
+instrumented job failed after a 630 s boot when the runner's own post-boot `input`/`overlay`
+adb calls hit broken pipes, before the test script started. The prebuild fix is validated,
+but deterministic instrumented execution still requires a KVM runner or device farm.
 
 ## Warning policy
 
@@ -81,8 +79,9 @@ farm.
 - A separate `assemble` job links the JNI library and checks the API 29 floor even when
   instrumented tests are skipped; it passes in current runs.
 - The API 35 smoke test passed for both flavors on `42874760135`, but the KVM-less
-  emulator lost `system_server` on `43108046671` and `43122308945`, producing zero-test
-  reports. The job is not stable on hosted runners; a KVM runner or device farm is
+  emulator lost `system_server` on `43108046671` and `43122308945`, and on
+  `43521054641` it lost the `input`/`overlay` services immediately after boot, before the
+  test script. The job is not stable on hosted runners; a KVM runner or device farm is
   required.
 - Lock/unlock, background sync, decoy, duress, wipe, Tor, LWS, and JNI callbacks still
   have no device coverage.
@@ -143,11 +142,10 @@ of its own.
    in Android string resources (passes in CI).
 2. Kotlin import/static scan for the CI-004/CI-006/CI-008/CI-009 patterns (prepared in the
    audit; CI compilation is authoritative).
-3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (zero errors;
-   the W-004 dependency advisories are cleared by the pending version update).
+3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (0 errors and
+   0 warnings on `43521054641`; the W-004 dependency advisories are cleared).
 4. Project-owned C++ warning flags (`-Wall -Wextra -Wpedantic -Werror`) with system include
-   trees. Native archives build and the adapter compiled without warnings in
-   `43122308945`; the next run validates the new `-Werror`.
+   trees. Native archives build and `43521054641` has no adapter warning under `-Werror`.
 5. JNI exact class/method symbol parity (implemented); signature and constructor
    descriptors still require a real build/link check.
 6. Gradle problems report paths in unit-test artifacts (unit job passes).
@@ -182,10 +180,12 @@ These are settings, not workflow code, and cannot be supplied by this audit:
 - **Validated in CI:** JVM unit tests, Android Lint (0/0), Kotlin compilation (0 warnings),
   JNI symbol parity, localization, architecture policy, native archives, and debug APK
   assembly/link on the pre-formatting commits.
-- **Validated in `43122308945`:** the formatting/lint commits and audit fixes compile,
-  pass JVM tests, lint, localization, JNI parity, native archives, and assemble/link.
+- **Validated in `43521054641`:** `-Werror`, the serialization/BouncyCastle update, lint
+  0/0, exact JNI parity, localization, native archives, assemble/link, and 62 JVM tests per
+  flavor.
 - **Validated once, not stable:** the API 35 smoke test passed on `42874760135` and failed
-  on `43108046671` and `43122308945` when the guest lost `system_server`.
+  on `43108046671`, `43122308945`, and `43521054641` when the KVM-less guest lost
+  `system_server` or the post-boot adb services.
 - **Unverified:** sanitizers, release signing and publication, broader wallet/Tor/LWS
   instrumented coverage.
 - **Blocked:** release environment, branch protection, certificate pinning, deterministic

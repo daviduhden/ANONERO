@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43521054641` | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
 | `43122308945` | `381d8ab` | `workflow_dispatch` | failure | instrumented | All code gates plus native and assemble pass; `system_server` SIGABRT while Gradle dexed the test APKs; both XML `tests=0`; health gate failed closed |
 | `43108046671` | `02b97b8` | `workflow_dispatch` | failure | instrumented | Guest lost `system_server` during install/uninstall; both XML `tests=0`; all other jobs pass |
 | `43058769285` | `76fcb79` | `workflow_dispatch` | failure | instrumented | Gradle ran both flavors successfully and XML validation passed; the inline retry loop failed because the emulator runner executes `script` line by line |
@@ -566,8 +567,34 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next instrumented run must either pass both flavors or fail
   with guest diagnostics; deterministic success still requires a KVM-capable runner or
   device farm.
-- **Status:** the diagnostic/stability changes are committed; the prebuild and worker-limit
-  fix is implemented in the working tree and needs the next run for validation.
+- **Status:** the diagnostic/stability changes and prebuild were validated in
+  `43521054641` up to the emulator action; the action then failed before the script
+  (CI-032). Deterministic execution still requires KVM or a device farm.
+
+### CI-032 — Guest services lost immediately after boot, before the test script
+
+- **Run:** `43521054641` (`feb985e`).
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** all code, native, assemble, lint, and JNI jobs pass (62 JVM tests per
+  flavor, lint 0/0, no `anonero.cpp`/`anonero.h` warning under `-Werror`). The emulator
+  boots after 630 s; the runner's post-boot `adb shell input keyevent 82` then fails with
+  `cmd: Failure calling service input: Broken pipe (32)`, `cmd overlay list` fails with
+  `Failure calling service overlay`, and the action aborts with adb exit code 224.
+  `run-instrumented.sh` never starts, so there are no XML reports or guest diagnostics.
+- **Root cause:** the KVM-less x86_64 emulator runs with `-accel off`; the guest loses the
+  `input`/`overlay` services immediately after boot. This is the same `system_server`
+  instability family as CI-031, but it now fails inside the emulator action before our
+  health gate. It is not a project-code failure.
+- **Pattern search:** `43108046671` lost `system_server` during install; `43122308945`
+  lost it during test-APK dexing; `43521054641` lost guest services immediately after boot.
+  The prebuild and health-gate fixes are validated, but they cannot run if the action's
+  own post-boot adb calls fail.
+- **Correction:** none applied. The deterministic fix is a self-hosted KVM runner or a
+  device farm; a blind job retry would hide the instability. Do not remove the XML gate or
+  the instrumented job.
+- **Regression check:** the next instrumented run must either execute both flavor reports
+  or fail with guest diagnostics. A stable hosted-emulator path is not proven.
+- **Status:** blocked on infrastructure.
 
 ## Warning inventory
 
@@ -615,9 +642,10 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   exception wrapping) and Bouncy Castle 1.87 (security release, twelve CVEs). The project
   uses only `SHA256Digest`, `PKCS5S2ParametersGenerator`, `KeyParameter`, and `Base64`
   from Bouncy Castle, none in the documented 1.86-incompatible areas.
-- **Regression check:** the next lint run must return to zero errors and zero warnings;
-  compilation and unit tests validate the new artifacts.
-- **Status:** implemented in the working tree; CI pending.
+- **Regression check:** lint must remain at zero errors and zero warnings and both flavors
+  must compile and run their JVM tests.
+- **Status:** validated in `43521054641`: lint 0/0, 62 JVM tests per flavor, and both
+  flavors compile with the new artifacts.
 
 ### W-005 — Runner, action, and emulator warnings
 
@@ -648,16 +676,17 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 
 ## CI evidence recorded
 
-- JVM tests pass on `dd692a8` and later, including 62 tests per flavor on `43122308945`.
-- Android Lint had zero errors and zero warnings through the previous baseline;
-  `43122308945` reports two `NewerVersionAvailable` advisories per flavor (W-004), fixed by
-  the pending dependency update.
-- Kotlin compilation emits zero `w:` diagnostics; `43122308945` has none in the unit,
+- JVM tests pass on `dd692a8` and later, including 62 tests per flavor on `43521054641`.
+- Android Lint is 0/0 on `43521054641`; the W-004 advisories are cleared by the dependency
+  update.
+- Kotlin compilation emits zero `w:` diagnostics; `43521054641` has none in the unit,
   lint, or assemble logs.
 - The native archives build successfully on `42743643959` and later.
 - The assemble/link job passes on `42847493558`; it caught the JNI array-region compile
   error, AGP 9 APK naming, and minSdk extraction issues along the way.
 - Instrumented smoke tests pass for both flavors on `42874760135` (1 test, 0 failures each).
-- No `anonero.cpp`/`anonero.h` warning appears in `43122308945`; the adapter compiled under
-  `-Wall -Wextra -Wpedantic`, so `-Werror` is now enabled for its target.
+- No `anonero.cpp`/`anonero.h` warning appears in `43521054641`; the adapter compiled under
+  `-Wall -Wextra -Wpedantic -Werror`.
+- `43521054641` lost the guest `input`/`overlay` services after boot and produced no
+  instrumented reports (CI-032).
 - No release, signing, sanitizer, or fuzz run.

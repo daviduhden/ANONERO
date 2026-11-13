@@ -12,6 +12,10 @@ validation.
 - Current evidence:
   - `42874760135` (`c228e36`) — all jobs pass; anon and nero each ran one instrumented
     smoke test with zero failures.
+  - `43521054641` (`feb985e`) — all code, native, assemble, lint, and JNI gates pass
+    (62 JVM tests per flavor, lint 0/0, `-Werror` clean). Instrumented fails after a 630 s
+    boot when the runner's post-boot `input`/`overlay` adb calls hit broken pipes; the test
+    script never starts and no reports are produced.
   - `43122308945` (`381d8ab`) — the post-format audit fixes compile and pass unit tests,
     lint, localization, JNI parity, native archives, and assemble. Instrumented still fails:
     `system_server` aborted while Gradle dexed the test APKs, and both reports had
@@ -19,8 +23,8 @@ validation.
   - `43108046671` (`02b97b8`) — all jobs pass except instrumented; the KVM-less emulator
     lost `system_server` and both reports had `tests=0`.
   - `a487cf5`…`32d8c1a` — formatting/lint commits; no CI run exists for them.
-  - The prebuild/worker-limit fix for the test APKs is in the working tree and has no CI
-    run yet.
+  - The prebuild/worker-limit fix for the test APKs is committed; `43521054641` validated
+    the prebuild step but the emulator failed before the test script.
   - No release, sanitizer, fuzz, or device-farm run exists. Absence of evidence is
     recorded as unverified, not as success.
 - Logs were read with `gh run view --log` and `--log-failed`. No workflow was executed,
@@ -39,4 +43,5 @@ GitHub Actions logs show the state of a specific commit and workflow definition.
 not prove the current working tree. Fixes described as “implemented, CI pending” have been
 reviewed statically only. Native and instrumented behavior remains unverified: the patch
 series is checked in and applies to the pinned commit, but the local Monero submodule is
-uninitialized locally; CI builds the archives, APKs, and smoke tests.
+uninitialized locally; CI builds the archives and APKs, while the instrumented smoke test
+is unstable on the KVM-less runner.
