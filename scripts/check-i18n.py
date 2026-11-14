@@ -43,11 +43,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RES = ROOT / "app/src/main/res"
 
-BASE_FILES = [RES / "values/strings.xml", RES / "values/strings_i18n.xml"]
+def string_catalogs(directory: Path) -> list[Path]:
+    # Keep the primary catalog mandatory; discover feature catalogs in every locale
+    # so a new resource file cannot evade parity/placeholder/reference checks.
+    primary = directory / "strings.xml"
+    return [primary, *sorted(path for path in directory.glob("strings*.xml") if path != primary)]
+
+
+BASE_FILES = string_catalogs(RES / "values")
 LOCALES = {
-    "es-ES": [RES / "values-es-rES/strings.xml", RES / "values-es-rES/strings_i18n.xml"],
-    "ru-RU": [RES / "values-ru-rRU/strings.xml"],
-    "zh-Hans": [RES / "values-b+zh+Hans/strings.xml"],
+    "es-ES": string_catalogs(RES / "values-es-rES"),
+    "ru-RU": string_catalogs(RES / "values-ru-rRU"),
+    "zh-Hans": string_catalogs(RES / "values-b+zh+Hans"),
 }
 REQUIRED_QUANTITIES = {
     "es-ES": {"one", "other"},
