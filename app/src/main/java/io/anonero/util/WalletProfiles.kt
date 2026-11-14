@@ -153,6 +153,7 @@ object WalletProfileStore {
                 ok = false
             }
         val editor = prefs.edit()
+        LwsConfig.preferenceKeys(profile).forEach { editor.remove(it) }
         if (profile.isDecoy) {
             editor.remove(PREFS_DURESS_PIN_HASH)
             editor.remove(PREFS_DECOY_PASSPHRASE_HASH)

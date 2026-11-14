@@ -78,7 +78,10 @@ class AnonApplication :
         val torService: TorService = get()
         val prefs: SharedPreferences = get(named(WALLET_PREFERENCES))
         val host = prefs.getString(NodeFields.RPC_HOST.value, "")
-        val lwsEnabled = prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false)
+        val lwsEnabled =
+            io.anonero.util.LwsConfig
+                .load(prefs)
+                .enabled
         if ((lwsEnabled || !host.isNullOrEmpty()) &&
             TransportConfig.load(prefs).mode.usesEmbeddedTor
         ) {

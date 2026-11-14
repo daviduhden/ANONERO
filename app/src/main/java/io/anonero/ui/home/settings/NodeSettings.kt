@@ -239,7 +239,9 @@ class NodeSettingsViewModel(
         withContext(Dispatchers.IO) {
             val manager = WalletManager.instance
             val wallet = manager?.wallet
-            if (prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) ||
+            if (io.anonero.util.LwsConfig
+                    .load(prefs)
+                    .enabled ||
                 wallet?.isLightWallet == true
             ) {
                 // Changing backends requires a restart; do not mutate the active LWS.
@@ -253,7 +255,10 @@ class NodeSettingsViewModel(
                     return@withContext
                 }
                 // Waiting for Tor can suspend while the user changes LWS settings.
-                if (prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) || wallet.isLightWallet) {
+                if (io.anonero.util.LwsConfig
+                        .load(prefs)
+                        .enabled || wallet.isLightWallet
+                ) {
                     uriValidationError.postValue(NodeValidationError.LWS_ACTIVE)
                     return@withContext
                 }
@@ -267,7 +272,10 @@ class NodeSettingsViewModel(
                 }
                 walletHandler.updateDaemon(node, lightWallet = false)
                 check(wallet.init(0, lightWallet = false)) { "Node initialization failed" }
-                if (prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) || wallet.isLightWallet) {
+                if (io.anonero.util.LwsConfig
+                        .load(prefs)
+                        .enabled || wallet.isLightWallet
+                ) {
                     wallet.setTrustedDaemon(false)
                     wallet.pauseRefresh()
                     uriValidationError.postValue(NodeValidationError.LWS_ACTIVE)
@@ -285,7 +293,10 @@ class NodeSettingsViewModel(
                     return@withContext
                 }
                 wallet?.pauseRefresh()
-                if (prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) || wallet?.isLightWallet == true) {
+                if (io.anonero.util.LwsConfig
+                        .load(prefs)
+                        .enabled || wallet?.isLightWallet == true
+                ) {
                     wallet?.setTrustedDaemon(false)
                 }
                 walletState.setConnectionStatus(io.anonero.model.Wallet.ConnectionStatus.ConnectionStatus_Disconnected)

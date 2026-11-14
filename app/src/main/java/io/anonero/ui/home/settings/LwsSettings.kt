@@ -70,14 +70,15 @@ fun LwsSettingsScreen(
     onBackPress: () -> Unit = {},
 ) {
     val prefs = koinInject<android.content.SharedPreferences>(named(WALLET_PREFERENCES))
-    val loaded = remember { LwsConfig.load(prefs) }
-    var enabled by remember { mutableStateOf(loaded.enabled) }
-    var host by remember { mutableStateOf(loaded.host) }
-    var portText by remember { mutableStateOf(loaded.port.toString()) }
-    var useTls by remember { mutableStateOf(loaded.useTls) }
-    var error by remember { mutableStateOf<LwsValidationError?>(null) }
-    var saved by remember { mutableStateOf(false) }
-    var pendingConfig by remember { mutableStateOf<LwsConfig?>(null) }
+    val profile = io.anonero.util.WalletSession.profile
+    val loaded = remember(profile) { LwsConfig.load(prefs, profile) }
+    var enabled by remember(profile) { mutableStateOf(loaded.enabled) }
+    var host by remember(profile) { mutableStateOf(loaded.host) }
+    var portText by remember(profile) { mutableStateOf(loaded.port.toString()) }
+    var useTls by remember(profile) { mutableStateOf(loaded.useTls) }
+    var error by remember(profile) { mutableStateOf<Int?>(null) }
+    var saved by remember(profile) { mutableStateOf(false) }
+    var pendingConfig by remember(profile) { mutableStateOf<LwsConfig?>(null) }
     val transport = TransportConfig.load(prefs)
     val transportCompatible =
         LwsConfig.validateTransport(
@@ -89,8 +90,16 @@ fun LwsSettingsScreen(
     BackHandler(enabled = pendingConfig != null) { pendingConfig = null }
 
     fun persist(config: LwsConfig) {
-        LwsConfig.save(prefs, config)
-        saved = true
+        saved = false
+        try {
+            check(io.anonero.util.WalletSession.profile == profile) { "Wallet session changed" }
+            LwsConfig.save(prefs, config, profile)
+            saved = true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            error = R.string.network_status_error
+        }
     }
 
     fun save() {
@@ -101,12 +110,12 @@ fun LwsSettingsScreen(
         if (enabled) {
             val validation = LwsConfig.validate(host, port, useTls)
             if (validation != null) {
-                error = validation
+                error = validation.messageRes()
                 return
             }
             val compatibility = LwsConfig.validateTransport(candidate, TransportConfig.load(prefs))
             if (compatibility != null) {
-                error = compatibility
+                error = compatibility.messageRes()
                 return
             }
         }
@@ -232,10 +241,10 @@ fun LwsSettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            error?.let { validationError ->
+            error?.let { errorResource ->
                 item {
                     Text(
-                        stringResource(validationError.messageRes()),
+                        stringResource(errorResource),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )

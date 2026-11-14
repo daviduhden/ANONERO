@@ -118,7 +118,10 @@ fun TorSplash(
 
     // no need to show tor splash if user disabled tor
     // if there is no wallet file, skip tor splash
-    val lwsEnabled = anonPrefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false)
+    val lwsEnabled =
+        io.anonero.util.LwsConfig
+            .load(anonPrefs)
+            .enabled
     if (!enableTor || !walletExist || !hasNetWork ||
         !TransportConfig.load(anonPrefs).mode.usesEmbeddedTor ||
         (!lwsEnabled && anonPrefs.getString(NodeFields.RPC_HOST.value, "").isNullOrEmpty())

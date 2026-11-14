@@ -53,3 +53,9 @@ const val PREFS_LWS_ENABLED = "lwsEnabled"
 const val PREFS_LWS_HOST = "lwsHost"
 const val PREFS_LWS_PORT = "lwsPort"
 const val PREFS_LWS_TLS = "lwsTls"
+
+// Decoy LWS consent/configuration never inherits MAIN's legacy lws* keys.
+const val PREFS_DECOY_LWS_ENABLED = "decoyLwsEnabled"
+const val PREFS_DECOY_LWS_HOST = "decoyLwsHost"
+const val PREFS_DECOY_LWS_PORT = "decoyLwsPort"
+const val PREFS_DECOY_LWS_TLS = "decoyLwsTls"

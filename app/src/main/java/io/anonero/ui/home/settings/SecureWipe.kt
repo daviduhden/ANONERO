@@ -160,11 +160,8 @@ class SecureWipeViewModel(
                         remove("pin_attempts")
                         remove("pin_last_attempt")
                         // Network identity is shared by both profiles. Clear it on every
-                        // wipe so the decoy cannot inherit the main node/LWS endpoint.
-                        remove(io.anonero.util.PREFS_LWS_ENABLED)
-                        remove(io.anonero.util.PREFS_LWS_HOST)
-                        remove(io.anonero.util.PREFS_LWS_PORT)
-                        remove(io.anonero.util.PREFS_LWS_TLS)
+                        // wipe so the decoy cannot inherit the main node endpoint.
+                        // Profile-specific LWS settings were removed with that profile.
                         remove(NodeFields.RPC_HOST.value)
                         remove(NodeFields.RPC_PORT.value)
                         remove(NodeFields.RPC_USERNAME.value)

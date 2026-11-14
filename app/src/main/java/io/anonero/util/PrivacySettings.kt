@@ -161,24 +161,42 @@ data class LwsConfig(
     companion object {
         const val DEFAULT_PORT = 8443
 
-        fun load(prefs: SharedPreferences): LwsConfig =
-            LwsConfig(
-                enabled = prefs.getBoolean(PREFS_LWS_ENABLED, false),
-                host = prefs.getString(PREFS_LWS_HOST, "").orEmpty().trim(),
-                port = prefs.getInt(PREFS_LWS_PORT, DEFAULT_PORT),
-                useTls = prefs.getBoolean(PREFS_LWS_TLS, false),
+        internal fun preferenceKeys(profile: WalletProfile): List<String> =
+            if (profile.isDecoy) {
+                listOf(PREFS_DECOY_LWS_ENABLED, PREFS_DECOY_LWS_HOST, PREFS_DECOY_LWS_PORT, PREFS_DECOY_LWS_TLS)
+            } else {
+                // Preserve installed MAIN configurations without copying their consent.
+                listOf(PREFS_LWS_ENABLED, PREFS_LWS_HOST, PREFS_LWS_PORT, PREFS_LWS_TLS)
+            }
+
+        fun load(
+            prefs: SharedPreferences,
+            profile: WalletProfile = WalletSession.profile,
+        ): LwsConfig {
+            val keys = preferenceKeys(profile)
+            return LwsConfig(
+                enabled = prefs.getBoolean(keys[0], false),
+                host = prefs.getString(keys[1], "").orEmpty().trim(),
+                port = prefs.getInt(keys[2], DEFAULT_PORT),
+                useTls = prefs.getBoolean(keys[3], false),
             )
+        }
 
         fun save(
             prefs: SharedPreferences,
             config: LwsConfig,
+            profile: WalletProfile = WalletSession.profile,
         ) {
-            prefs.edit(commit = true) {
-                putBoolean(PREFS_LWS_ENABLED, config.enabled)
-                putString(PREFS_LWS_HOST, config.host)
-                putInt(PREFS_LWS_PORT, config.port)
-                putBoolean(PREFS_LWS_TLS, config.useTls)
-            }
+            val keys = preferenceKeys(profile)
+            check(
+                prefs
+                    .edit()
+                    .putBoolean(keys[0], config.enabled)
+                    .putString(keys[1], config.host)
+                    .putInt(keys[2], config.port)
+                    .putBoolean(keys[3], config.useTls)
+                    .commit(),
+            ) { "Could not persist LWS configuration" }
         }
 
         /*

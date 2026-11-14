@@ -30,6 +30,15 @@ import org.junit.Test
 
 class LwsConfigTest {
     @Test
+    fun `legacy main LWS keys and decoy keys are disjoint`() {
+        val main = LwsConfig.preferenceKeys(WalletProfile.MAIN)
+        val decoy = LwsConfig.preferenceKeys(WalletProfile.DECOY)
+        assertEquals(listOf("lwsEnabled", "lwsHost", "lwsPort", "lwsTls"), main)
+        assertEquals(4, decoy.distinct().size)
+        assertTrue(main.intersect(decoy.toSet()).isEmpty())
+    }
+
+    @Test
     fun `valid onion and dns hosts pass`() {
         assertNull(LwsConfig.validate("lws.example.onion", 8443))
         assertNull(LwsConfig.validate("lws.example.com", 1, useTls = true))

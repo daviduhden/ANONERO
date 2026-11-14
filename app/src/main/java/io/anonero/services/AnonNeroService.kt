@@ -174,10 +174,12 @@ class AnonNeroService : Service() {
         val mNotificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val wallet = WalletManager.instance?.wallet
-        val lwsEnabled = prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false)
+        val lwsConfig =
+            io.anonero.util.LwsConfig
+                .load(prefs)
         val daemon =
-            if (lwsEnabled) {
-                prefs.getString(io.anonero.util.PREFS_LWS_HOST, "") ?: ""
+            if (lwsConfig.enabled) {
+                lwsConfig.host
             } else {
                 prefs.getString(NodeFields.RPC_HOST.value, "") ?: ""
             }
