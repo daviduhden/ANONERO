@@ -21,21 +21,20 @@ package io.anonero.ui.util
 import android.content.Context
 import android.util.Log
 import io.anonero.AnonConfig
-import io.anonero.BuildConfig
 import io.anonero.store.AnonLog
+import io.anonero.store.DiagnosticPolicy
 import io.anonero.store.LogRepository
 import io.anonero.util.StealthMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.io.File
 import java.util.Date
 
 class AnonLogTree(
-    private val logFile: File,
     private val logRepository: LogRepository,
 ) : Timber.DebugTree() {
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -44,16 +43,14 @@ class AnonLogTree(
         AnonConfig.context?.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
     }
 
-    // Every persisted line rewrites the whole log store, so release builds keep info and
-    // above; debug-level lines (per-block sync, QR payloads) stay in debug builds only.
-    // Stealth mode suppresses persistence entirely: a log file is an at-rest record of
-    // amounts (historically), node addresses and wallet lifecycle.
+    // Debug/info messages include activity patterns and untrusted payloads. Only
+    // warnings/errors enter the reviewed persistent diagnostic policy in all builds.
     override fun isLoggable(
         tag: String?,
         priority: Int,
     ): Boolean {
         val stealth = prefs?.let { StealthMode.isEnabled(it) } == true
-        return !stealth && (BuildConfig.DEBUG || priority >= Log.INFO)
+        return !stealth && priority >= Log.WARN
     }
 
     // This is the Timber tree itself; using Timber here would recurse into this method.
@@ -64,15 +61,18 @@ class AnonLogTree(
         message: String,
         t: Throwable?,
     ) {
-        // Timber has already appended t's stack trace to message
-        val item = AnonLog(date = Date().time, message = message, priority = priority, tag = tag ?: "Anon")
+        // Timber has already appended throwable text: sanitize before persistence.
+        val item = DiagnosticPolicy.sanitize(AnonLog(date = Date().time, message = message, priority = priority, tag = tag ?: "Anon"))
+        val generation = logRepository.generation
         ioScope.launch {
             try {
-                logRepository.addItem(item)
-            } catch (e: Exception) {
+                logRepository.addItem(item, generation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
                 // a failed write must not crash the app, and must not go through Timber:
                 // that re-enters this tree and loops
-                Log.w(TAG, "log write failed", e)
+                Log.w(TAG, "log write failed")
             }
         }
     }

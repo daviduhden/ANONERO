@@ -22,11 +22,13 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.SharedPreferences
+import androidx.datastore.dataStoreFile
 import io.anonero.di.appModule
 import io.anonero.model.WalletManager
 import io.anonero.model.node.NodeFields
 import io.anonero.network.TransportConfig
 import io.anonero.services.TorService
+import io.anonero.store.LOG_STORE
 import io.anonero.store.LogRepository
 import io.anonero.store.NodesRepository
 import io.anonero.ui.util.AnonLogTree
@@ -38,7 +40,6 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext.startKoin
 import org.koin.core.qualifier.named
 import timber.log.Timber
-import timber.log.Timber.DebugTree
 import java.io.File
 
 const val FOREGROUND_CHANNEL = "anon_foreground"
@@ -64,6 +65,16 @@ class AnonApplication :
     override fun onCreate() {
         super.onCreate()
         AnonConfig.context = this
+        // This runs before any DataStore consumer exists. Diagnostics are session data,
+        // never wallet recovery data; discard historical raw logs and exported copies.
+        val diagnosticCleanupFailed =
+            runCatching {
+                val store = dataStoreFile(LOG_STORE)
+                val storeRemoved = !store.exists() || store.delete()
+                val exports = File(cacheDir, "logs")
+                val exportsRemoved = !exports.exists() || exports.deleteRecursively()
+                !storeRemoved || !exportsRemoved
+            }.getOrDefault(true)
         // Must run before Koin or any resource-bearing UI is created. On API 33+ this
         // reconciles the saved preference with the platform per-app locale.
         LocaleController.applySaved(this)
@@ -74,6 +85,7 @@ class AnonApplication :
         }
         initConfigs()
         plantLog()
+        if (diagnosticCleanupFailed) Timber.tag(TAG).w("Could not clear historical diagnostics")
         Thread.setDefaultUncaughtExceptionHandler(this)
         val torService: TorService = get()
         val prefs: SharedPreferences = get(named(WALLET_PREFERENCES))
@@ -109,14 +121,8 @@ class AnonApplication :
     }
 
     private fun plantLog() {
-        anonLogTree = AnonLogTree(AnonConfig.getLogFile(applicationContext), get<LogRepository>())
-
-        if (BuildConfig.DEBUG) {
-            Timber.plant(DebugTree())
-            Timber.plant(anonLogTree)
-        } else {
-            Timber.plant(anonLogTree)
-        }
+        anonLogTree = AnonLogTree(get<LogRepository>())
+        Timber.plant(anonLogTree)
         Timber.tag(TAG).i("BUILD_TYPE: %s", BuildConfig.BUILD_TYPE)
         Timber.tag(TAG).i("FLAVOR: %s", BuildConfig.FLAVOR)
         Timber.tag(TAG).i("APPLICATION_ID: %s", BuildConfig.APPLICATION_ID)
@@ -161,7 +167,9 @@ class AnonApplication :
         t: Thread,
         e: Throwable,
     ) {
-        Timber.tag(TAG).e(e)
-        defaultHandler?.uncaughtException(t, e)
+        Timber.tag(TAG).e("Uncaught application failure")
+        // Android's handler writes the throwable independently of Timber. Keep its
+        // termination behavior without publishing original messages, causes or payloads.
+        defaultHandler?.uncaughtException(t, IllegalStateException("Application failure; details withheld"))
     }
 }

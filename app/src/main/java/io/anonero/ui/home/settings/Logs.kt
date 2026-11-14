@@ -71,6 +71,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -78,7 +79,7 @@ import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private const val TAG = "Logs"
@@ -103,47 +104,28 @@ class LogViewModel(
         }
     }
 
-    private fun logDeviceInfo(): String {
-        val deviceInfo =
-            """
-            Model          : ${Build.MODEL}
-            Manufacturer   : ${Build.MANUFACTURER}
-            Brand          : ${Build.BRAND}
-            Device         : ${Build.DEVICE}
-            OS Version     : ${Build.VERSION.RELEASE}
-            SDK Version    : ${Build.VERSION.SDK_INT}
-            Product        : ${Build.PRODUCT}
-            Hardware       : ${Build.HARDWARE}
-            Board          : ${Build.BOARD}
-            Host           : ${Build.HOST}
-            """.trimIndent()
-        return deviceInfo
-    }
+    private fun logDeviceInfo(): String = "Android API: ${Build.VERSION.SDK_INT}"
 
     fun prePareForShare(): Job =
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val logsAsString =
-                logLines
-                    .map { list ->
-                        list.joinToString(separator = "\n") {
-                            val instant =
-                                Instant.ofEpochMilli(it.date)
-                            val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
-                            val formatter = DateTimeFormatter.ofPattern("MMM dd hh:mm:ssa")
-                            val level =
-                                when (it.priority) {
-                                    Log.VERBOSE -> "VERBOSE"
-                                    Log.DEBUG -> "DEBUG"
-                                    Log.INFO -> "INFO"
-                                    Log.WARN -> "WARN"
-                                    Log.ERROR -> "ERROR"
-                                    Log.ASSERT -> "ASSERT"
-                                    else -> "UNKNOWN"
-                                }
-                            "${formatter.format(dateTime)} | $level | ${it.tag} | ${it.message}"
+                logRepository.logFlow.first().joinToString(separator = "\n") {
+                    val instant =
+                        Instant.ofEpochMilli(it.date)
+                    val dateTime = LocalDateTime.ofInstant(instant, ZoneOffset.UTC)
+                    val formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                    val level =
+                        when (it.priority) {
+                            Log.VERBOSE -> "VERBOSE"
+                            Log.DEBUG -> "DEBUG"
+                            Log.INFO -> "INFO"
+                            Log.WARN -> "WARN"
+                            Log.ERROR -> "ERROR"
+                            Log.ASSERT -> "ASSERT"
+                            else -> "UNKNOWN"
                         }
-                    }.stateIn(viewModelScope)
-                    .value
+                    "${formatter.format(dateTime)} | $level | ${it.tag} | ${it.message}"
+                }
             val logFile = AnonConfig.context?.let { AnonConfig.getLogFile(it) }
             if (logFile?.exists() == true) {
                 logFile.writeText("")

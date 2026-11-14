@@ -25,14 +25,18 @@ import androidx.datastore.core.Serializer
 import androidx.datastore.dataStore
 import io.anonero.AnonConfig
 import io.anonero.jsonDecoder
+import io.anonero.util.StealthMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.atomic.AtomicLong
 
 const val LOG_STORE = "logs"
 private const val TAG = "LogDataStore"
@@ -51,7 +55,12 @@ object LogSerializer : Serializer<List<AnonLog>> {
     override suspend fun readFrom(input: InputStream): List<AnonLog> =
         try {
             val json = input.readBytes().decodeToString()
-            jsonDecoder.decodeFromString(ListSerializer(AnonLog.serializer()), json)
+            jsonDecoder
+                .decodeFromString(ListSerializer(AnonLog.serializer()), json)
+                .filter { it.priority >= 5 }
+                .map(DiagnosticPolicy::sanitize)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             // Logs are diagnostic, capped, and cleared on unlock. A corrupt log store must
             // never break logging or block the app, so reset it instead of failing closed
@@ -85,9 +94,15 @@ private val Context.logsStore: DataStore<List<AnonLog>> by dataStore(
 class LogRepository(
     private val context: Context,
 ) {
+    private val epoch = AtomicLong()
+    val generation: Long get() = epoch.get()
+    private val prefs = context.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
+
+    // Recheck stealth inside the actual mutation, not just when a coroutine is queued.
     // Expose a Flow to observe the list of items
     val logFlow: Flow<List<AnonLog>> =
         context.logsStore.data
+            .map { items -> items.filter { it.priority >= 5 }.map(DiagnosticPolicy::sanitize) }
             .catch { exception ->
                 if (exception is IOException) {
                     emit(emptyList()) // Handle errors by emitting an empty list
@@ -97,33 +112,36 @@ class LogRepository(
             }
 
     suspend fun saveItems(items: List<AnonLog>) {
-        context.logsStore.updateData { items }
-    }
-
-    // Add a new item to the list,prune old items
-    suspend fun addItem(item: AnonLog) {
-        context.logsStore.updateData { currentItems ->
-            val prunedList =
-                if (currentItems.size > AnonConfig.MAX_LOG_SIZE) {
-                    currentItems.takeLast(AnonConfig.MAX_LOG_SIZE - 5)
-                } else {
-                    currentItems
-                }
-            prunedList + item
+        context.logsStore.updateData {
+            if (StealthMode.isEnabled(prefs)) emptyList() else items.filter { it.priority >= 5 }.map(DiagnosticPolicy::sanitize)
         }
     }
 
-    // Remove an item by NodeString
+    // A clear invalidates every write queued by the previous session.
+    suspend fun addItem(
+        item: AnonLog,
+        expectedGeneration: Long = generation,
+    ) {
+        context.logsStore.updateData { currentItems ->
+            if (expectedGeneration != generation || StealthMode.isEnabled(prefs) || item.priority < 5) {
+                currentItems
+            } else {
+                currentItems.takeLast(AnonConfig.MAX_LOG_SIZE - 1) + DiagnosticPolicy.sanitize(item)
+            }
+        }
+    }
+
+    // Remove only the requested diagnostic record.
     suspend fun remove(logId: AnonLog) {
         context.logsStore.updateData { currentItems ->
             currentItems.filter {
-                it.date == logId.date && it.tag == logId.tag && logId.priority == it.priority &&
-                    it.message == logId.message
+                it != logId
             }
         }
     }
 
     suspend fun clear() {
+        epoch.incrementAndGet()
         context.logsStore.updateData {
             listOf()
         }
