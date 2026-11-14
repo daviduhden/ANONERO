@@ -19,7 +19,6 @@
 package io.anonero.network
 
 import android.content.SharedPreferences
-import androidx.core.content.edit
 import io.anonero.model.node.NodeFields
 import io.anonero.util.WALLET_PROXY
 import io.anonero.util.WALLET_PROXY_PORT
@@ -249,32 +248,33 @@ data class TransportConfig(
             proxyPort != next.proxyPort ||
             customNodeNetwork != next.customNodeNetwork
 
-    fun save(prefs: SharedPreferences) {
-        prefs.edit(commit = true) {
-            putString(PREFS_TRANSPORT_MODE, mode.name)
-            putString(PREFS_TRANSPORT_HOST, proxyHost)
-            putInt(PREFS_TRANSPORT_PORT, proxyPort)
-            putString(PREFS_TRANSPORT_NETWORK, customNodeNetwork.name)
-            putBoolean(PREFS_NODE_AUTO_SELECT, autoSelectNode)
-            putBoolean(PREFS_NODE_PREFER_TRUSTED, preferTrustedNode)
+    fun save(prefs: SharedPreferences): Boolean =
+        prefs
+            .edit()
+            .apply {
+                putString(PREFS_TRANSPORT_MODE, mode.name)
+                putString(PREFS_TRANSPORT_HOST, proxyHost)
+                putInt(PREFS_TRANSPORT_PORT, proxyPort)
+                putString(PREFS_TRANSPORT_NETWORK, customNodeNetwork.name)
+                putBoolean(PREFS_NODE_AUTO_SELECT, autoSelectNode)
+                putBoolean(PREFS_NODE_PREFER_TRUSTED, preferTrustedNode)
 
-            // Keep the legacy keys coherent for older readers and downgrade safety.
-            putBoolean(WALLET_USE_TOR, mode.usesEmbeddedTor)
-            when {
-                mode.usesEmbeddedTor || mode == TransportMode.SYSTEM_VPN -> {
-                    remove(WALLET_PROXY)
-                    remove(WALLET_PROXY_PORT)
-                }
+                // Keep the legacy keys coherent for older readers and downgrade safety.
+                putBoolean(WALLET_USE_TOR, mode.usesEmbeddedTor)
+                when {
+                    mode.usesEmbeddedTor || mode == TransportMode.SYSTEM_VPN -> {
+                        remove(WALLET_PROXY)
+                        remove(WALLET_PROXY_PORT)
+                    }
 
-                else -> {
-                    proxyEndpoint?.let {
-                        putString(WALLET_PROXY, it.host)
-                        putInt(WALLET_PROXY_PORT, it.port)
+                    else -> {
+                        proxyEndpoint?.let {
+                            putString(WALLET_PROXY, it.host)
+                            putInt(WALLET_PROXY_PORT, it.port)
+                        }
                     }
                 }
-            }
-        }
-    }
+            }.commit()
 
     companion object {
         fun load(prefs: SharedPreferences): TransportConfig {
@@ -345,3 +345,16 @@ data class TransportState(
     val failure: TransportFailure? = null,
     val vpnActive: Boolean = false,
 )
+
+/** VPN recovery only updates availability; resuming traffic requires authorization. */
+internal fun TransportState.observeVpn(active: Boolean): TransportState =
+    if (mode == TransportMode.SYSTEM_VPN && !active) {
+        copy(
+            status = TransportStatus.UNAVAILABLE,
+            endpoint = null,
+            failure = TransportFailure.VPN_INACTIVE,
+            vpnActive = false,
+        )
+    } else {
+        copy(vpnActive = active)
+    }

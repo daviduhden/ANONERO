@@ -162,4 +162,25 @@ class TransportPolicyTest {
         assertFalse(ProxyEndpoint.isLoopback("::ffff:192.0.2.1"))
         assertEquals("127.0.0.1", ProxyEndpoint.normalizeHost("LOCALHOST"))
     }
+
+    @Test
+    fun `VPN loss clears direct authorization and recovery does not resume it`() {
+        val ready =
+            TransportState(
+                mode = TransportMode.SYSTEM_VPN,
+                status = TransportStatus.READY,
+                endpoint = TransportEndpoint.Direct,
+                vpnActive = true,
+            )
+        val lost = ready.observeVpn(false)
+        assertEquals(TransportStatus.UNAVAILABLE, lost.status)
+        assertNull(lost.endpoint)
+        assertEquals(TransportFailure.VPN_INACTIVE, lost.failure)
+        val recovered = lost.observeVpn(true)
+        assertTrue(recovered.vpnActive)
+        assertNull(recovered.endpoint)
+        assertEquals(TransportStatus.UNAVAILABLE, recovered.status)
+        val tor = ready.copy(mode = TransportMode.EMBEDDED_TOR, endpoint = null)
+        assertEquals(tor.copy(vpnActive = false), tor.observeVpn(false))
+    }
 }

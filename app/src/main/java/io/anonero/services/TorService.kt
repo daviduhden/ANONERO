@@ -67,7 +67,7 @@ class TorService(
         CoroutineScope(
             SupervisorJob() +
                 CoroutineExceptionHandler { _, e ->
-                    Timber.tag(TAG).w(e, "Tor action failed")
+                    Timber.tag(TAG).w("Tor action failed (%s)", e.javaClass.simpleName)
                 },
         )
 
@@ -92,14 +92,14 @@ class TorService(
 
             TorEvent.entries().forEach { event ->
                 if (event == TorEvent.ERR) {
-                    observerStatic(event, OnEvent.Executor.Immediate) { data ->
-                        _torLogs.tryEmit(data)
+                    observerStatic(event, OnEvent.Executor.Immediate) { _ ->
+                        _torLogs.tryEmit("Tor error event")
                     }
                 }
             }
             RuntimeEvent.entries().forEach { event ->
-                observerStatic(event, OnEvent.Executor.Immediate) { data ->
-                    _torLogs.tryEmit(data.toString())
+                observerStatic(event, OnEvent.Executor.Immediate) { _ ->
+                    _torLogs.tryEmit("Tor runtime event")
                 }
             }
             observerStatic(RuntimeEvent.STATE) { state ->
@@ -115,9 +115,7 @@ class TorService(
             }
             observerStatic(RuntimeEvent.LISTENERS) {
                 val socketAddr = it.socks.firstOrNull()
-                if (socketAddr != null && wanted) {
-                    _socksState.value = socketAddr
-                }
+                _socksState.value = socketAddr.takeIf { wanted }
             }
             config { _ ->
                 TorOption.SocksPort.configure { auto() }
@@ -156,7 +154,7 @@ class TorService(
         _socksState.value = null
         scope.launch {
             runCatching { runtime.stopDaemonAsync() }
-                .onFailure { Timber.tag(TAG).i("Tor dispose exception: ${it.message}") }
+                .onFailure { Timber.tag(TAG).i("Tor dispose failed (%s)", it.javaClass.simpleName) }
         }
         // Keep the scope reusable: Koin owns this process singleton and Android may keep
         // the process alive after the foreground service task is removed. Cancelling the

@@ -25,12 +25,14 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
 import io.anonero.services.TorService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -57,12 +59,19 @@ private class EmbeddedTorProvider(
     private val torService: TorService,
 ) : TransportProvider {
     override val mode: TransportMode = TransportMode.EMBEDDED_TOR
+    private var released = false
 
     override suspend fun acquire(): TransportEndpoint {
-        torService.start()
+        synchronized(this) {
+            if (released) throw TransportUnavailableException(TransportFailure.TRANSPORT_CHANGED)
+            torService.start()
+        }
         val deadline = 60_000L
         var waited = 0L
         while (torService.socks == null) {
+            synchronized(this) {
+                if (released) throw TransportUnavailableException(TransportFailure.TRANSPORT_CHANGED)
+            }
             if (waited >= deadline) {
                 throw TransportUnavailableException(TransportFailure.EMBEDDED_TOR_TIMEOUT)
             }
@@ -77,7 +86,10 @@ private class EmbeddedTorProvider(
         )
     }
 
-    override fun release() = Unit
+    @Synchronized
+    override fun release() {
+        released = true
+    }
 }
 
 private class ExternalSocksProvider(
@@ -139,6 +151,7 @@ class TransportController(
     val state: StateFlow<TransportState> = _state.asStateFlow()
 
     private var provider: TransportProvider? = null
+    private var generation = 0L
     private val networkCallback =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) = refreshVpnState()
@@ -156,6 +169,7 @@ class TransportController(
         refreshVpnState()
     }
 
+    @Synchronized
     fun saveConfig(newConfig: TransportConfig): Result<Unit> {
         val error = newConfig.validationError()
         if (error != null) return Result.failure(IllegalArgumentException(error.name))
@@ -167,102 +181,164 @@ class TransportController(
                 torService.stop()
             }
         }
-        newConfig.save(prefs)
+        val persisted = runCatching { newConfig.save(prefs) }.getOrDefault(false)
+        if (!persisted) {
+            // commit can update memory even when its disk write fails. Restore only
+            // network configuration; never snapshot the preference map containing secrets.
+            val restored = runCatching { previous.save(prefs) }.getOrDefault(false)
+            release()
+            _state.value =
+                TransportState(
+                    mode = previous.mode,
+                    status = TransportStatus.ERROR,
+                    failure = TransportFailure.INVALID_CONFIGURATION,
+                    vpnActive = hasVpnTransport(),
+                )
+            val message =
+                if (restored) {
+                    "Transport configuration could not be persisted"
+                } else {
+                    "Transport configuration persistence and restoration failed"
+                }
+            return Result.failure(IOException(message))
+        }
         _config.value = newConfig
-        _state.value =
-            TransportState(
-                mode = newConfig.mode,
-                status = TransportStatus.STOPPED,
-                vpnActive = hasVpnTransport(),
-            )
+        if (transportChanged) {
+            _state.value =
+                TransportState(
+                    mode = newConfig.mode,
+                    status = TransportStatus.STOPPED,
+                    vpnActive = hasVpnTransport(),
+                )
+        }
         return Result.success(Unit)
     }
 
     suspend fun authorize(): TransportEndpoint {
-        val current = _config.value
+        val (current, authorizationGeneration) = synchronized(this) { _config.value to generation }
+
+        fun publish(state: TransportState) {
+            synchronized(this) {
+                if (generation != authorizationGeneration || _config.value != current) {
+                    throw TransportUnavailableException(TransportFailure.TRANSPORT_CHANGED)
+                }
+                if (state.endpoint == TransportEndpoint.Direct && !hasVpnTransport()) {
+                    generation++
+                    _state.value =
+                        state.copy(
+                            status = TransportStatus.UNAVAILABLE,
+                            endpoint = null,
+                            failure = TransportFailure.VPN_INACTIVE,
+                            vpnActive = false,
+                        )
+                    throw TransportUnavailableException(TransportFailure.VPN_INACTIVE)
+                }
+                _state.value = state
+            }
+        }
         val error = current.validationError()
         if (error != null) {
-            _state.value =
+            publish(
                 TransportState(
                     mode = current.mode,
                     status = TransportStatus.ERROR,
                     failure = TransportFailure.INVALID_CONFIGURATION,
                     vpnActive = hasVpnTransport(),
-                )
+                ),
+            )
             throw TransportUnavailableException(TransportFailure.INVALID_CONFIGURATION)
         }
 
         if (current.mode == TransportMode.I2P_JAVA && !isI2pJavaInstalled()) {
-            _state.value =
+            publish(
                 TransportState(
                     mode = current.mode,
                     status = TransportStatus.UNAVAILABLE,
                     failure = TransportFailure.I2P_APP_MISSING,
                     vpnActive = hasVpnTransport(),
-                )
+                ),
+            )
             throw TransportUnavailableException(TransportFailure.I2P_APP_MISSING)
         }
         if (current.mode == TransportMode.SYSTEM_VPN) {
             if (!hasVpnTransport()) {
-                _state.value =
+                publish(
                     TransportState(
                         mode = current.mode,
                         status = TransportStatus.UNAVAILABLE,
                         failure = TransportFailure.VPN_INACTIVE,
                         vpnActive = false,
-                    )
+                    ),
+                )
                 throw TransportUnavailableException(TransportFailure.VPN_INACTIVE)
             }
-            _state.value =
+            publish(
                 TransportState(
                     mode = current.mode,
                     status = TransportStatus.READY,
                     endpoint = TransportEndpoint.Direct,
                     vpnActive = true,
-                )
+                ),
+            )
             return TransportEndpoint.Direct
         }
 
-        if (current.mode != TransportMode.EMBEDDED_TOR) {
-            torService.stop()
-        }
         val active =
-            provider
-                ?.takeIf { it.mode == current.mode }
-                ?: factory(current).also { provider = it }
+            synchronized(this) {
+                if (generation != authorizationGeneration || _config.value != current) {
+                    throw TransportUnavailableException(TransportFailure.TRANSPORT_CHANGED)
+                }
+                if (current.mode != TransportMode.EMBEDDED_TOR) {
+                    torService.stop()
+                }
+                provider
+                    ?.takeIf { it.mode == current.mode }
+                    ?: factory(current).also { provider = it }
+            }
         return try {
             val endpoint = active.acquire()
-            _state.value =
+            publish(
                 TransportState(
                     mode = current.mode,
                     status = TransportStatus.READY,
                     endpoint = endpoint,
                     vpnActive = hasVpnTransport(),
-                )
+                ),
+            )
             endpoint
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: TransportUnavailableException) {
-            _state.value =
+            if (synchronized(this) { generation != authorizationGeneration || _config.value != current }) throw e
+            publish(
                 TransportState(
                     mode = current.mode,
                     status = TransportStatus.UNAVAILABLE,
                     failure = e.failure,
                     vpnActive = hasVpnTransport(),
-                )
+                ),
+            )
             throw e
         } catch (e: Exception) {
-            _state.value =
+            if (synchronized(this) { generation != authorizationGeneration || _config.value != current }) {
+                throw TransportUnavailableException(TransportFailure.TRANSPORT_CHANGED)
+            }
+            publish(
                 TransportState(
                     mode = current.mode,
                     status = TransportStatus.ERROR,
                     failure = TransportFailure.INTERNAL_ERROR,
                     vpnActive = hasVpnTransport(),
-                )
+                ),
+            )
             throw TransportUnavailableException(TransportFailure.INTERNAL_ERROR)
         }
     }
 
     /** Drops the active endpoint. Callers must re-authorize before the next wallet call. */
+    @Synchronized
     fun release() {
+        generation++
         provider?.release()
         provider = null
         _state.value =
@@ -327,19 +403,13 @@ class TransportController(
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
     }
 
+    @Synchronized
     private fun refreshVpnState() {
         val vpn = hasVpnTransport()
         val current = _state.value
-        if (current.mode == TransportMode.SYSTEM_VPN && !vpn) {
-            _state.value =
-                current.copy(
-                    status = TransportStatus.UNAVAILABLE,
-                    endpoint = null,
-                    failure = TransportFailure.VPN_INACTIVE,
-                    vpnActive = false,
-                )
-        } else {
-            _state.value = current.copy(vpnActive = vpn)
+        if (current.mode == TransportMode.SYSTEM_VPN && !vpn && (current.vpnActive || current.endpoint != null)) {
+            generation++
         }
+        _state.value = current.observeVpn(vpn)
     }
 }
