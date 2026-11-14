@@ -103,12 +103,13 @@ The hosted `ubuntu-24.04` runner does not expose `/dev/kvm`; the x86_64 emulator
 `-accel off` and can take 10-16 minutes to boot. Run `43108046671` lost `system_server`
 during install, `43122308945` caught a SIGABRT while Gradle dexed the test APKs, and
 `43521054641` lost the `input`/`overlay` services immediately after a 630 s boot, before
-the test script. The instrumented job builds the app and test APKs before the emulator
-starts, limits connected Gradle to two workers, and `.github/scripts/run-instrumented.sh`
-gates on the `package`/`activity` services, writes crash/system/main diagnostics, and
-retries only attach/zero-test failures. The XML and exit-code checks are mandatory. A
-self-hosted KVM runner or a device farm is required for deterministic instrumented
-execution; do not relax the test gate to make the job green.
+the test script. Run `43528256395` then passed both flavors after a 919 s boot. The
+instrumented job builds the app and test APKs before the emulator starts, limits connected
+Gradle to two workers, and `.github/scripts/run-instrumented.sh` gates on the
+`package`/`activity` services, writes crash/system/main diagnostics, and retries only
+attach/zero-test failures. The XML and exit-code checks are mandatory. A self-hosted KVM
+runner or a device farm is required for deterministic instrumented execution; do not
+relax the test gate to make the job green.
 
 Manual test run, from the GitHub Actions UI or CLI:
 

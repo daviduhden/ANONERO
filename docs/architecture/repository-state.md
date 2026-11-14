@@ -33,7 +33,7 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 | Submodule not populated locally | `external-libs/monero` empty |
 | Wallet-API patch series present | `external-libs/patches/0001..0005`, `apply.sh`, `README.md` |
 | Patch series applies to the pin | `git apply --index --3way` on a clean `85f036ba` checkout |
-| Native archives and adapter link | build in CI; API 35 smoke test passed once, unstable without KVM |
+| Native archives and adapter link | build in CI; API 35 smoke test passed on two runs, unstable without KVM |
 | Embedded Tor with mandatory proxy | `TorService.kt`, `AnonWalletHandler.applyProxy`, `WALLET_USE_TOR` default true |
 | Optional LWS over Tor | `PrivacySettings.kt` `LwsConfig`, `AnonWalletHandler.startService` |
 | Keystore-bound wallet secret | `KeyStoreHelper.kt`, `WalletKey.kt` |
@@ -66,8 +66,8 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 
 - Native reproducibility: the wallet-API patch series is checked in and applies to the
   pinned commit. The local submodule is uninitialized; CI builds the native archives, the
-  adapter, and the debug APKs. The API 35 smoke test passed on `42874760135` but is not
-  stable on the KVM-less hosted runner.
+  adapter, and the debug APKs. The API 35 smoke test passed on `42874760135` and
+  `43528256395` but is not stable on the KVM-less hosted runner.
 - Documentation: `docs/` was empty; this audit adds the documentation index, architecture
   and JNI docs, security model, features, development, build/release, state, dependency
   record, progress/roadmap/todo files, and the instruction system.
@@ -138,8 +138,8 @@ was committed in `52d67d4`. The CI compile-failure fixes were committed afterwar
 
 1. **Validate the restored Monero patch series.** The seven patches and their nested
    submodule pins are checked in; CI builds the native archives, the adapter, and the
-   debug APKs. The API 35 smoke test passed on `42874760135` but remains unstable on the
-   KVM-less runner. The series is adapted from `monero_c` under LGPL-3.0 (see
+   debug APKs. The API 35 smoke test passed on `42874760135` and `43528256395` but remains
+   unstable on the KVM-less runner. The series is adapted from `monero_c` under LGPL-3.0 (see
    `external-libs/patches/README.md`).
 2. **Initialize the Monero submodule for local native work.**
    `git submodule update --init --recursive` is required before patch application or a
