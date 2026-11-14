@@ -188,7 +188,9 @@ open class Node {
     }
 
     constructor() {
-        networkType = WalletManager.instance?.networkType
+        // Keep the model testable without loading the native wallet library. The build
+        // network is the same value WalletManager initializes from.
+        networkType = AnonConfig.getNetworkType()
     }
 
     // constructor used for created nodes from retrieved peer lists
