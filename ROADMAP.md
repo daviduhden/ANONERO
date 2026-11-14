@@ -59,8 +59,8 @@ then maintainability.
   diagnosis requires a root cause, a global pattern search, and a regression check.
 - Keep Android Lint green and the project-owned C++ `-Werror` gate green (validated in
   `43521054641`), then add sanitizer/fuzz coverage only with a working native matrix.
-- Move instrumented tests to a KVM-capable runner or a device farm; the hosted Linux
-  runner cannot run the x86_64 emulator deterministically under TCG.
+- Move instrumented tests to a KVM-capable runner or a device farm. The hosted Linux
+  runner passed in `43528256395` but remains non-deterministic under TCG.
 - Add a pinned format/lint gate for Kotlin, C++, Python, shell, and workflows.
 
 ## 6. Documentation and maintainability

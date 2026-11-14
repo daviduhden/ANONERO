@@ -29,9 +29,9 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
-- [ ] Move instrumented tests to a self-hosted KVM runner or a device farm. The hosted
-      emulator failed before the test script on `43521054641`; do not keep tuning
-      RAM/timeouts or add blind retries.
+- [ ] Decide the instrumented runner: `43528256395` passed on hosted, but `43521054641`
+      failed before the script. Use a self-hosted KVM runner or a device farm for
+      deterministic gates; do not add blind retries.
 - [ ] Device-test the corrupt `nodes_store` path: add/remove must fail visibly, must not
       overwrite the file, and backup export must fail instead of omitting nodes.
 - [ ] Add a format/lint CI gate with pinned ktlint, clang-format, Ruff, shfmt, shellcheck,

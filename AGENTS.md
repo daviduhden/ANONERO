@@ -386,8 +386,8 @@ Rules for documentation:
 
 - The Monero wallet-API patch series is checked in and applies cleanly to the pinned
   commit. CI builds the native archives and both debug APKs. The API 35 smoke test passed
-  on `42874760135` but is not stable on the KVM-less hosted runner; broader runtime and
-  device behavior remains unverified.
+  on `42874760135` and `43528256395` but is not stable on the KVM-less hosted runner;
+  broader runtime and device behavior remains unverified.
 - The Monero submodule is uninitialized locally; CI checks it out.
 - The native toolchain (CMake 4.4.5, NDK r30, Boost 1.92.0, zlib 1.4) and the Android
   toolchain (AGP 9.5.1, Gradle 9.9.0, CMake 4.1.2, NDK 30) build in CI; the project-owned

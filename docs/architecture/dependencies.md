@@ -208,10 +208,9 @@ These updates are **not** validated until GitHub Actions succeeds:
 - A future dependency lockfile/verification task should be added in CI if reproducible
   resolution is required.
 
-Run `43521054641` (`feb985e`) validated unit tests, lint 0/0, JNI parity, native archives,
-and assemble/link after the serialization and Bouncy Castle updates. Its instrumented job
-lost the guest adb services after boot (CI-032), so runtime APK behavior and release
-signing remain unverified.
+Run `43528256395` (`0cf9db0`) validated unit tests (62 per flavor), lint 0/0, JNI parity,
+native archives, assemble/link, and one instrumented smoke test per flavor after the
+serialization and Bouncy Castle updates. Release signing remains unverified.
 
-Static analysis cannot prove runtime APK behavior. Treat instrumented execution and
-release signing as pending CI verification.
+Static analysis cannot prove runtime APK behavior. Treat release signing and broader
+device behavior as pending CI verification.

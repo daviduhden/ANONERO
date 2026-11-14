@@ -178,6 +178,11 @@ records progress; it is not a release note and does not claim CI validation.
   630 s boot when the emulator runner's post-boot `input`/`overlay` adb calls hit broken
   pipes, before `run-instrumented.sh` started. The prebuild step itself passed; the
   remaining blocker is the KVM-less hosted emulator.
+- Run `43528256395` (`0cf9db0`) is fully green. The emulator booted in 919 s and both anon
+  and nero ran their instrumented smoke test with 0 failures. The run also confirms 62 JVM
+  tests per flavor, lint 0/0, no adapter warning under `-Werror`, the dependency updates,
+  the exact JNI gate, and the test-APK prebuild. Hosted-emulator stability is still not
+  guaranteed; KVM or a device farm remains the reliable option.
 - Run `43122308945` surfaced two `NewerVersionAvailable` lint advisories per flavor.
   kotlinx.serialization is updated to 1.13.0 (Kotlin 2.4.x, reverts the 1.12 exception
   wrapping) and Bouncy Castle to 1.87 (security release, twelve CVEs). ANONERO uses only
@@ -200,8 +205,8 @@ records progress; it is not a release note and does not claim CI validation.
 - **Native build:** the archives build and the adapter links in CI. `43521054641` compiles
   the adapter under `-Werror` with no warning line.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
-  CI. The API 35 smoke tests passed once (`42874760135`) but are not stable on hosted
-  runners without KVM; `43521054641` failed before the test script.
+  CI. The API 35 smoke tests passed on `42874760135` and `43528256395` but remain
+  non-deterministic on hosted runners without KVM; `43521054641` failed before the script.
 - **Runtime behavior:** lock/unlock, background sync, decoy switching, Tor transitions,
   LWS reconnect, notifications, and wipe still need dedicated device tests.
 - **Cryptography:** no independent side-channel or Keystore audit has been performed.
