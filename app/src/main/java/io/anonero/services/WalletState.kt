@@ -133,6 +133,7 @@ class WalletState {
     val connectionStatus: Flow<Wallet.ConnectionStatus?> = _connectionStatus
     val incomingTx = _incomingTx.asSharedFlow()
 
+    @Synchronized
     fun update() {
         if (_blockUpdates.get()) return
         getWallet?.let { wallet ->
@@ -238,25 +239,36 @@ class WalletState {
         }
     }
 
-    // Called after a PIN has selected a wallet profile, before the service starts.
-    fun setProfile(profile: WalletProfile) {
-        if (_profile.value != profile) {
-            _profile.value = profile
-            _transactions.value = emptyList()
-            _subAddresses.value = emptyList()
-            _coins.value = emptyList()
-            _accounts.value = emptyList()
-            _nextAddress.value = null
-            _balanceInfo.value = null
-            _unLockedBalance.value = null
-            _walletStatus.value = null
-            _syncProgress.value = null
-            _connectedDaemon.value = null
-            _connectionStatus.value = null
-            _previousConnectionStatus.set(null)
-            _backgroundSync.value = false
-            backgroundSyncActive = false
+    // Every open starts a fresh UI session, even when reopening the same profile.
+    @Synchronized
+    fun resetSession(profile: WalletProfile) {
+        _profile.value = profile
+        _transactions.value = emptyList()
+        _subAddresses.value = emptyList()
+        _coins.value = emptyList()
+        _accounts.value = emptyList()
+        _activeAccount.value = 0
+        _nextAddress.value = null
+        _balanceInfo.value = null
+        _unLockedBalance.value = null
+        _walletStatus.value = null
+        _syncProgress.value = null
+        _connectedDaemon.value = null
+        _connectionStatus.value = null
+        _previousConnectionStatus.set(null)
+        _backgroundSync.value = false
+        backgroundSyncActive = false
+        _isLoading.value = false
+        _isSyncing.set(false)
+        _offline.value = false
+        while (_unlockShortcut.tryReceive().isSuccess) {
+            // Discard actions queued for the previous wallet session.
         }
+    }
+
+    @Synchronized
+    fun setProfile(profile: WalletProfile) {
+        if (_profile.value != profile) resetSession(profile)
     }
 
     /*

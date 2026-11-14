@@ -25,6 +25,10 @@ class MoneroHandlerThread(
     private val transportReady: () -> Boolean = { true },
 ) : Thread(null, null, "MoneroHandler", THREAD_STACK_SIZE),
     WalletListener {
+    // A listener belongs to one native wallet, never to whichever wallet replaced it.
+    private val isCurrentSession: Boolean
+        get() = WalletManager.instance?.wallet === wallet
+
     @Synchronized
     override fun start() {
         super.start()
@@ -44,7 +48,8 @@ class MoneroHandlerThread(
         amount: Long,
     ) {
         // Do not log the amount; logs are persisted and may be shared by the user.
-        WalletManager.instance?.wallet?.store()
+        if (!isCurrentSession) return
+        wallet.store()
     }
 
     override fun unconfirmedMoneyReceived(
@@ -53,7 +58,7 @@ class MoneroHandlerThread(
     ) {}
 
     override fun newBlock(height: Long) {
-        Timber.tag(name).d("newBlock: %s", height)
+        if (!isCurrentSession) return
         updateSyncProgress(height)
     }
 
@@ -74,19 +79,16 @@ class MoneroHandlerThread(
     }
 
     override fun updated() {
+        if (!isCurrentSession) return
         refresh(false)
-        Timber.tag(name).i("updated()")
         walletState.update()
     }
 
     override fun refreshed() {
+        if (!isCurrentSession) return
         val status = wallet.fullStatus.connectionStatus
         val daemonHeight = wallet.getDaemonBlockChainHeight()
         val chainHeight = wallet.getBlockChainHeight()
-        // / height
-        // runs every ~10s: routine passes are debug-only, reconnects stay in release logs
-        val summary = "refreshed() status:$status daemonHeight:$daemonHeight chainHeight:$chainHeight"
-        Timber.tag(name).d(summary)
         if (wallet.isLightWallet) {
             // LWS scan height legitimately trails the chain; the normal height-difference
             // reconnect would re-login on every refresh.
@@ -107,12 +109,10 @@ class MoneroHandlerThread(
             // no node to reconnect to
             walletState.setLoading(false)
         } else if (status === Wallet.ConnectionStatus.ConnectionStatus_Disconnected || status == null) {
-            Timber.tag(name).i("restarting connection: $summary")
             tryRestartConnection()
         } else {
             val heightDiff = daemonHeight - chainHeight
             if (heightDiff >= 2) {
-                Timber.tag(name).i("restarting connection: $summary")
                 tryRestartConnection()
             } else {
                 if (!wallet.isSynchronized) {
@@ -130,6 +130,7 @@ class MoneroHandlerThread(
     }
 
     private fun tryRestartConnection() {
+        if (!isCurrentSession) return
         val lightWallet = wallet.isLightWallet
         // System VPN is the only direct/clearnet mode, and embedded Tor must have a live
         // SOCKS endpoint. If the transport is unavailable, do not re-init or re-login:
@@ -171,6 +172,7 @@ class MoneroHandlerThread(
     }
 
     private fun refresh(walletSynced: Boolean) {
+        if (!isCurrentSession) return
         wallet.refreshHistory()
         if (walletSynced) {
             wallet.refreshCoins()

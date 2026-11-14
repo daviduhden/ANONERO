@@ -139,6 +139,7 @@ class AnonWalletHandler(
         }
     }
 
+    @Synchronized
     fun openWallet(pin: String): Boolean {
         val context = AnonConfig.context!!
         val profile = WalletProfileStore.resolvePin(context, prefs, pin) ?: throw InvalidPin()
@@ -163,6 +164,9 @@ class AnonWalletHandler(
             }
             WalletSession.reset()
         }
+
+        handler = null
+        walletState.resetSession(profile)
 
         val anonWallet =
             if (WalletKey.exists(context, walletName)) {
