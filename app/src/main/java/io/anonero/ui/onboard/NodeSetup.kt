@@ -69,7 +69,8 @@ import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.node.Node
 import io.anonero.model.node.NodeFields
-import io.anonero.services.TorService
+import io.anonero.network.NodeSelectionPolicy
+import io.anonero.network.TransportController
 import io.anonero.store.NodesRepository
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -91,7 +92,7 @@ fun SetupNodeComposable(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val nodesRepository = koinInject<NodesRepository>()
-    val torService = koinInject<TorService>()
+    val transportController = koinInject<TransportController>()
 
     LaunchedEffect(true) {
         val prefs = localContext.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
@@ -284,10 +285,12 @@ fun SetupNodeComposable(
                                     error = resources.getString(R.string.invalid_url)
                                     return@launch
                                 }
+                                val useTls = cleanURL.startsWith("https://")
                                 val nodeJson =
                                     JSONObject()
                                         .apply {
                                             put(NodeFields.RPC_HOST.value, host)
+                                            put(NodeFields.NODE_TLS.value, useTls)
                                             put(
                                                 NodeFields.RPC_PORT.value,
                                                 if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
@@ -300,8 +303,16 @@ fun SetupNodeComposable(
                                             )
                                             put(NodeFields.NODE_NAME.value, "anon")
                                         }
+                                val node = Node.fromJson(nodeJson)
+                                if (node == null ||
+                                    !NodeSelectionPolicy.accepts(transportController.config.value, node)
+                                ) {
+                                    error = resources.getString(R.string.node_network_mismatch)
+                                    return@launch
+                                }
 
                                 editor.putString(NodeFields.RPC_HOST.value, host)
+                                editor.putBoolean(NodeFields.NODE_TLS.value, useTls)
                                 editor.putInt(
                                     NodeFields.RPC_PORT.value,
                                     if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
@@ -309,10 +320,7 @@ fun SetupNodeComposable(
                                 editor.putString(NodeFields.RPC_USERNAME.value, rpcUsername)
                                 editor.putString(NodeFields.RPC_PASSWORD.value, rpcPassPhrase)
                                 editor.apply()
-                                Node.fromJson(nodeJson)?.let {
-                                    nodesRepository.addItem(it)
-                                }
-                                torService.start()
+                                nodesRepository.addItem(node)
                             }
                             oNextPressed()
                         } catch (_: Exception) {

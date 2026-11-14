@@ -22,6 +22,7 @@ import timber.log.Timber
 class MoneroHandlerThread(
     private val wallet: Wallet,
     private val walletState: WalletState,
+    private val transportReady: () -> Boolean = { true },
 ) : Thread(null, null, "MoneroHandler", THREAD_STACK_SIZE),
     WalletListener {
     @Synchronized
@@ -130,6 +131,19 @@ class MoneroHandlerThread(
 
     private fun tryRestartConnection() {
         val lightWallet = wallet.isLightWallet
+        // System VPN is the only direct/clearnet mode, and embedded Tor must have a live
+        // SOCKS endpoint. If the transport is unavailable, do not re-init or re-login:
+        // the wallet must stay offline instead of reconnecting directly or through a
+        // stale endpoint.
+        if (!transportReady()) {
+            wallet.pauseRefresh()
+            wallet.setOffline(true)
+            if (lightWallet) wallet.setTrustedDaemon(false)
+            walletState.setOffline(true)
+            walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+            walletState.setLoading(false)
+            return
+        }
         try {
             if (lightWallet) wallet.setTrustedDaemon(false)
             check(wallet.init(0, lightWallet = lightWallet)) { "Wallet initialization failed" }

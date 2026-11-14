@@ -108,6 +108,8 @@ import io.anonero.R
 import io.anonero.icons.AnonIcons
 import io.anonero.model.TransactionInfo
 import io.anonero.model.WalletManager
+import io.anonero.network.TransportConfig
+import io.anonero.network.TransportController
 import io.anonero.services.TorService
 import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
@@ -127,7 +129,6 @@ import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.util.Formats
 import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WALLET_USE_TOR
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -186,6 +187,7 @@ fun TransactionScreen(
     var showMenu by remember { mutableStateOf(false) }
     val walletState = koinInject<WalletState>()
     val torService = koinInject<TorService>()
+    val transportController = koinInject<TransportController>()
     val anonPrefs = koinInject<android.content.SharedPreferences>(named(WALLET_PREFERENCES))
     val showLockScreen by walletState.backgroundSyncFlow.asLiveData().observeAsState(walletState.backgroundSync)
     val streetMode by walletState.hideAmountsFlow.asLiveData().observeAsState(false)
@@ -284,6 +286,15 @@ fun TransactionScreen(
                                         val wallet =
                                             WalletManager.instance?.wallet
                                                 ?: throw IllegalStateException("wallet unavailable")
+                                        val transport = transportController.config.value
+                                        if (transport.validationError() != null) {
+                                            throw IllegalStateException("transport configuration is invalid")
+                                        }
+                                        if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
+                                            !transportController.isVpnActive()
+                                        ) {
+                                            throw IllegalStateException("system VPN is not active")
+                                        }
                                         val error = wallet.submitTransaction(path)
                                         if (error != "Transaction submitted!") {
                                             throw IllegalStateException(error ?: "broadcast failed")
@@ -547,7 +558,7 @@ fun TransactionScreen(
     val view = LocalView.current
     val torSocket by torService.socksFlow.asLiveData().observeAsState(torService.socks)
     val torConnected = torSocket != null
-    val useTor = anonPrefs.getBoolean(WALLET_USE_TOR, true)
+    val useTor = TransportConfig.load(anonPrefs).mode.usesEmbeddedTor
     val stealthEnabled by StealthMode.enabled.collectAsState()
     val hazeState = rememberHazeState()
     val hazeSurface = MaterialTheme.colorScheme.surface

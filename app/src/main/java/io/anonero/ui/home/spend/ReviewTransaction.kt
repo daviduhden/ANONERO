@@ -78,6 +78,7 @@ import io.anonero.model.PendingTransaction
 import io.anonero.model.SigningSummary
 import io.anonero.model.UnsignedTransaction
 import io.anonero.model.WalletManager
+import io.anonero.network.TransportController
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.ui.home.spend.qr.ExportType
 import io.anonero.ui.home.spend.qr.ImportEvents
@@ -131,6 +132,7 @@ private const val TAG = "ReviewTransaction"
  * not navigate back to a prefilled send form after a broadcast.
  */
 class ReviewTransactionViewModel : ViewModel() {
+    private val transportController: TransportController by inject(TransportController::class.java)
     private val broadcastInProgress =
         java.util.concurrent.atomic
             .AtomicBoolean(false)
@@ -219,6 +221,15 @@ class ReviewTransactionViewModel : ViewModel() {
                 val wallet = WalletManager.instance?.wallet
                 if (wallet == null) {
                     throw Exception("Wallet is unavailable")
+                }
+                val transport = transportController.config.value
+                if (transport.validationError() != null) {
+                    throw IllegalStateException("Transport configuration is invalid")
+                }
+                if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
+                    !transportController.isVpnActive()
+                ) {
+                    throw IllegalStateException("System VPN is not active")
                 }
                 if (!AnonConfig.viewOnly) {
                     val tx =

@@ -70,6 +70,7 @@ import io.anonero.R
 import io.anonero.model.PendingTransaction
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
+import io.anonero.network.TransportController
 import io.anonero.services.WalletState
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.util.Formats
@@ -81,6 +82,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import org.koin.java.KoinJavaComponent.inject
 import timber.log.Timber
 import java.io.File
 
@@ -112,6 +114,7 @@ data class RecipientInput(
 fun parseExactAmount(text: String): Long? = MoneroAmount.parseExact(text)
 
 class PayToManyViewModel : ViewModel() {
+    private val transportController: TransportController by inject(TransportController::class.java)
     private val _error = MutableStateFlow<PayToManyError?>(null)
     val error: StateFlow<PayToManyError?> = _error
     private val _preparing = MutableStateFlow(false)
@@ -124,6 +127,17 @@ class PayToManyViewModel : ViewModel() {
             try {
                 if (AnonConfig.viewOnly) {
                     _error.value = PayToManyError.VIEW_ONLY
+                    return@withContext null
+                }
+                val transport = transportController.config.value
+                if (transport.validationError() != null) {
+                    _error.value = PayToManyError.NOT_CONNECTED
+                    return@withContext null
+                }
+                if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
+                    !transportController.isVpnActive()
+                ) {
+                    _error.value = PayToManyError.NOT_CONNECTED
                     return@withContext null
                 }
                 val wallet =

@@ -27,12 +27,17 @@ import io.anonero.model.WalletManager
 import io.anonero.model.node.DaemonInfo
 import io.anonero.model.node.Node
 import io.anonero.model.node.NodeFields
+import io.anonero.network.NodeSelectionPolicy
+import io.anonero.network.ProxyEndpoint
+import io.anonero.network.TransportController
+import io.anonero.network.TransportEndpoint
+import io.anonero.network.TransportMode
+import io.anonero.store.NodesRepository
 import io.anonero.util.LwsConfig
 import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
 import io.anonero.util.WALLET_PROXY
 import io.anonero.util.WALLET_PROXY_PORT
-import io.anonero.util.WALLET_USE_TOR
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
@@ -73,8 +78,12 @@ class AnonWalletHandler(
     private val prefs: SharedPreferences,
     private val walletState: WalletState,
     private val torService: TorService,
+    private val transportController: TransportController,
+    private val nodesRepository: NodesRepository,
 ) {
-    private val _scope = CoroutineScope(Dispatchers.Default) + SupervisorJob()
+    // startService/reapply perform blocking wallet2, file, and proxy operations. Use the
+    // IO pool, not Default, so they cannot starve CPU-bound coroutines.
+    private val _scope = CoroutineScope(Dispatchers.IO) + SupervisorJob()
 
     private var handler: MoneroHandlerThread? = null
 
@@ -83,6 +92,7 @@ class AnonWalletHandler(
     init {
         scope.launch {
             torService.socksFlow.collect { socket ->
+                if (!transportController.config.value.mode.usesEmbeddedTor) return@collect
                 val wallet = WalletManager.instance?.wallet
                 if (socket == null) {
                     // Tor restarted or stopped. Never reuse the old port; pause until a
@@ -94,11 +104,13 @@ class AnonWalletHandler(
                         )
                         walletState.setLoading(false)
                     }
-                } else if (prefs.getBoolean(WALLET_USE_TOR, true) &&
-                    wallet?.isInitialized == true
-                ) {
+                } else if (wallet?.isInitialized == true) {
                     try {
-                        setProxy(socket.address.value, socket.port.value)
+                        applyEndpoint(
+                            TransportEndpoint.Socks5(
+                                ProxyEndpoint(socket.address.value, socket.port.value),
+                            ),
+                        )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: Exception) {
@@ -110,6 +122,23 @@ class AnonWalletHandler(
                         Timber.tag(TAG).e("Could not update Tor proxy; refresh paused")
                     }
                 }
+            }
+        }
+        scope.launch {
+            transportController.state.collect { state ->
+                if (state.mode != io.anonero.network.TransportMode.SYSTEM_VPN) return@collect
+                if (state.status != io.anonero.network.TransportStatus.UNAVAILABLE) return@collect
+                val wallet = WalletManager.instance?.wallet ?: return@collect
+                wallet.pauseRefresh()
+                wallet.setOffline(true)
+                // Drop the live HTTP client connection so an in-flight request cannot
+                // finish over the default network after the VPN is gone.
+                runCatching { wallet.setProxy("") }
+                walletState.setOffline(true)
+                walletState.setConnectionStatus(
+                    Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
+                )
+                walletState.setLoading(false)
             }
         }
     }
@@ -250,7 +279,15 @@ class AnonWalletHandler(
             MoneroHandlerThread(
                 wallet,
                 walletState,
-            )
+            ) {
+                // Never reconnect directly after losing the only clearnet transport, and
+                // never re-init through a stale embedded-Tor port.
+                when (transportController.config.value.mode) {
+                    TransportMode.SYSTEM_VPN -> transportController.isVpnActive()
+                    TransportMode.EMBEDDED_TOR -> torService.socks != null
+                    else -> true
+                }
+            }
 
         wallet.setListener(handler)
         wallet.refreshHistory()
@@ -271,32 +308,49 @@ class AnonWalletHandler(
         try {
             if (lwsActive) {
                 wallet.setTrustedDaemon(false)
-                // The LWS receives the view key. Sending that or the address outside Tor
-                // would hand the server the user's IP as well; refuse rather than silently
-                // falling back to a manual/clearnet proxy.
-                if (!prefs.getBoolean(WALLET_USE_TOR, true)) {
-                    throw Exception("LWS requires Tor; enable built-in Tor in Proxy settings")
-                }
-                val validation = LwsConfig.validate(lws.host, lws.port)
+                // The LWS receives the view key. Its destination must match the
+                // selected transport network and clearnet servers must use TLS unless
+                // they are local. This is the same fail-closed policy as RPC.
+                val transport = transportController.config.value
+                val compatibility = LwsConfig.validateTransport(lws, transport)
+                if (compatibility != null) throw Exception(compatibility.technicalMessage)
+                val validation = LwsConfig.validate(lws.host, lws.port, lws.useTls)
                 if (validation != null) throw Exception(validation.technicalMessage)
             }
-            // no node (offline signer): nothing to route, leave Tor off
+            // no node (offline signer): nothing to route, leave the transport off
             if (host?.isNotEmpty() == true) applyProxy()
             // A profile switch or close can replace this session while Tor is starting.
             if (WalletManager.instance !== manager || manager.wallet !== wallet) return
             if (host?.isNotEmpty() == true) {
-                val nodeObj =
-                    JSONObject()
-                        .apply {
-                            put(NodeFields.RPC_HOST.value, host)
-                            put(NodeFields.RPC_PORT.value, rpcPort)
-                            put(NodeFields.RPC_USERNAME.value, rpcUsername)
-                            put(NodeFields.RPC_PASSWORD.value, rpcPassphrase)
-                            put(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
-                            put(NodeFields.NODE_NAME.value, if (lwsActive) "lws" else "anon")
+                var node =
+                    nodeFromPrefs(
+                        host,
+                        rpcPort,
+                        rpcUsername,
+                        rpcPassphrase,
+                        lwsActive,
+                        if (lwsActive) lws.useTls else prefs.getBoolean(NodeFields.NODE_TLS.value, false),
+                    )
+                if (!lwsActive && node != null &&
+                    !NodeSelectionPolicy.accepts(transportController.config.value, node)
+                ) {
+                    val replacement =
+                        if (transportController.config.value.autoSelectNode) {
+                            NodeSelectionPolicy.select(
+                                nodesRepository.getAll(),
+                                transportController.config.value,
+                                AnonConfig.getNetworkType(),
+                            )
+                        } else {
+                            null
                         }
-                val node = Node.fromJson(nodeObj)
-                updateDaemon(node)
+                    if (replacement == null) {
+                        throw Exception("No compatible node for the selected transport")
+                    }
+                    persistNode(replacement)
+                    node = replacement
+                }
+                updateDaemon(node, lightWallet = lwsActive)
                 walletState.setLoading(true)
             }
             walletState.update()
@@ -336,7 +390,9 @@ class AnonWalletHandler(
         } catch (_: Exception) {
             if (WalletManager.instance !== manager || manager.wallet !== wallet) return
             wallet.pauseRefresh()
+            wallet.setOffline(true)
             if (lwsActive) wallet.setTrustedDaemon(false)
+            walletState.setOffline(true)
             walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
             Timber.tag(TAG).e("Wallet service start failed")
             walletState.setLoading(false)
@@ -344,62 +400,146 @@ class AnonWalletHandler(
     }
 
     /*
-     * Routes the wallet through Tor (waiting for its socks port) or the manual proxy. Call it
-     * before the wallet first talks to a node, or that traffic goes out unproxied.
+     * Applies the endpoint selected by TransportController to the manager and live wallet.
+     * Call it before the wallet first talks to a node/LWS, or that traffic goes out
+     * unproxied.
      */
     suspend fun applyProxy() {
         val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
         val wallet = manager.wallet
-        val proxyHost = prefs.getString(WALLET_PROXY, "")
-        val proxyPort = prefs.getInt(WALLET_PROXY_PORT, -1)
-        val useTor = prefs.getBoolean(WALLET_USE_TOR, true)
-        val lwsActive = LwsConfig.load(prefs).enabled || WalletManager.instance?.wallet?.isLightWallet == true
-        check(!lwsActive || useTor) { "LWS requires built-in Tor" }
-        if (useTor) {
-            torService.start()
-            var waited = 0L
-            while (torService.socks == null) {
-                if (waited >= 60_000L) {
-                    // Never fall through to a direct connection: failing closed is the
-                    // only safe behavior when Tor does not come up.
-                    throw Exception("Tor proxy did not start; refusing an unproxied connection")
+        val endpoint = transportController.authorize()
+        if (WalletManager.instance !== manager || manager.wallet !== wallet) {
+            throw CancellationException("Wallet session changed while acquiring transport")
+        }
+        applyEndpoint(endpoint)
+    }
+
+    /**
+     * Re-applies the selected transport to an active LWS backend. This is required after
+     * a transport change: the old HTTP client must not keep using the previous proxy.
+     * The caller marks the wallet offline if this throws.
+     */
+    suspend fun reapplyLightWallet() {
+        val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
+        val wallet = manager.wallet ?: return
+        val lws = LwsConfig.load(prefs)
+        if (!lws.enabled) throw IllegalStateException("LWS is not enabled")
+        val compatibility = LwsConfig.validateTransport(lws, transportController.config.value)
+        if (compatibility != null) throw IllegalStateException(compatibility.technicalMessage)
+        val validation = LwsConfig.validate(lws.host, lws.port, lws.useTls)
+        if (validation != null) throw IllegalStateException(validation.technicalMessage)
+        wallet.pauseRefresh()
+        wallet.setTrustedDaemon(false)
+        applyProxy()
+        val node =
+            nodeFromPrefs(
+                lws.host,
+                lws.port,
+                "",
+                "",
+                lws = true,
+                useTls = lws.useTls,
+            ) ?: throw IllegalStateException("Invalid LWS endpoint")
+        updateDaemon(node, lightWallet = true)
+        check(wallet.init(0, lightWallet = true)) { "LWS initialization failed" }
+        wallet.setTrustedDaemon(false)
+        check(wallet.lightWalletLogin()) { "LWS login failed" }
+        wallet.setTrustedDaemon(false)
+        wallet.setOffline(false)
+        wallet.startRefresh()
+    }
+
+    private fun applyEndpoint(endpoint: TransportEndpoint) {
+        val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
+        val wallet = manager.wallet
+        val previous = manager.proxy
+        try {
+            when (endpoint) {
+                is TransportEndpoint.Socks5 -> {
+                    val address = endpoint.endpoint.formatted
+                    check(manager.setProxy(address)) { "Transport proxy was rejected" }
+                    if (wallet != null && !wallet.setProxy(address)) {
+                        throw IllegalStateException("Wallet proxy was rejected")
+                    }
                 }
-                delay(200)
-                waited += 200
+
+                TransportEndpoint.Direct -> {
+                    check(manager.clearProxy()) { "Clearing the proxy was rejected" }
+                    if (wallet != null && !wallet.clearProxy()) {
+                        throw IllegalStateException("Clearing the wallet proxy was rejected")
+                    }
+                }
             }
-            val socket =
-                torService.socks
-                    ?: throw IllegalStateException("Tor proxy stopped before it could be applied")
-            if (WalletManager.instance !== manager || manager.wallet !== wallet) {
-                throw CancellationException("Wallet session changed while waiting for Tor")
-            }
-            check(manager.setProxy(socket.value)) { "Tor proxy was rejected" }
-        } else if (!proxyHost.isNullOrEmpty() && proxyPort in 1..65535) {
-            val host: String = proxyHost
-            if (WalletManager.instance !== manager || manager.wallet !== wallet) {
-                throw CancellationException("Wallet session changed before applying proxy")
-            }
-            check(manager.setProxy(proxyAddress(host, proxyPort))) { "Manual proxy was rejected" }
-        } else {
-            throw Exception("no proxy")
+        } catch (e: Exception) {
+            // Do not leave the manager on a half-applied endpoint.
+            if (previous.isNotEmpty()) manager.setProxy(previous) else manager.clearProxy()
+            throw e
         }
     }
 
-    fun updateDaemon(node: Node?) {
+    private fun nodeFromPrefs(
+        host: String,
+        rpcPort: Int,
+        username: String,
+        password: String,
+        lws: Boolean,
+        useTls: Boolean,
+    ): Node? =
+        Node.fromJson(
+            JSONObject()
+                .apply {
+                    put(NodeFields.RPC_HOST.value, host)
+                    put(NodeFields.NODE_TLS.value, useTls)
+                    put(NodeFields.RPC_PORT.value, rpcPort)
+                    put(NodeFields.RPC_USERNAME.value, username)
+                    put(NodeFields.RPC_PASSWORD.value, password)
+                    put(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
+                    put(NodeFields.NODE_NAME.value, if (lws) "lws" else "anon")
+                },
+        )
+
+    private fun persistNode(node: Node) {
+        prefs.edit(commit = true) {
+            putString(NodeFields.RPC_HOST.value, node.host)
+            putBoolean(NodeFields.NODE_TLS.value, node.useTls)
+            putInt(NodeFields.RPC_PORT.value, node.rpcPort)
+            putString(NodeFields.RPC_USERNAME.value, node.username)
+            putString(NodeFields.RPC_PASSWORD.value, node.password)
+            putString(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
+            putString(NodeFields.NODE_NAME.value, node.name)
+        }
+    }
+
+    fun updateDaemon(
+        node: Node?,
+        lightWallet: Boolean = WalletManager.instance?.wallet?.isLightWallet == true,
+    ) {
         walletState.setLoading(true)
         val wallet = WalletManager.instance?.wallet
         val walletManager = WalletManager.instance
         wallet?.pauseRefresh()
-        // Every caller must preserve LWS trust, including startup before light mode is set.
-        val lwsActive = LwsConfig.load(prefs).enabled || wallet?.isLightWallet == true
-        if (lwsActive) wallet?.setTrustedDaemon(false)
+        // Callers state the backend explicitly: startup applies the pending mode before
+        // wallet.init(), and a pending enable/disable must not change trust or skip the
+        // node-network check for the current RPC wallet.
+        val lwsActive = lightWallet
         try {
+            if (!lwsActive && node != null) {
+                require(NodeSelectionPolicy.accepts(transportController.config.value, node)) {
+                    "Node network does not match the selected transport"
+                }
+            }
+            if (transportController.config.value.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
+                !transportController.isVpnActive()
+            ) {
+                throw IllegalStateException("System VPN is not active")
+            }
+            if (lwsActive) wallet?.setTrustedDaemon(false)
             if (node != null) {
                 walletState.setOffline(false)
                 wallet?.setOffline(false)
                 walletState.updateDaemon(
                     DaemonInfo(
-                        daemon = "${node.host}:${node.rpcPort}",
+                        daemon = node.hostPort,
                         Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
                         daemonHeight = 0L,
                     ),
@@ -417,6 +557,9 @@ class AnonWalletHandler(
             wallet?.setTrustedDaemon(!lwsActive)
             walletState.setLoading(false)
         } catch (e: Exception) {
+            wallet?.pauseRefresh()
+            wallet?.setOffline(true)
+            walletState.setOffline(true)
             walletState.updateDaemon(
                 DaemonInfo(
                     daemon = null,
@@ -424,6 +567,7 @@ class AnonWalletHandler(
                     daemonHeight = 0L,
                 ),
             )
+            walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
             if (lwsActive) wallet?.setTrustedDaemon(false)
             walletState.setLoading(false)
             throw e
@@ -436,7 +580,7 @@ class AnonWalletHandler(
     ): String {
         require(host.isNotBlank() && port in 1..65535) { "Invalid proxy endpoint" }
         val formattedHost = if (':' in host && !host.startsWith("[")) "[$host]" else host
-        return "$formattedHost:$port"
+        return "socks5://$formattedHost:$port"
     }
 
     fun setProxy(
@@ -445,8 +589,15 @@ class AnonWalletHandler(
         persist: Boolean = true,
     ) {
         Timber.tag(TAG).d("setProxy: updating endpoint")
-        // disable proxy
+        // LWS traffic must follow the selected transport. The legacy proxy screen must not
+        // be able to install or clear a second proxy that bypasses TransportController.
+        val lwsActive = LwsConfig.load(prefs).enabled || WalletManager.instance?.wallet?.isLightWallet == true
+        check(!lwsActive) { "LWS proxy is managed by Network & Nodes" }
+        // Disable the proxy in both native clients, not only in preferences.
         if (proxy == null && port == null) {
+            val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
+            check(manager.clearProxy()) { "Clearing the proxy was rejected" }
+            manager.wallet?.clearProxy()
             if (persist) {
                 prefs.edit(commit = true) {
                     remove(WALLET_PROXY)
@@ -458,14 +609,6 @@ class AnonWalletHandler(
             val proxyPort = requireNotNull(port) { "Proxy port required" }
             val proxyStr = proxyAddress(proxyHost, proxyPort)
             val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-            val lwsActive = LwsConfig.load(prefs).enabled || manager.wallet?.isLightWallet == true
-            if (lwsActive) {
-                check(prefs.getBoolean(WALLET_USE_TOR, true)) { "LWS requires built-in Tor" }
-                val socket = checkNotNull(torService.socks) { "Tor proxy unavailable" }
-                check(proxyHost == socket.address.value && proxyPort == socket.port.value) {
-                    "LWS requires the built-in Tor endpoint"
-                }
-            }
             check(manager.setProxy(proxyStr)) { "Proxy was rejected" }
             val wallet = manager.wallet
             if (wallet != null && !wallet.setProxy(proxyStr)) {
