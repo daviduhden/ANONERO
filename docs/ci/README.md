@@ -10,6 +10,9 @@ validation.
 - Workflows: `Tests` (`test.yml`) and `Build and publish APKs` (`release.yml`); both are
   manual-only and owner-gated.
 - Current evidence:
+  - `43528256395` (`0cf9db0`) — all jobs pass, including instrumented; anon and nero each
+    ran one smoke test with zero failures. Boot took 919 s; lint is 0/0, 62 JVM tests per
+    flavor, and the adapter compiles under `-Werror`.
   - `42874760135` (`c228e36`) — all jobs pass; anon and nero each ran one instrumented
     smoke test with zero failures.
   - `43521054641` (`feb985e`) — all code, native, assemble, lint, and JNI gates pass
@@ -24,7 +27,7 @@ validation.
     lost `system_server` and both reports had `tests=0`.
   - `a487cf5`…`32d8c1a` — formatting/lint commits; no CI run exists for them.
   - The prebuild/worker-limit fix for the test APKs is committed; `43521054641` validated
-    the prebuild step but the emulator failed before the test script.
+    the prebuild step, and `43528256395` then passed both flavors.
   - No release, sanitizer, fuzz, or device-farm run exists. Absence of evidence is
     recorded as unverified, not as success.
 - Logs were read with `gh run view --log` and `--log-failed`. No workflow was executed,

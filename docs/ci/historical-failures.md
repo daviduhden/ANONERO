@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43528256395` | `0cf9db0` | `workflow_dispatch` | success | none | All jobs pass; instrumented anon and nero each ran 1 test with 0 failures; boot 919 s; 62 JVM tests per flavor; lint 0/0; no adapter warnings under `-Werror` |
 | `43521054641` | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
 | `43122308945` | `381d8ab` | `workflow_dispatch` | failure | instrumented | All code gates plus native and assemble pass; `system_server` SIGABRT while Gradle dexed the test APKs; both XML `tests=0`; health gate failed closed |
 | `43108046671` | `02b97b8` | `workflow_dispatch` | failure | instrumented | Guest lost `system_server` during install/uninstall; both XML `tests=0`; all other jobs pass |
@@ -33,9 +34,9 @@
 | `42552892586` | `ed8b097` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 | `42547686992` | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
-No release, instrumented, sanitizer, or fuzz run exists. The native job passed its patch
-preflight only after the series was restored; the compile/link result is still pending.
-The two historical `push` triggers are no longer present; workflows are manual-only.
+No release, sanitizer, or fuzz run exists. The native archives build, and instrumented
+passed on `42874760135` and `43528256395` but is non-deterministic without KVM. The two
+historical `push` triggers are no longer present; workflows are manual-only.
 
 ## Failure records
 
@@ -458,7 +459,8 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next run must reach the tests and either pass both XML files
   or produce the guest diagnostics. This does not replace KVM; a self-hosted KVM runner
   or device farm is required for deterministic results.
-- **Status:** mitigated but not deterministic without KVM.
+- **Status:** mitigated; `43528256395` passed both flavors after a 919 s boot, but the
+  hosted emulator remains non-deterministic without KVM.
 
 ### CI-027 — Instrumented job green while the NERO report had a failure
 
@@ -567,9 +569,9 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 - **Regression check:** the next instrumented run must either pass both flavors or fail
   with guest diagnostics; deterministic success still requires a KVM-capable runner or
   device farm.
-- **Status:** the diagnostic/stability changes and prebuild were validated in
-  `43521054641` up to the emulator action; the action then failed before the script
-  (CI-032). Deterministic execution still requires KVM or a device farm.
+- **Status:** resolved in `43528256395`: both flavors passed with the diagnostic,
+  prebuild, and worker-limit changes. The hosted emulator remains non-deterministic, so
+  KVM or a device farm is still recommended for repeatability.
 
 ### CI-032 — Guest services lost immediately after boot, before the test script
 
@@ -594,7 +596,9 @@ The two historical `push` triggers are no longer present; workflows are manual-o
   the instrumented job.
 - **Regression check:** the next instrumented run must either execute both flavor reports
   or fail with guest diagnostics. A stable hosted-emulator path is not proven.
-- **Status:** blocked on infrastructure.
+- **Status:** transient. Run `43528256395` (`0cf9db0`) booted in 919 s and passed both
+  one-test flavor reports with the same script and image. The hosted emulator remains
+  non-deterministic; KVM or a device farm is still the reliable option.
 
 ## Warning inventory
 
@@ -676,17 +680,18 @@ The two historical `push` triggers are no longer present; workflows are manual-o
 
 ## CI evidence recorded
 
-- JVM tests pass on `dd692a8` and later, including 62 tests per flavor on `43521054641`.
-- Android Lint is 0/0 on `43521054641`; the W-004 advisories are cleared by the dependency
+- JVM tests pass on `dd692a8` and later, including 62 tests per flavor on `43528256395`.
+- Android Lint is 0/0 on `43528256395`; the W-004 advisories are cleared by the dependency
   update.
-- Kotlin compilation emits zero `w:` diagnostics; `43521054641` has none in the unit,
+- Kotlin compilation emits zero `w:` diagnostics; `43528256395` has none in the unit,
   lint, or assemble logs.
 - The native archives build successfully on `42743643959` and later.
 - The assemble/link job passes on `42847493558`; it caught the JNI array-region compile
   error, AGP 9 APK naming, and minSdk extraction issues along the way.
-- Instrumented smoke tests pass for both flavors on `42874760135` (1 test, 0 failures each).
-- No `anonero.cpp`/`anonero.h` warning appears in `43521054641`; the adapter compiled under
+- Instrumented smoke tests pass for both flavors on `42874760135` and `43528256395`
+  (1 test, 0 failures each; boot 919 s on the latter).
+- No `anonero.cpp`/`anonero.h` warning appears in `43528256395`; the adapter compiled under
   `-Wall -Wextra -Wpedantic -Werror`.
 - `43521054641` lost the guest `input`/`overlay` services after boot and produced no
-  instrumented reports (CI-032).
+  instrumented reports (CI-032); `43528256395` passed with the same code.
 - No release, signing, sanitizer, or fuzz run.

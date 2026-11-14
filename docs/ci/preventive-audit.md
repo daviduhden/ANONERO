@@ -2,13 +2,13 @@
 
 ## Status
 
-This is a static audit followed by manual CI validation. Run `42874760135` passed every
-job, including one API 35 smoke test per flavor. Run `43521054641` (`feb985e`) passed every
-code, native, assemble, lint, and JNI gate: `-Werror` compiles the adapter without warnings,
-serialization/BouncyCastle resolve, lint is 0/0, and both flavors run 62 JVM tests. Its
-instrumented job failed after a 630 s boot when the runner's own post-boot `input`/`overlay`
-adb calls hit broken pipes, before the test script started. The prebuild fix is validated,
-but deterministic instrumented execution still requires a KVM runner or device farm.
+This is a static audit followed by manual CI validation. Run `43528256395` (`0cf9db0`)
+passed every job: 62 JVM tests per flavor, lint 0/0, `-Werror` with no adapter warning,
+serialization/BouncyCastle, exact JNI parity, native archives, assemble/link, and one
+instrumented smoke test per flavor with zero failures. The emulator booted in 919 s. Run
+`43521054641` had failed before the script after a 630 s boot, so the hosted emulator
+remains non-deterministic; deterministic execution still requires a KVM runner or device
+farm.
 
 ## Warning policy
 
@@ -78,11 +78,10 @@ but deterministic instrumented execution still requires a KVM runner or device f
 - The instrumented job is skipped whenever native fails; native now passes.
 - A separate `assemble` job links the JNI library and checks the API 29 floor even when
   instrumented tests are skipped; it passes in current runs.
-- The API 35 smoke test passed for both flavors on `42874760135`, but the KVM-less
-  emulator lost `system_server` on `43108046671` and `43122308945`, and on
-  `43521054641` it lost the `input`/`overlay` services immediately after boot, before the
-  test script. The job is not stable on hosted runners; a KVM runner or device farm is
-  required.
+- The API 35 smoke test passed for both flavors on `42874760135` and `43528256395`, but
+  the KVM-less emulator lost `system_server` on `43108046671` and `43122308945`, and on
+  `43521054641` it lost the `input`/`overlay` services immediately after boot. The job is
+  not stable on hosted runners; a KVM runner or device farm is required.
 - Lock/unlock, background sync, decoy, duress, wipe, Tor, LWS, and JNI callbacks still
   have no device coverage.
 - The emulator matrix is API 35 x86_64 only; API 29 compile/manifest checks are separated
@@ -180,11 +179,12 @@ These are settings, not workflow code, and cannot be supplied by this audit:
 - **Validated in CI:** JVM unit tests, Android Lint (0/0), Kotlin compilation (0 warnings),
   JNI symbol parity, localization, architecture policy, native archives, and debug APK
   assembly/link on the pre-formatting commits.
-- **Validated in `43521054641`:** `-Werror`, the serialization/BouncyCastle update, lint
-  0/0, exact JNI parity, localization, native archives, assemble/link, and 62 JVM tests per
-  flavor.
-- **Validated once, not stable:** the API 35 smoke test passed on `42874760135` and failed
-  on `43108046671`, `43122308945`, and `43521054641` when the KVM-less guest lost
+- **Validated in `43528256395`:** all jobs, including `-Werror`, the
+  serialization/BouncyCastle update, lint 0/0, exact JNI parity, localization, native
+  archives, assemble/link, 62 JVM tests per flavor, and one instrumented smoke test per
+  flavor with zero failures.
+- **Not stable:** the API 35 smoke test passed on `42874760135` and `43528256395` but
+  failed on `43108046671`, `43122308945`, and `43521054641` when the KVM-less guest lost
   `system_server` or the post-boot adb services.
 - **Unverified:** sanitizers, release signing and publication, broader wallet/Tor/LWS
   instrumented coverage.
