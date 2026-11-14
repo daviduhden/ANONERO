@@ -195,3 +195,16 @@ Two positional hazards are deliberate checks:
 - `scripts/check-jni-contract.py`
 - [`overview.md`](overview.md)
 - [`../security-model.md`](../security-model.md)
+
+
+## Continued constructor/snapshot hardening (2026-11-14)
+
+The static contract guard derives descriptors and checks reviewed parameter names/order
+for CoinsInfo, Transfer, TransactionInfo and Wallet.Status. A reordered same-type argument
+cannot silently pass that model check. Full JNI export signatures and bytecode still need
+CI. Intermediate model/list references use scoped cleanup, and failed allocations or
+record conversion no longer produce partial successful snapshots. Coins/TransactionHistory
+refresh catches native exceptions and preserves/raises Java failure. closeJ catches native
+failure without invalidating the wrapper until confirmed success. Kotlin owns auxiliary
+wrappers through RetainedWallets and retries closure. Listener quiescence, destruction
+interleavings and upstream exception-lifetime semantics remain unverified.

@@ -37,8 +37,8 @@ Do not use for wallet policy (use `monero-wallet`) or pure C++ upstream work
 - No alternate native runtime or FFI layer. No new C++ file unless the JNI boundary
   truly requires it.
 - Kotlin `external` name and `Java_io_anonero_<package>_<Class>_<method>` export must
-  match exactly. The static script checks class/method names, not signatures; signatures
-  and linkage require CI.
+  match exactly. The static script checks external symbols and four reviewed model
+  constructors/order; remaining export signatures, bytecode and linkage require CI.
 - JNI class names and constructor signatures are binary contracts. Update Kotlin and
   C++ together:
   - `io/anonero/model/TransactionInfo`
@@ -100,3 +100,16 @@ each `GetMethodID`, confirm the class and signature still match Kotlin.
 - [ ] Failure is fail-closed.
 - [ ] No secret logging.
 - [ ] `check-jni-contract.py` passes; native/CI evidence is required.
+
+
+Project-owned native diagnostics permit fixed warning/error literals only; verbose/debug/
+info lifecycle logging and arbitrary `.what()` disclosure are forbidden. wallet2 logging
+initializes silent at JNI load and logger init. Keep `scripts/check-native-diagnostics.py`
+passing, without claiming full exception containment or callback/handle lifetime proof.
+
+
+`check-jni-contract.py` now validates CoinsInfo, Transfer, TransactionInfo and Wallet.Status
+constructor parameter order plus derived JVM descriptors. It does not prove every export
+signature. Output/history snapshot conversion fails atomically, checks allocations and uses
+ScopedLocalRef; refresh errors preserve JVM failures or raise a fixed Java error. Keep the
+CI-only mutation tests under scripts/tests; never execute them locally under agent policy.

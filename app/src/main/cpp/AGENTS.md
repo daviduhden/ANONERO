@@ -156,3 +156,12 @@ Forbidden: `cmake`, `make`, `./gradlew`, `docker`, emulator, `adb`.
 - [ ] No secret or credential logging.
 - [ ] Failure returns are fail-closed and documented.
 - [ ] CI `jni-contract` and `native` jobs are the evidence.
+
+
+Snapshot constructors and list builders must preserve pending JVM errors and fail atomically;
+never clear exceptions or skip failed records to return an apparently valid output/history
+list. Use ScopedLocalRef for intermediate objects and check each allocation. The two refresh
+exports translate native failures into fixed Java errors. closeJ preserves ownership on
+false/exception; Kotlin retained resources must not be discarded until close succeeds.
+The parity script also guards four model constructor descriptors and parameter order;
+remaining export signatures and listener quiescence still require CI/native review.

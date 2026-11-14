@@ -54,6 +54,29 @@ for operation in ("importKeyImages", "importOutputs", "submitTransaction", "sign
     if "errorString()" in text[start:end]:
         failures.append(f"{operation}: raw wallet2 error crosses the operation result boundary")
 
+# Snapshot conversion must fail atomically. Clearing a JVM error or skipping a
+# failed record makes a partial output/history list look successful to Kotlin.
+for function in (
+    "newWalletStatusInstance",
+    "newCoinsInfo",
+    "coins_cpp2java",
+    "newTransferInstance",
+    "newTransferList",
+    "newTransactionInfo",
+    "cpp2java",
+):
+    start = text.index(f"jobject {function}(")
+    end = text.index("\n}\n", start)
+    body = text[start:end]
+    if "ExceptionClear" in body or re.search(r"\bcontinue\s*;", body):
+        failures.append(f"{function}: snapshot conversion must preserve errors and all records")
+for model in ("Coins", "TransactionHistory"):
+    start = text.index(f"Java_io_anonero_model_{model}_refreshJ(")
+    end = text.index("\n}\n", start)
+    body = text[start:end]
+    if "catch (...)" not in body or "throwSnapshotFailure(env)" not in body:
+        failures.append(f"{model}: refresh must contain native exceptions and reject null snapshots")
+
 if failures:
     raise SystemExit("\n".join(failures))
 print("Native diagnostic static policy passed (not runtime or security proof)")

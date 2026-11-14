@@ -914,8 +914,14 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, walletInstance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    bool closeSuccess =
-        Monero::WalletManagerFactory::getWalletManager()->closeWallet(wallet, false);
+    bool closeSuccess = false;
+    try {
+        closeSuccess = Monero::WalletManagerFactory::getWalletManager()->closeWallet(wallet, false);
+    } catch (...) {
+        // Keep the wrapper and listener reachable for the failed-close owner.
+        LOGE("wallet close failed");
+        return JNI_FALSE;
+    }
     if (closeSuccess) {
         // Invalidate the raw handle before the Kotlin wrapper can be used again.
         setHandleFromLong(env, walletInstance, 0);
@@ -1034,16 +1040,15 @@ JNIEXPORT jint JNICALL Java_io_anonero_model_Wallet_getStatusJ(JNIEnv *env, jobj
 
 jobject newWalletStatusInstance(JNIEnv *env, int status, const std::string &errorString) {
     jmethodID init = env->GetMethodID(class_WalletStatus, "<init>", "(ILjava/lang/String;)V");
-    if (init == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (init == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     jstring _errorString = env->NewStringUTF(errorString.c_str());
+    ScopedLocalRef _errorStringRef(env, _errorString);
+    if (_errorString == nullptr || env->ExceptionCheck())
+        return nullptr;
     jobject instance = env->NewObject(class_WalletStatus, init, status, _errorString);
-    env->DeleteLocalRef(_errorString);
     if (env->ExceptionCheck())
-        env->ExceptionClear();
+        return nullptr;
     return instance;
 }
 
@@ -1851,6 +1856,17 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getCoinsJ(JNIEnv *env, jobj
     return reinterpret_cast<jlong>(wallet->coins());
 }
 
+// Snapshot conversion is atomic: never publish an apparently complete partial list.
+static void throwSnapshotFailure(JNIEnv *env) {
+    if (env->ExceptionCheck())
+        return;
+    jclass failure = env->FindClass("java/lang/IllegalStateException");
+    if (failure == nullptr)
+        return;
+    env->ThrowNew(failure, "Native wallet snapshot unavailable");
+    env->DeleteLocalRef(failure);
+}
+
 jobject newCoinsInfo(JNIEnv *env, Monero::CoinsInfo *info) {
     if (info == nullptr)
         return nullptr;
@@ -1858,58 +1874,66 @@ jobject newCoinsInfo(JNIEnv *env, Monero::CoinsInfo *info) {
     // clang-format off
     jmethodID c = env->GetMethodID(class_CoinsInfo, "<init>", "(JZLjava/lang/String;JLjava/lang/String;Ljava/lang/String;ZJZIIJLjava/lang/String;Ljava/lang/String;Z)V");
     // clang-format on
-    if (c == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (c == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     jstring _key_image = env->NewStringUTF(info->keyImage().c_str());
+    ScopedLocalRef _key_imageRef(env, _key_image);
+    if (_key_image == nullptr || env->ExceptionCheck())
+        return nullptr;
     jstring _pub_key = env->NewStringUTF(info->pubKey().c_str());
+    ScopedLocalRef _pub_keyRef(env, _pub_key);
+    if (_pub_key == nullptr || env->ExceptionCheck())
+        return nullptr;
     jstring _hash = env->NewStringUTF(info->hash().c_str());
+    ScopedLocalRef _hashRef(env, _hash);
+    if (_hash == nullptr || env->ExceptionCheck())
+        return nullptr;
     jstring _address = env->NewStringUTF(info->address().c_str());
+    ScopedLocalRef _addressRef(env, _address);
+    if (_address == nullptr || env->ExceptionCheck())
+        return nullptr;
     jstring _address_label = env->NewStringUTF(info->addressLabel().c_str());
+    ScopedLocalRef _address_labelRef(env, _address_label);
+    if (_address_label == nullptr || env->ExceptionCheck())
+        return nullptr;
     jobject result = env->NewObject(
         class_CoinsInfo, c, static_cast<jlong>(info->globalOutputIndex()), info->spent(),
         _key_image, static_cast<jlong>(info->amount()), _hash, _pub_key, info->frozen(),
         static_cast<jlong>(info->internalOutputIndex()), info->unlocked(),
         static_cast<jint>(info->subaddrAccount()), static_cast<jint>(info->subaddrIndex()),
         static_cast<jlong>(info->blockHeight()), _address, _address_label, info->keyImageKnown());
-    env->DeleteLocalRef(_key_image);
-    env->DeleteLocalRef(_hash);
-    env->DeleteLocalRef(_pub_key);
-    env->DeleteLocalRef(_address);
-    env->DeleteLocalRef(_address_label);
     if (env->ExceptionCheck())
-        env->ExceptionClear();
+        return nullptr;
     return result;
 }
 
 jobject coins_cpp2java(JNIEnv *env, const std::vector<Monero::CoinsInfo *> &vector) {
 
     jmethodID java_util_ArrayList_ = env->GetMethodID(class_ArrayList, "<init>", "(I)V");
+    if (java_util_ArrayList_ == nullptr || env->ExceptionCheck())
+        return nullptr;
     jmethodID java_util_ArrayList_add =
         env->GetMethodID(class_ArrayList, "add", "(Ljava/lang/Object;)Z");
-    if (java_util_ArrayList_ == nullptr || java_util_ArrayList_add == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (java_util_ArrayList_ == nullptr || java_util_ArrayList_add == nullptr ||
+        env->ExceptionCheck())
         return nullptr;
-    }
 
     jobject arrayList =
         env->NewObject(class_ArrayList, java_util_ArrayList_, static_cast<jint>(vector.size()));
-    if (arrayList == nullptr || env->ExceptionCheck()) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (arrayList == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     for (Monero::CoinsInfo *s : vector) {
         jobject info = newCoinsInfo(env, s);
-        if (info == nullptr)
-            continue;
+        if (info == nullptr || env->ExceptionCheck()) {
+            env->DeleteLocalRef(arrayList);
+            return nullptr;
+        }
         env->CallBooleanMethod(arrayList, java_util_ArrayList_add, info);
         env->DeleteLocalRef(info);
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(arrayList);
+            return nullptr;
+        }
     }
     return arrayList;
 }
@@ -1921,10 +1945,20 @@ JNIEXPORT jint JNICALL Java_io_anonero_model_Coins_getCount(JNIEnv *env, jobject
 
 JNIEXPORT jobject JNICALL Java_io_anonero_model_Coins_refreshJ(JNIEnv *env, jobject instance) {
     Monero::Coins *coins = getHandle<Monero::Coins>(env, instance);
-    if (coins == nullptr)
+    if (coins == nullptr) {
+        throwSnapshotFailure(env);
         return nullptr;
-    coins->refresh();
-    return coins_cpp2java(env, coins->getAll());
+    }
+    try {
+        coins->refresh();
+        jobject snapshot = coins_cpp2java(env, coins->getAll());
+        if (snapshot == nullptr)
+            throwSnapshotFailure(env);
+        return snapshot;
+    } catch (...) {
+        throwSnapshotFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT void JNICALL Java_io_anonero_model_Coins_setFrozenJ(JNIEnv *env, jobject instance,
@@ -2189,16 +2223,15 @@ JNIEXPORT jint JNICALL Java_io_anonero_model_TransactionHistory_getCount(JNIEnv 
 // Keep in sync with Transfer(Long amount, String? address).
 jobject newTransferInstance(JNIEnv *env, uint64_t amount, const std::string &address) {
     jmethodID c = env->GetMethodID(class_Transfer, "<init>", "(JLjava/lang/String;)V");
-    if (c == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (c == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     jstring _address = env->NewStringUTF(address.c_str());
+    ScopedLocalRef _addressRef(env, _address);
+    if (_address == nullptr || env->ExceptionCheck())
+        return nullptr;
     jobject transfer = env->NewObject(class_Transfer, c, static_cast<jlong>(amount), _address);
-    env->DeleteLocalRef(_address);
     if (env->ExceptionCheck())
-        env->ExceptionClear();
+        return nullptr;
     return transfer;
 }
 
@@ -2211,29 +2244,30 @@ jobject newTransferList(JNIEnv *env, Monero::TransactionInfo *info) {
     }
     // make new ArrayList
     jmethodID java_util_ArrayList_ = env->GetMethodID(class_ArrayList, "<init>", "(I)V");
+    if (java_util_ArrayList_ == nullptr || env->ExceptionCheck())
+        return nullptr;
     jmethodID java_util_ArrayList_add =
         env->GetMethodID(class_ArrayList, "add", "(Ljava/lang/Object;)Z");
-    if (java_util_ArrayList_ == nullptr || java_util_ArrayList_add == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (java_util_ArrayList_ == nullptr || java_util_ArrayList_add == nullptr ||
+        env->ExceptionCheck())
         return nullptr;
-    }
     jobject result =
         env->NewObject(class_ArrayList, java_util_ArrayList_, static_cast<jint>(transfers.size()));
-    if (result == nullptr || env->ExceptionCheck()) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (result == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     // create Transfer objects and stick them in the List
     for (const Monero::TransactionInfo::Transfer &s : transfers) {
         jobject element = newTransferInstance(env, s.amount, s.address);
-        if (element == nullptr)
-            continue;
+        if (element == nullptr || env->ExceptionCheck()) {
+            env->DeleteLocalRef(result);
+            return nullptr;
+        }
         env->CallBooleanMethod(result, java_util_ArrayList_add, element);
         env->DeleteLocalRef(element);
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(result);
+            return nullptr;
+        }
     }
     return result;
 }
@@ -2245,15 +2279,24 @@ jobject newTransactionInfo(JNIEnv *env, Monero::TransactionInfo *info) {
     jmethodID c = env->GetMethodID(
         class_TransactionInfo, "<init>",
         "(IZZJJJLjava/lang/String;JLjava/lang/String;IIJLjava/lang/String;Ljava/util/List;)V");
-    if (c == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (c == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     jobject transfers = newTransferList(env, info);
+    ScopedLocalRef transfersRef(env, transfers);
+    if (env->ExceptionCheck() || (transfers == nullptr && !info->transfers().empty()))
+        return nullptr;
     jstring _hash = env->NewStringUTF(info->hash().c_str());
+    ScopedLocalRef _hashRef(env, _hash);
+    if (_hash == nullptr || env->ExceptionCheck())
+        return nullptr;
     jstring _paymentId = env->NewStringUTF(info->paymentId().c_str());
+    ScopedLocalRef _paymentIdRef(env, _paymentId);
+    if (_paymentId == nullptr || env->ExceptionCheck())
+        return nullptr;
     jstring _label = env->NewStringUTF(info->label().c_str());
+    ScopedLocalRef _labelRef(env, _label);
+    if (_label == nullptr || env->ExceptionCheck())
+        return nullptr;
     uint32_t subaddrIndex = 0;
     if (info->direction() == Monero::TransactionInfo::Direction_In) {
         const std::set<uint32_t> indices = info->subaddrIndex();
@@ -2266,41 +2309,38 @@ jobject newTransactionInfo(JNIEnv *env, Monero::TransactionInfo *info) {
         static_cast<jlong>(info->blockHeight()), _hash, static_cast<jlong>(info->timestamp()),
         _paymentId, static_cast<jint>(info->subaddrAccount()), static_cast<jint>(subaddrIndex),
         static_cast<jlong>(info->confirmations()), _label, transfers);
-    env->DeleteLocalRef(transfers);
-    env->DeleteLocalRef(_hash);
-    env->DeleteLocalRef(_paymentId);
-    env->DeleteLocalRef(_label);
     if (env->ExceptionCheck())
-        env->ExceptionClear();
+        return nullptr;
     return result;
 }
 
 jobject cpp2java(JNIEnv *env, const std::vector<Monero::TransactionInfo *> &vector) {
 
     jmethodID java_util_ArrayList_ = env->GetMethodID(class_ArrayList, "<init>", "(I)V");
+    if (java_util_ArrayList_ == nullptr || env->ExceptionCheck())
+        return nullptr;
     jmethodID java_util_ArrayList_add =
         env->GetMethodID(class_ArrayList, "add", "(Ljava/lang/Object;)Z");
-    if (java_util_ArrayList_ == nullptr || java_util_ArrayList_add == nullptr) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (java_util_ArrayList_ == nullptr || java_util_ArrayList_add == nullptr ||
+        env->ExceptionCheck())
         return nullptr;
-    }
 
     jobject arrayList =
         env->NewObject(class_ArrayList, java_util_ArrayList_, static_cast<jint>(vector.size()));
-    if (arrayList == nullptr || env->ExceptionCheck()) {
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+    if (arrayList == nullptr || env->ExceptionCheck())
         return nullptr;
-    }
     for (Monero::TransactionInfo *s : vector) {
         jobject info = newTransactionInfo(env, s);
-        if (info == nullptr)
-            continue;
+        if (info == nullptr || env->ExceptionCheck()) {
+            env->DeleteLocalRef(arrayList);
+            return nullptr;
+        }
         env->CallBooleanMethod(arrayList, java_util_ArrayList_add, info);
         env->DeleteLocalRef(info);
-        if (env->ExceptionCheck())
-            env->ExceptionClear();
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(arrayList);
+            return nullptr;
+        }
     }
     return arrayList;
 }
@@ -2308,10 +2348,20 @@ jobject cpp2java(JNIEnv *env, const std::vector<Monero::TransactionInfo *> &vect
 JNIEXPORT jobject JNICALL Java_io_anonero_model_TransactionHistory_refreshJ(JNIEnv *env,
                                                                             jobject instance) {
     Monero::TransactionHistory *history = getHandle<Monero::TransactionHistory>(env, instance);
-    if (history == nullptr)
+    if (history == nullptr) {
+        throwSnapshotFailure(env);
         return nullptr;
-    history->refresh();
-    return cpp2java(env, history->getAll());
+    }
+    try {
+        history->refresh();
+        jobject snapshot = cpp2java(env, history->getAll());
+        if (snapshot == nullptr)
+            throwSnapshotFailure(env);
+        return snapshot;
+    } catch (...) {
+        throwSnapshotFailure(env);
+        return nullptr;
+    }
 }
 
 // TransactionInfo is implemented in Java - no need here
