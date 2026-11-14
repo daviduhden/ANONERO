@@ -11,7 +11,7 @@ adapter uses. `apply.sh` applies every `*.patch` here in lexical order with
 
 ## Origin and licence
 
-The series is adapted from the Monero patches in
+Seven patches are adapted from the Monero patches in
 `MrCyjaneK/monero_c` (`patches/monero/`, `develop`):
 
 - `0004-use-proper-error-handling-in-get_seed.patch`
@@ -26,6 +26,9 @@ The series is adapted from the Monero patches in
 `LICENSE-LGPL-3.0`. The patches modify Monero, which remains under its own
 BSD-3-Clause licence. Keep this directory's licensing separate from the
 Apache-2.0 application code.
+
+`0008-enforce-tls-for-https-daemon-address.patch` is project-original and is
+provided under Apache-2.0. It is not part of the `monero_c` series.
 
 ## Adaptations
 
@@ -53,6 +56,10 @@ Apache-2.0 application code.
   unaffected.
 - A `wallet_rpc_server` call-site update for the new preferred-input parameter, plus
   `CMAKE_CURRENT_SOURCE_DIR` paths so the submodule build does not touch the parent tree.
+- Enforced TLS for `https://` daemon/LWS addresses: wallet2's autodetect mode would
+  otherwise retry in cleartext when the TLS handshake fails. Plain `http://` endpoints
+  keep the upstream autodetect behaviour; `.onion`/`.i2p` endpoints use `http://` and rely
+  on their transport.
 
 ## Nested submodules
 
@@ -67,11 +74,17 @@ patches are applied:
 
 ## Validation
 
-- Every patch applies with `git apply --index --3way` on a clean checkout of the
-  pinned base (seven patches).
+- The original seven patches applied with `git apply --index --3way` on a clean checkout of
+  the pinned base in CI before `0008` was added.
+- `0008-enforce-tls-for-https-daemon-address.patch` has been checked with `git apply
+  --check` against the pinned `src/wallet/api/wallet.cpp` and applies cleanly with
+  `git apply --index --3way` after the earlier `wallet.cpp` hunks in a simulated sequence;
+  a full eight-patch native CI run is still required.
 - `git submodule update --init --recursive --depth 1` fetched all three new
   submodules at the commits above.
 - `apply.sh` and the `Containerfile` use `struct CoinsInfo` and
   `viewOnlyBalance` as markers; both are present after the series.
+- `apply.sh` also checks the TLS marker in `src/wallet/api/wallet.cpp`; an existing
+  seven-patch checkout gets `0008` applied instead of being treated as complete.
 - The native compile and link still require the manual `Tests` workflow. A
   successful patch application is not proof that the native build works.

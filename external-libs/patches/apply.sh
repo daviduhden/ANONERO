@@ -49,7 +49,19 @@ EOF
 fi
 
 if grep -q "$MARKER" "$API"; then
-    echo "Monero patches already applied; ensuring nested submodules are present."
+    # The seven original patches may be present from an earlier checkout while the
+    # TLS-enforcement patch is new. Do not treat the CoinsInfo marker as proof that
+    # every patch was applied: a missing TLS patch would silently restore wallet2's
+    # cleartext autodetect fallback.
+    TLS_WALLET="$MONERO/src/wallet/api/wallet.cpp"
+    TLS_MARKER="An explicit https:// endpoint must never fall back to cleartext"
+    if grep -q "$TLS_MARKER" "$TLS_WALLET"; then
+        echo "Monero patches already applied; ensuring nested submodules are present."
+    else
+        echo "Applying the ANONERO TLS-enforcement patch to an existing patched checkout..."
+        git -C "$MONERO" apply --index --3way \
+            "$PWD/0008-enforce-tls-for-https-daemon-address.patch"
+    fi
 else
     if [ -n "$(git -C "$MONERO" status --porcelain)" ]; then
         cat >&2 <<'EOF'

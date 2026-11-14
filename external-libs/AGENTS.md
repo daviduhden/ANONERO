@@ -33,13 +33,14 @@ The build is intended to be reproducible. Treat every pin as a security input.
 - The ANONERO patch series under `patches/` is part of the Monero input. Patches must
   be applied to the official submodule; do not commit a locally modified Monero tree.
 
-**Current checkout state:** the seven wallet-API patches, `apply.sh`, `README.md`, and
+**Current checkout state:** the eight wallet-API patches, `apply.sh`, `README.md`, and
 `LICENSE-LGPL-3.0` are checked in under `patches/`. They apply cleanly to the pinned
 `85f036ba` commit. `external-libs/monero` is uninitialized locally and the native archives
 build in CI; the local submodule is still uninitialized, so local native work needs the submodule checkout.
 
-The patch series is adapted from `monero_c` and is LGPL-3.0; keep the licence file with
-the patches and do not relicense them as Apache-2.0.
+Seven patches are adapted from `monero_c` and are LGPL-3.0; keep the licence file with
+them and do not relicense them as Apache-2.0. `0008-enforce-tls-for-https-daemon-address.patch`
+is project-original and Apache-2.0.
 
 ## 3. Hard rules
 
@@ -84,6 +85,8 @@ If restoring or changing the patch series:
 - Update `apply.sh` only if the patch layout changes; it currently applies every
   `*.patch` in lexical order.
 - Keep the marker check (`struct CoinsInfo`) consistent with the first/last patch.
+  `apply.sh` also checks the TLS marker in `src/wallet/api/wallet.cpp` so an existing
+  seven-patch checkout receives `0008` instead of skipping it.
 - Do not create local commits in the submodule.
 - Document the upstream methods the patches add and why upstream cannot provide them.
 - Verify the Containerfile guard (`CoinsInfo`, `viewOnlyBalance`) matches the patch
