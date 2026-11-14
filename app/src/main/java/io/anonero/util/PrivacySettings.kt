@@ -25,6 +25,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import androidx.core.content.edit
+import io.anonero.network.NodeNetwork
+import io.anonero.network.TransportConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -130,7 +132,8 @@ object SecureClipboard {
  * speaks in light-wallet mode. Only the wallet's view key and public address are sent;
  * the spend key never leaves the device. The server can still see every incoming
  * transaction, amount, and the approximate timing, and can lie about chain state.
- * Communications are forced through Tor by AnonWalletHandler.
+ * Communications use the transport selected in TransportController; the destination
+ * network must match that transport and non-loopback clearnet requires TLS.
  */
 enum class LwsValidationError(
     val technicalMessage: String,
@@ -140,14 +143,19 @@ enum class LwsValidationError(
     HOST_HAS_SCHEME_OR_PORT("Enter only the host name, without scheme, path or port"),
     HOST_INVALID("Invalid host name"),
     PORT_RANGE("Port must be between 1 and 65535"),
+    NETWORK_MISMATCH("LWS destination does not match the selected transport network"),
+    CLEARNET_REQUIRES_TLS("Clearnet LWS requires TLS unless the host is loopback"),
 }
 
 data class LwsConfig(
     val enabled: Boolean,
     val host: String,
     val port: Int,
+    val useTls: Boolean = false,
 ) {
-    val address: String get() = "$host:$port"
+    val network: NodeNetwork get() = NodeNetwork.fromHost(host)
+
+    val address: String get() = "${if (useTls) "https" else "http"}://$host:$port"
 
     companion object {
         const val DEFAULT_PORT = 8443
@@ -157,6 +165,7 @@ data class LwsConfig(
                 enabled = prefs.getBoolean(PREFS_LWS_ENABLED, false),
                 host = prefs.getString(PREFS_LWS_HOST, "").orEmpty().trim(),
                 port = prefs.getInt(PREFS_LWS_PORT, DEFAULT_PORT),
+                useTls = prefs.getBoolean(PREFS_LWS_TLS, false),
             )
 
         fun save(
@@ -167,6 +176,7 @@ data class LwsConfig(
                 putBoolean(PREFS_LWS_ENABLED, config.enabled)
                 putString(PREFS_LWS_HOST, config.host)
                 putInt(PREFS_LWS_PORT, config.port)
+                putBoolean(PREFS_LWS_TLS, config.useTls)
             }
         }
 
@@ -196,6 +206,57 @@ data class LwsConfig(
         fun validate(
             host: String,
             port: Int,
-        ): LwsValidationError? = validateHost(host) ?: validatePort(port)
+            useTls: Boolean = false,
+        ): LwsValidationError? = validateHost(host) ?: validatePort(port) ?: clearnetTlsError(host, useTls)
+
+        fun validateTransport(
+            config: LwsConfig,
+            transport: TransportConfig,
+        ): LwsValidationError? {
+            if (config.network != transport.nodeNetwork) {
+                return LwsValidationError.NETWORK_MISMATCH
+            }
+            if (config.network == NodeNetwork.CLEARNET &&
+                !config.useTls &&
+                !isLocalHost(config.host)
+            ) {
+                return LwsValidationError.CLEARNET_REQUIRES_TLS
+            }
+            return null
+        }
+
+        /**
+         * A new enabled server causes the view key to be disclosed to a different
+         * operator. Re-saving the same server, or disabling LWS, needs no consent.
+         */
+        fun requiresConsent(
+            previous: LwsConfig,
+            next: LwsConfig,
+        ): Boolean =
+            next.enabled &&
+                (
+                    !previous.enabled ||
+                        previous.host != next.host ||
+                        previous.port != next.port ||
+                        previous.useTls != next.useTls
+                )
+
+        fun isLocalHost(host: String): Boolean {
+            val h = host.trim().trim('[', ']').lowercase()
+            return h == "localhost" || h == "::1" || h.startsWith("127.")
+        }
+
+        private fun clearnetTlsError(
+            host: String,
+            useTls: Boolean,
+        ): LwsValidationError? =
+            if (NodeNetwork.fromHost(host) == NodeNetwork.CLEARNET &&
+                !useTls &&
+                !isLocalHost(host)
+            ) {
+                LwsValidationError.CLEARNET_REQUIRES_TLS
+            } else {
+                null
+            }
     }
 }

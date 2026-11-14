@@ -97,8 +97,9 @@ import io.anonero.R
 import io.anonero.model.WalletManager
 import io.anonero.model.node.Node
 import io.anonero.model.node.NodeFields
+import io.anonero.network.NodeSelectionPolicy
+import io.anonero.network.TransportController
 import io.anonero.services.AnonWalletHandler
-import io.anonero.services.TorService
 import io.anonero.services.WalletState
 import io.anonero.store.NodesRepository
 import io.anonero.ui.components.DaemonStatus
@@ -130,15 +131,16 @@ enum class NodeValidationError(
     LWS_ACTIVE(R.string.disable_lws_restart),
     CONNECT_FAILED(R.string.connection_failed),
     STORAGE_UNAVAILABLE(R.string.node_storage_unavailable),
+    NETWORK_MISMATCH(R.string.node_network_mismatch),
 }
 
 class NodeSettingsViewModel(
     private val prefs: SharedPreferences,
     private val nodesRepository: NodesRepository,
+    private val transportController: TransportController,
 ) : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
 
-    private val torService: TorService by inject(TorService::class.java)
     private val walletHandler: AnonWalletHandler by inject(AnonWalletHandler::class.java)
     private val uriValidationError = MutableLiveData<NodeValidationError?>()
     private val _nodes = MutableStateFlow<List<Node>>(emptyList())
@@ -201,10 +203,12 @@ class NodeSettingsViewModel(
                 uriValidationError.postValue(NodeValidationError.INVALID_URL)
                 return null
             }
+            val useTls = cleanURL.startsWith("https://")
             val nodeJson =
                 JSONObject()
                     .apply {
                         put(NodeFields.RPC_HOST.value, validatedUrl.host)
+                        put(NodeFields.NODE_TLS.value, useTls)
                         put(
                             NodeFields.RPC_PORT.value,
                             if (validatedUrl.port == -1) Node.defaultRpcPort else validatedUrl.port,
@@ -218,7 +222,12 @@ class NodeSettingsViewModel(
                         put(NodeFields.NODE_NAME.value, "anon")
                     }
 
-            return Node.fromJson(nodeJson)
+            val node = Node.fromJson(nodeJson)
+            if (node != null && !NodeSelectionPolicy.accepts(transportController.config.value, node)) {
+                uriValidationError.postValue(NodeValidationError.NETWORK_MISMATCH)
+                return null
+            }
+            return node
         } catch (_: Exception) {
             Timber.tag(TAG).w("Invalid node configuration")
             uriValidationError.postValue(NodeValidationError.INVALID_URL)
@@ -251,11 +260,12 @@ class NodeSettingsViewModel(
                 wallet.pauseRefresh()
                 prefs.edit(commit = true) {
                     putString(NodeFields.RPC_HOST.value, node.host)
+                    putBoolean(NodeFields.NODE_TLS.value, node.useTls)
                     putInt(NodeFields.RPC_PORT.value, node.rpcPort)
                     putString(NodeFields.RPC_USERNAME.value, node.username)
                     putString(NodeFields.RPC_PASSWORD.value, node.password)
                 }
-                walletHandler.updateDaemon(node)
+                walletHandler.updateDaemon(node, lightWallet = false)
                 check(wallet.init(0, lightWallet = false)) { "Node initialization failed" }
                 if (prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) || wallet.isLightWallet) {
                     wallet.setTrustedDaemon(false)

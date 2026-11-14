@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,10 +56,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.anonero.R
+import io.anonero.network.TransportConfig
 import io.anonero.util.LwsConfig
 import io.anonero.util.LwsValidationError
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WALLET_USE_TOR
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 
@@ -73,31 +74,48 @@ fun LwsSettingsScreen(
     var enabled by remember { mutableStateOf(loaded.enabled) }
     var host by remember { mutableStateOf(loaded.host) }
     var portText by remember { mutableStateOf(loaded.port.toString()) }
+    var useTls by remember { mutableStateOf(loaded.useTls) }
     var error by remember { mutableStateOf<LwsValidationError?>(null) }
-    var requiresTor by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
-    val useTor = prefs.getBoolean(WALLET_USE_TOR, true)
+    var pendingConfig by remember { mutableStateOf<LwsConfig?>(null) }
+    val transport = TransportConfig.load(prefs)
+    val transportCompatible =
+        LwsConfig.validateTransport(
+            LwsConfig(enabled = true, host = host, port = portText.toIntOrNull() ?: loaded.port, useTls = useTls),
+            transport,
+        ) == null
 
     BackHandler { onBackPress() }
+    BackHandler(enabled = pendingConfig != null) { pendingConfig = null }
+
+    fun persist(config: LwsConfig) {
+        LwsConfig.save(prefs, config)
+        saved = true
+    }
 
     fun save() {
         error = null
-        requiresTor = false
         saved = false
         val port = portText.toIntOrNull() ?: LwsConfig.DEFAULT_PORT
+        val candidate = LwsConfig(enabled, host.trim(), port, useTls)
         if (enabled) {
-            val validation = LwsConfig.validate(host, port)
+            val validation = LwsConfig.validate(host, port, useTls)
             if (validation != null) {
                 error = validation
                 return
             }
+            val compatibility = LwsConfig.validateTransport(candidate, TransportConfig.load(prefs))
+            if (compatibility != null) {
+                error = compatibility
+                return
+            }
         }
-        if (enabled && !prefs.getBoolean(WALLET_USE_TOR, true)) {
-            requiresTor = true
-            return
+        val isNewServer = LwsConfig.requiresConsent(loaded, candidate)
+        if (isNewServer) {
+            pendingConfig = candidate
+        } else {
+            persist(candidate)
         }
-        LwsConfig.save(prefs, LwsConfig(enabled, host.trim(), port))
-        saved = true
     }
 
     Scaffold(
@@ -157,25 +175,55 @@ fun LwsSettingsScreen(
                 )
             }
             item {
-                Text(
-                    stringResource(R.string.lws_privacy_warning),
-                    style = MaterialTheme.typography.bodySmall,
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.lws_tls)) },
+                    supportingContent = { Text(stringResource(R.string.lws_tls_supporting)) },
+                    trailingContent = {
+                        Switch(checked = useTls, onCheckedChange = { useTls = it })
+                    },
                 )
             }
             item {
                 Text(
-                    if (useTor) {
-                        stringResource(R.string.lws_tor_enabled)
-                    } else {
-                        stringResource(R.string.lws_tor_disabled)
-                    },
+                    text =
+                        stringResource(
+                            R.string.lws_transport_network,
+                            stringResource(
+                                when (transport.nodeNetwork) {
+                                    io.anonero.network.NodeNetwork.CLEARNET -> R.string.network_clearnet
+                                    io.anonero.network.NodeNetwork.ONION -> R.string.network_onion
+                                    io.anonero.network.NodeNetwork.I2P -> R.string.network_i2p
+                                },
+                            ),
+                        ),
                     style = MaterialTheme.typography.bodySmall,
-                    color =
-                        if (useTor) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
+                )
+            }
+            if (enabled) {
+                item {
+                    Text(
+                        text =
+                            stringResource(
+                                if (transportCompatible) {
+                                    R.string.lws_transport_compatible
+                                } else {
+                                    R.string.lws_transport_incompatible
+                                },
+                            ),
+                        color =
+                            if (transportCompatible) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            item {
+                Text(
+                    stringResource(R.string.lws_privacy_warning),
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             item {
@@ -193,15 +241,6 @@ fun LwsSettingsScreen(
                     )
                 }
             }
-            if (requiresTor) {
-                item {
-                    Text(
-                        stringResource(R.string.lws_requires_tor),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
             if (saved) {
                 item {
                     Text(
@@ -213,6 +252,28 @@ fun LwsSettingsScreen(
             }
         }
     }
+    pendingConfig?.let { config ->
+        AlertDialog(
+            onDismissRequest = { pendingConfig = null },
+            title = { Text(stringResource(R.string.lws_consent_title)) },
+            text = { Text(stringResource(R.string.lws_privacy_warning)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        persist(config)
+                        pendingConfig = null
+                    },
+                ) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingConfig = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
 }
 
 private fun LwsValidationError.messageRes(): Int =
@@ -222,6 +283,8 @@ private fun LwsValidationError.messageRes(): Int =
         LwsValidationError.HOST_HAS_SCHEME_OR_PORT -> R.string.lws_error_host_format
         LwsValidationError.HOST_INVALID -> R.string.lws_error_host_invalid
         LwsValidationError.PORT_RANGE -> R.string.lws_error_port_range
+        LwsValidationError.NETWORK_MISMATCH -> R.string.lws_network_mismatch
+        LwsValidationError.CLEARNET_REQUIRES_TLS -> R.string.lws_clearnet_requires_tls
     }
 
 @Preview(device = "id:pixel_5")

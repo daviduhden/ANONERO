@@ -72,6 +72,7 @@ import io.anonero.ui.home.graph.routes.CoinsScreenRoute
 import io.anonero.ui.home.graph.routes.DecoySettingsRoute
 import io.anonero.ui.home.graph.routes.HomeScreenRoute
 import io.anonero.ui.home.graph.routes.LwsSettingsRoute
+import io.anonero.ui.home.graph.routes.NetworkSettingsRoute
 import io.anonero.ui.home.graph.routes.PayToManyRoute
 import io.anonero.ui.home.graph.routes.ProxySettingsRoute
 import io.anonero.ui.home.graph.routes.ReceiveRoute
@@ -91,6 +92,7 @@ import io.anonero.ui.home.settings.DecoySettingsScreen
 import io.anonero.ui.home.settings.ExportBackUp
 import io.anonero.ui.home.settings.LogViewer
 import io.anonero.ui.home.settings.LwsSettingsScreen
+import io.anonero.ui.home.settings.NetworkSettings
 import io.anonero.ui.home.settings.NodeSettings
 import io.anonero.ui.home.settings.ProxySettings
 import io.anonero.ui.home.settings.SecureWipe
@@ -455,6 +457,19 @@ fun HomeScreenComposable(
                             navigateToSpend = {
                                 showBottomNavigation = true
                                 bottomNavController.navigate(it)
+                            },
+                        )
+                    }
+                    composable<NetworkSettingsRoute> {
+                        NetworkSettings(
+                            onBackPress = {
+                                bottomNavController.popBackStack()
+                            },
+                            onManageNodes = {
+                                bottomNavController.navigate(SettingsNodeRoute)
+                            },
+                            onManageLws = {
+                                bottomNavController.navigate(LwsSettingsRoute)
                             },
                         )
                     }

@@ -83,7 +83,7 @@ import io.anonero.ui.home.LockScreenMode
 import io.anonero.ui.home.graph.routes.AccountsRoute
 import io.anonero.ui.home.graph.routes.DecoySettingsRoute
 import io.anonero.ui.home.graph.routes.LwsSettingsRoute
-import io.anonero.ui.home.graph.routes.ProxySettingsRoute
+import io.anonero.ui.home.graph.routes.NetworkSettingsRoute
 import io.anonero.ui.home.graph.routes.SecureWipeRoute
 import io.anonero.ui.home.graph.routes.SettingsExportBackUp
 import io.anonero.ui.home.graph.routes.SettingsLogs
@@ -426,15 +426,13 @@ fun SettingsPage(
                             )
                         }
                     }
-                    if (!offline) {
-                        item {
-                            SettingsMenuItem(title = stringResource(R.string.settings_proxy_settings), onClick = {
-                                navigateTo(ProxySettingsRoute)
-                            })
-                            HorizontalDivider(
-                                thickness = 2.5.dp,
-                            )
-                        }
+                    item {
+                        SettingsMenuItem(title = stringResource(R.string.settings_network_nodes), onClick = {
+                            navigateTo(NetworkSettingsRoute)
+                        })
+                        HorizontalDivider(
+                            thickness = 2.5.dp,
+                        )
                     }
                     item {
                         SettingsActionItem(

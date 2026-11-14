@@ -87,6 +87,9 @@ data object SettingsNodeRoute
 data object ProxySettingsRoute
 
 @Serializable
+data object NetworkSettingsRoute
+
+@Serializable
 data object SecureWipeRoute
 
 @Serializable

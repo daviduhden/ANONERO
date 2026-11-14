@@ -99,6 +99,7 @@ import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.icons.AnonIcons
 import io.anonero.model.WalletManager
+import io.anonero.network.ProxyEndpoint
 import io.anonero.services.AnonWalletHandler
 import io.anonero.services.TorService
 import io.anonero.util.WALLET_PROXY
@@ -111,7 +112,7 @@ import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
-import java.util.regex.Pattern
+import java.io.File
 
 private const val TAG = "ProxySettings"
 
@@ -125,17 +126,7 @@ enum class ProxyValidationError(
 
 // Accepts IPv4 and the full eight-group IPv6 form. Compressed IPv6 (::) is intentionally
 // not accepted by this UI validator; a valid compressed address may be rejected here.
-fun isNumericAddress(address: String): Boolean {
-    val ipv4Pattern =
-        Pattern.compile(
-            "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
-        )
-    val ipv6Pattern =
-        Pattern.compile(
-            "^(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}$",
-        )
-    return ipv4Pattern.matcher(address).matches() || ipv6Pattern.matcher(address).matches()
-}
+fun isNumericAddress(address: String): Boolean = ProxyEndpoint.isNumericOrLoopback(address)
 
 class ProxySettingsViewModel(
     private val anonWalletHandler: AnonWalletHandler,
@@ -158,14 +149,6 @@ class ProxySettingsViewModel(
 
     init {
         updateProxyState()
-        viewModelScope.launch {
-            torService.socksFlow.collect {
-                val socks = torService.socks
-                if (anonPrefs.getBoolean(WALLET_USE_TOR, true) && socks != null) {
-                    setProxy(socks.address.value, socks.port.value, persist = false)
-                }
-            }
-        }
     }
 
     fun setProxy(
@@ -208,15 +191,6 @@ class ProxySettingsViewModel(
     }
 
     fun enableTor(enable: Boolean) {
-        if (!enable &&
-            (
-                anonPrefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false) ||
-                    WalletManager.instance?.wallet?.isLightWallet == true
-            )
-        ) {
-            addressValidationError.postValue(ProxyValidationError.UPDATE_FAILED)
-            return
-        }
         addressValidationError.postValue(null)
         if (enable) {
             // The Tor SOCKS port is ephemeral and must never be persisted as a manual
@@ -237,6 +211,7 @@ class ProxySettingsViewModel(
                 remove(WALLET_PROXY)
                 remove(WALLET_PROXY_PORT)
             }
+            torService.stop()
             _proxyAddress.postValue(null)
             _useManualProxy.postValue(true)
         }

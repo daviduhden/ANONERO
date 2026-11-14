@@ -37,6 +37,14 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Package visibility for the official I2P for Android app. This is used only to
+         show setup instructions; ANONERO never starts or configures the external app. -->
+    <queries>
+        <package android:name="net.i2p.android" />
+        <package android:name="net.i2p.android.donate" />
+        <package android:name="net.i2p.android.router" />
+    </queries>
+
     <!-- Backups are disabled and excluded again by both XML rule files. FLAG_SECURE
          is set in MainActivity. Cleartext is permitted for node/LWS compatibility;
          proxy enforcement is application-level, not an OS network-security policy. -->

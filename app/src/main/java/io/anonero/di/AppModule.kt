@@ -21,6 +21,7 @@ package io.anonero.di
 import android.content.Context
 import android.content.SharedPreferences
 import io.anonero.AnonConfig
+import io.anonero.network.TransportController
 import io.anonero.services.AnonWalletHandler
 import io.anonero.services.TorService
 import io.anonero.services.WalletState
@@ -28,6 +29,7 @@ import io.anonero.store.LogRepository
 import io.anonero.store.NodesRepository
 import io.anonero.ui.home.SendViewModel
 import io.anonero.ui.home.settings.LogViewModel
+import io.anonero.ui.home.settings.NetworkSettingsViewModel
 import io.anonero.ui.home.settings.NodeSettingsViewModel
 import io.anonero.ui.home.settings.ProxySettingsViewModel
 import io.anonero.ui.home.settings.SecureWipeViewModel
@@ -57,8 +59,17 @@ val appModule =
     module {
         single(named(WALLET_PREFERENCES)) { provideWalletSharedPrefs(androidApplication()) }
         single { TorService(get(named(WALLET_PREFERENCES))) }
+        single { TransportController(androidApplication(), get(named(WALLET_PREFERENCES)), get()) }
         single { WalletState() }
-        single { AnonWalletHandler(get(named(WALLET_PREFERENCES)), get(), get()) }
+        single {
+            AnonWalletHandler(
+                get(named(WALLET_PREFERENCES)),
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
         single { LogRepository(get()) }
         single { NodesRepository(get()) }
         viewModel { AppViewModel(get(), get(), get()) }
@@ -66,6 +77,15 @@ val appModule =
         viewModel { LogViewModel(get()) }
         viewModel { SendViewModel() }
         viewModel { SecureWipeViewModel(get(), get(named(WALLET_PREFERENCES)), get(), get()) }
-        viewModel { NodeSettingsViewModel(get(named(WALLET_PREFERENCES)), get<NodesRepository>()) }
+        viewModel { NodeSettingsViewModel(get(named(WALLET_PREFERENCES)), get<NodesRepository>(), get()) }
         viewModel { ProxySettingsViewModel(get(), get(), get(named(WALLET_PREFERENCES))) }
+        viewModel {
+            NetworkSettingsViewModel(
+                get(named(WALLET_PREFERENCES)),
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
     }
