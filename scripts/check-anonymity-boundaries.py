@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+#
+# Copyright (c) 2026, David Uhden Collado
+# Copyright (c) 2022-2026, r4v3r23
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+"""Check selected source policy boundaries; no application or test execution."""
+
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+JAVA = ROOT / "app/src/main/java/io/anonero"
+failures = []
+application = (JAVA / "AnonApplication.kt").read_text(encoding="utf-8")
+logs = (JAVA / "ui/home/settings/Logs.kt").read_text(encoding="utf-8")
+repository = (JAVA / "store/LogsDataStore.kt").read_text(encoding="utf-8")
+service = (JAVA / "services/AnonNeroService.kt").read_text(encoding="utf-8")
+
+if "Timber.plant(DebugTree())" in application:
+    failures.append("An independent logcat tree bypasses persistent diagnostic policy")
+if "defaultHandler?.uncaughtException(t, e)" in application:
+    failures.append("Original uncaught exceptions must not reach the system log handler")
+for field in ("MODEL", "MANUFACTURER", "BRAND", "DEVICE", "PRODUCT", "HARDWARE", "BOARD", "HOST", "FINGERPRINT"):
+    if f"Build.{field}" in logs:
+        failures.append(f"Log export must not fingerprint hardware via Build.{field}")
+if "DiagnosticPolicy.sanitize" not in repository or "expectedGeneration != generation" not in repository:
+    failures.append("Diagnostic persistence requires sanitization and stale-session rejection")
+if service.count(".setVisibility(NotificationCompat.VISIBILITY_SECRET)") != 2:
+    failures.append("Both wallet notification builders require secret lock-screen visibility")
+# New consumers must use profile-aware LwsConfig rather than legacy MAIN keys.
+for source in JAVA.rglob("*.kt"):
+    if source.name in {"Prefs.kt", "PrivacySettings.kt"}:
+        continue
+    if "PREFS_LWS_" in source.read_text(encoding="utf-8"):
+        failures.append(f"Raw MAIN LWS preference access outside profile boundary: {source.relative_to(ROOT)}")
+
+# Void JNI freeze/thaw calls cannot establish success on their own. The Kotlin
+# wrapper must verify the refreshed native snapshot before reporting the mutation.
+coins = (JAVA / "model/Coins.kt").read_text(encoding="utf-8")
+for operation, verdict in (("freeze", "it.frozen"), ("thaw", "!it.frozen")):
+    start = coins.index(f"fun {operation}(publicKey: String)")
+    end = coins.index("\n    }", start)
+    body = coins[start:end]
+    if "refresh()" not in body or f"it.pub_key == publicKey && {verdict}" not in body:
+        failures.append(f"Coins.{operation} requires a refreshed frozen-state postcondition")
+
+backup = (JAVA / "util/backup/BackupHelper.kt").read_text(encoding="utf-8")
+start = backup.index("private suspend fun createBackupLocked(")
+end = backup.index("val manager =", start)
+if "check(!AnonConfig.viewOnly)" not in backup[start:end] or "if (WalletSession.isDecoy)" not in backup[start:end]:
+    failures.append("Backup export must reject view-only/decoy contexts before auxiliary wallet access")
+
+manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
+android = "{http://schemas.android.com/apk/res/android}"
+app = manifest.find("application")
+if app is None or app.get(android + "allowBackup") != "false":
+    failures.append("Android automatic backup must remain disabled")
+for component in manifest.findall("application/service") + manifest.findall("application/provider"):
+    if component.get(android + "exported") != "false":
+        failures.append("Wallet services and file providers must not be exported")
+if failures:
+    raise SystemExit("\n".join(failures))
+print("Selected anonymity source boundaries passed (not dynamic or security proof)")
