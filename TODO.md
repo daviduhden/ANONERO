@@ -27,6 +27,29 @@ the rationale to `ROADMAP.md`.
 - [ ] Validate the Android toolchain (AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, CMake 4.1.2).
 - [ ] Run instrumented tests for lock/unlock, background sync, decoy/duress, and wipe.
 
+## Network transports
+
+- [ ] Device-test embedded Tor, Orbot, InviZible Tor, system VPN, i2pd, InviZible I2P,
+      official I2P for Android, and custom SOCKS5 against real `.onion`/`.i2p`/clearnet
+      nodes.
+- [ ] Validate the official I2P Java I2PTunnel SOCKS setup, package detection, SAM/I2CP
+      availability differences, and interactive SAM authorization without assuming a
+      default SOCKS port.
+- [ ] Verify Android VPN routing for ANONERO specifically and document that
+      `TRANSPORT_VPN` does not prove per-app inclusion or DNS protection.
+- [ ] Validate wallet2 `socks5://` remote resolution and the opt-in `https://` daemon path
+      against the pinned native build.
+- [ ] Move onboarding proxy setup onto `TransportController` or Network & Nodes. The
+      legacy `ProxySettings` screen writes `WALLET_USE_TOR`/`WALLET_PROXY` directly and does
+      not choose a custom-proxy destination network, so its state can be stale relative to
+      `TransportConfig` after startup.
+- [ ] Add automatic recovery/re-apply for external Orbot, InviZible, i2pd, and custom proxy
+      failures; today the user must re-apply after a startup failure.
+- [ ] Add a vetted, privacy-preserving node-discovery source or keep the saved-node
+      catalog as the documented discovery boundary.
+- [ ] Add instrumented tests for transport changes during sync, VPN loss, and a
+      transaction broadcast attempt while the transport is unavailable.
+
 ## Correctness and tests
 
 - [ ] Decide the instrumented runner: `43528256395` passed on hosted, but `43521054641`
@@ -42,9 +65,11 @@ the rationale to `ROADMAP.md`.
       statically.
 - [ ] Add a restore fixture for a v2 PIN-keyed backup whose external passphrase differs
       from the PIN, and verify both open attempts and the rollback path.
-- [ ] Move remaining main-thread wallet reads out of composition (`HomeGraph`, seed/key
+- [x] Move remaining main-thread wallet reads out of composition (`HomeGraph`, seed/key
       screens, `SeedSettings` address/NERO export, `Send` coin reads, transaction detail)
-      into `Dispatchers.IO` state producers.
+      into `Dispatchers.IO` state producers. `HomeGraph` now uses the cached
+      `WalletState.walletStatus`; sign/verify, seed/address export, pin change, and coin
+      selection run on IO with cancellation preserved.
 - [ ] Add a native/JNI test fixture for signed-transaction binding once the wallet2 getter
       exists.
 - [ ] Test backup interruption between ZIP and encryption and assert no plaintext remains.
@@ -56,20 +81,25 @@ the rationale to `ROADMAP.md`.
       failure.
 - [ ] Add JNI boundary tests for null strings, zero handles, length mismatches, and listener
       replacement.
-- [ ] Convert remaining raw JNI string paths to `ScopedUtfChars` where practical.
+- [x] Convert remaining raw JNI string paths to `ScopedUtfChars` (array and `ArrayList`
+      readers now use `ScopedUtfChars` + `ScopedLocalRef`; native CI still required).
 
 ## Security and privacy
 
-- [ ] Validate Tor restart/SOCKS re-application and LWS trust reset on a device.
+- [ ] Validate Tor restart/SOCKS re-application and LWS trust reset on a device, including
+      LWS over external Tor/I2P, system VPN, and a custom proxy.
 - [ ] Decide whether a failed `startBackgroundSync` should close/reset the wallet or keep
       the lock overlay and document the chosen recovery path.
 - [ ] Review the cleartext manifest flag and confirm no new unproxied client is introduced.
 - [ ] Add a device test for stealth notifications, clipboard clearing, and `FLAG_SECURE`.
-- [ ] Harden v1/v2 backup deserialization validation for node host/port and other untrusted
-      fields, including negative heights and malformed hosts.
+- [x] Harden v1/v2 backup deserialization validation for node host/port and other
+      untrusted fields, including negative heights and malformed hosts. Backup node
+      records now pass `BackupNodePolicy`; invalid records are dropped and the active node
+      is written with the build's network type. Restore height was already bounded.
 - [ ] Add a Gradle dependency lockfile/verification metadata in a CI-generated change.
 - [ ] Verify the Kotlin/C++ architecture policy check in CI.
-- [ ] Decide whether to keep the narrow IPv6 proxy validator or broaden it safely.
+- [x] Broaden the legacy proxy validator: it now delegates to
+      `ProxyEndpoint.isNumericOrLoopback`, including compressed IPv6 and loopback names.
 
 ## Features and UX
 
@@ -82,5 +112,6 @@ the rationale to `ROADMAP.md`.
 
 - [ ] Keep `docs/architecture/dependencies.md` current after every dependency change.
 - [ ] Update `PROGRESS.md` at the end of each development cycle.
-- [ ] Remove the `ui/NavGraph.kt` stub in a dedicated cleanup change if it remains unused.
+- [x] Remove the `ui/NavGraph.kt` stub; the active graphs are `HomeGraph.kt` and
+      `OnboardingGraph.kt`.
 - [ ] Do not commit or push without explicit supervisor authorization.

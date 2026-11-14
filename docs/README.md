@@ -10,6 +10,7 @@ skills under `.agents/`; it does not replace them.
 | --- | --- | --- |
 | [`../README.md`](../README.md) | Users and new contributors | What ANONERO is, features, platform, downloads, build entry points |
 | [`architecture/overview.md`](architecture/overview.md) | Android and wallet developers | Modules, state flow, lifecycle, persistence, Tor/LWS, build boundaries |
+| [`architecture/network-transport.md`](architecture/network-transport.md) | Android, wallet, and privacy developers | Transport providers, proxy policy, node-network matrix, VPN/I2P limits |
 | [`architecture/jni-boundary.md`](architecture/jni-boundary.md) | Native and Kotlin developers | Kotlin/C++/wallet2 contracts, handles, memory, errors, callbacks |
 | [`security-model.md`](security-model.md) | Security reviewers | Assets, trust boundaries, invariants, privacy limits, known issues |
 | [`features.md`](features.md) | Product and QA | Implemented wallet features, flows, and limitations |
@@ -28,9 +29,10 @@ ANONERO is a Kotlin/Jetpack Compose Android application. UI state is derived fro
 managed wallet through `WalletState`; `AnonWalletHandler` owns wallet lifecycle, profile
 selection, proxy application, LWS login, and wipe. Wallet operations cross a C++ JNI adapter
 into the official Monero `wallet2` static libraries built by `external-libs/`. Network
-traffic is proxied through an embedded Tor daemon; the optional LWS path uses the built-in
-Tor endpoint and treats the server as an untrusted index. Secrets are protected at rest by
-a Keystore-wrapped wallet password and a PBKDF2 PIN gate.
+traffic is routed through the selected transport (embedded Tor by default) and the wallet's
+proxy setting; the optional LWS path uses that same endpoint and treats the server as an
+untrusted index. Secrets are protected at rest by a Keystore-wrapped wallet password and a
+PBKDF2 PIN gate.
 
 ## Documentation rules
 

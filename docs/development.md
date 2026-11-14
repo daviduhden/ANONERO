@@ -82,10 +82,10 @@ adapter plus the prebuilt Monero archives.
   do not create a parallel wallet cache.
 - `WalletManager` owns one managed wallet. Use unmanaged wallets only for the decoy and
   backup copy, and close them.
-- `AnonWalletHandler` owns open/close, profile resolution, proxy, daemon, LWS, and wipe.
+- `AnonWalletHandler` owns open/close, profile resolution, transport application, daemon, LWS, and wipe.
 - `MoneroHandlerThread` owns wallet callbacks and refresh decisions.
 - `AnonNeroService` keeps sync alive and publishes notifications; it does not own the wallet.
-- `TorService` owns the embedded daemon and publishes the SOCKS endpoint.
+- `TransportController` (in `network/`) owns mode policy, proxy validation, VPN checks, and the node-network matrix. `TorService` owns only the embedded daemon.
 - Security-sensitive operations must be serialized or guarded; a failed close/switch must
   not leave two profiles referenced at once.
 
@@ -189,7 +189,7 @@ CI jobs (manual dispatch only; every job other than `authorize` needs the owner 
 - Pure Kotlin logic (formatting, parsing, migrations, archive rules) belongs in
   `app/src/test`. `SigningSummaryTest` covers the wallet2 review-summary parser.
 - Native linkage and behavior need the `native` job and a device/instrumented test.
-- UI rendering, permission flows, Tor transitions, LWS reconnect, lock screen, and decoy
+- UI rendering, permission flows, transport/IPv6/VPN transitions, LWS reconnect, lock screen, and decoy
   switching need device validation.
 - Do not run tests locally as an agent; add the test and let CI run it.
 
@@ -206,8 +206,8 @@ CI jobs (manual dispatch only; every job other than `authorize` needs the owner 
 
 ## 10. Current tooling oddities
 
-- `ui/NavGraph.kt` has no executable code; navigation is implemented in `HomeGraph.kt` and
-  `OnboardingGraph.kt`.
+- Navigation is implemented exclusively in `HomeGraph.kt` and `OnboardingGraph.kt`; the
+  old `ui/NavGraph.kt` stub has been removed.
 - The Monero submodule is not initialized in the local checkout. The wallet-API patch
   series is checked in and applies to the pinned commit; the native archives still need
   the manual CI `native` job.

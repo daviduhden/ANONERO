@@ -70,11 +70,11 @@ dependency versions and hashes, CMake/NDK archives, `SOURCE_DATE_EPOCH`, `ZERO_A
 `TZ=UTC`, and static archives. Do not add an unpinned download or a host toolchain
 dependency.
 
-**Current state:** the seven wallet-API patches are checked in under
-`external-libs/patches/` and apply cleanly to the pinned commit, but the local Monero
-submodule is uninitialized locally; CI builds the native archives and assembles both debug
-APKs. The API 35 smoke test passed on `42874760135` but is not stable on the KVM-less
-hosted runner.
+**Current state:** the eight wallet-API patches (seven from `monero_c`, one
+project-original TLS-enforcement patch) are checked in under `external-libs/patches/` and
+apply cleanly to the pinned commit, but the local Monero submodule is uninitialized
+locally; CI builds the native archives and assembles both debug APKs. The API 35 smoke
+test passed on `42874760135` but is not stable on the KVM-less hosted runner.
 
 ## 4. GitHub Actions: test pipeline
 

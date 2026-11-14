@@ -11,7 +11,7 @@ fund safety.
 | --- | --- | --- |
 | Recovery seed / passphrase | wallet2; displayed only on explicit seed screens | App sandbox, Keystore-wrapped wallet password, PIN gate, `FLAG_SECURE` |
 | Spend key | wallet2, present only while the wallet is unlocked | Background sync removes it; Keystore/PIN gate |
-| View key | wallet2; sent to LWS in light-wallet mode | Tor; LWS trust policy |
+| View key | wallet2; sent to LWS in light-wallet mode | Selected transport; LWS trust policy |
 | Wallet password `W` | 256-bit random secret | Android Keystore AES-GCM wrapping; never derived from PIN |
 | PIN | user input; stored as PBKDF2 hash | PBKDF2-HMAC-SHA256, throttle, constant-time compare |
 | Encrypted backup | user-selected file | PBKDF2 600k + AES-256-GCM; v1/v2 read compatibility |
@@ -28,8 +28,8 @@ fund safety.
 | Android Keystore/TEE/StrongBox | Non-exportable key storage, AES-GCM wrapping | A fully compromised app process that can call the key |
 | wallet2 | Key derivation, transaction construction, signing, wallet file format | UI policy, network proxy, PIN gate |
 | Monero daemon | Chain data and wallet RPC | Honesty about chain state; it can lie or be malicious |
+| Transport (Tor/I2P/VPN/custom) | Network-path confidentiality according to the selected mode | Timing, amounts, sync patterns; a VPN cannot prove per-app routing |
 | LWS | Remote indexing | Trust; it sees the view key and incoming metadata and can lie |
-| Tor | Network-path confidentiality | Timing, amounts, sync patterns, endpoint compromise |
 | Backup file | Portability | Confidentiality if the passphrase is weak; integrity for v1 only |
 | CI/release chain | Artifact provenance | A compromised dependency, action, runner, or signing secret |
 
@@ -140,22 +140,39 @@ path.
 - `BackupHelper.createBackUp` clears only transient backup/airgapped artifacts, preserving
   the live Tor cache and cache log. A failed restore removes only MAIN and does not leave the
   backup's node as the active configuration.
+- Restored node records are validated by `BackupNodePolicy`: schemes, credentials, paths,
+  whitespace, embedded ports, malformed IPv6, and out-of-range ports are dropped, and the
+  saved network type is the build's network rather than the backup's value.
 
-## 9. Tor and LWS
+## 9. Transports, Tor, I2P, VPN, and LWS
 
-- All wallet traffic must go through the embedded Tor SOCKS endpoint or a manual proxy when
-  Tor is disabled. `applyProxy` waits up to 60 seconds for SOCKS and throws on timeout.
-  `TorSplash` timing out does not authorize a direct connection.
-- LWS requires the built-in Tor endpoint; a manual proxy is rejected. The server receives the
-  public address and view key, can observe incoming transactions/amounts/timing, and can lie
-  about chain state.
-- `setTrustedDaemon(false)` is set before and after LWS login, including failure paths. A LWS
-  login failure does not fall back to a full node.
-- Tor hides the network path. It does not hide timing, amounts, sync patterns, or the use of
-  Tor itself.
+- Transport is explicit: embedded Tor (default), external Tor, external I2P (i2pd, InviZible, official I2P Java), custom SOCKS5,
+  or system VPN. Tor/I2P/custom require their proxy and never fall back to clearnet.
+- Embedded Tor waits up to 60 seconds for SOCKS and throws on timeout. A `TorSplash` timeout
+  does not authorize a direct connection.
+- System VPN is the only clearnet mode. It requires an active `TRANSPORT_VPN` and fails
+  closed when the VPN is absent or lost. Android cannot prove that a VPN included this app,
+  so this mode is not described as leak-proof.
+- LWS uses the same selected transport as RPC. Its destination must match the transport
+  network (`.onion` on Tor, `.i2p` on I2P, clearnet on system VPN or an explicit
+  custom-clearnet proxy); a mismatch is rejected and leaves the wallet offline. The server
+  receives the public address and view key, can observe incoming transactions/amounts/timing,
+  and can lie about chain state.
+- Non-loopback clearnet LWS requires TLS (`https://`); loopback may use `http://` for a
+  local server. `.onion` and `.i2p` endpoints use `http://` and rely on their transport.
+  Patch `0008-enforce-tls-for-https-daemon-address.patch` forces TLS for `https://`
+  instead of wallet2's autodetect, which could otherwise retry in cleartext. epee verifies
+  the system CA and hostname; this still requires CI/device validation.
+- The first save of a new LWS server requires explicit user consent before the view key is
+  disclosed. ANONERO never silently switches to a different LWS operator; automatic
+  reconnection to the already authorized server is allowed.
+- `setTrustedDaemon(false)` is set before and after LWS login, including failure paths. A
+  LWS login failure does not fall back to a full node.
+- Tor hides the network path, not timing, amounts, sync patterns, or the use of Tor. I2P and
+  VPN have their own, narrower properties and are not interchangeable with Tor.
 - `AndroidManifest.xml` permits cleartext traffic for node/LWS compatibility. That flag is
   not a proxy bypass or a TLS guarantee; Android will not enforce HTTPS for those endpoints.
-  The app-level proxy rule is what keeps wallet traffic on Tor.
+  The app-level transport rule keeps wallet traffic on the selected path.
 
 ## 10. Stealth, decoy, and duress
 
@@ -200,11 +217,12 @@ correlate the two profiles.
 These are current limitations. Items fixed in the latest development cycle are listed
 separately below.
 
-1. **Monero patch series licensing and native validation.** The seven wallet-API patches
-   are checked in and apply to the pinned commit, but they are adapted from `monero_c`
-   under LGPL-3.0 (see `external-libs/patches/README.md`) and the native archives have not
-   been compiled. Treat the native build as unvalidated until the manual `native` CI job
-   passes.
+1. **Monero patch series licensing and native validation.** Seven wallet-API patches
+   adapted from `monero_c` are licensed under LGPL-3.0; the project-original
+   `0008-enforce-tls-for-https-daemon-address.patch` is Apache-2.0 (see
+   `external-libs/patches/README.md`). CI builds the native archives; local compilation is
+   not permitted. Treat runtime TLS and wallet behavior as unvalidated until the manual
+   `native` and device jobs pass.
 2. **No dependency lockfile/verification metadata.** Gradle resolution is not locked, and
    the wrapper JAR is the only checked-in binary build artifact. Supply-chain verification
    relies on pinned versions, the wrapper checksum, and CI. See `dependencies.md`.
@@ -212,12 +230,12 @@ separately below.
    SharedPreferences/DataStore. The app sandbox is the protection boundary; a forensic copy
    of app data exposes them.
 4. **LWS metadata exposure.** The view key and incoming transaction metadata are disclosed to
-   the LWS. Tor does not hide them from the server.
+   the LWS. The selected transport does not hide them from the server.
 5. **Decoy is not plausible deniability.** See section 10.
 6. **Stealth is not anonymity.** See section 10.
-7. **Manual IPv6 proxy validation is narrow.** `ProxySettings.isNumericAddress` accepts
-   full IPv4 and a full eight-group IPv6 form, not compressed IPv6. A valid compressed
-   address may be rejected; this is a usability limitation, not a clearnet bypass.
+7. **Legacy proxy validation now matches Network & Nodes.** The old `ProxySettings` screen
+   delegates to `ProxyEndpoint.isNumericOrLoopback`, so IPv4, compressed IPv6, and loopback
+   names are accepted consistently. This is still a usability boundary, not a clearnet bypass.
 8. **Background-sync failure is not a proof of spend-key removal.** The UI remains locked,
    but if wallet2 refuses `startBackgroundSync`, the native wallet may still hold the spend
    key. Restarting the process or a later successful `stopBackgroundSync` is the recovery

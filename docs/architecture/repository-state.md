@@ -31,11 +31,11 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 | Localization parity is statically checked | `scripts/check-i18n.py`, `test.yml` |
 | Monero submodule pinned | `git ls-tree HEAD external-libs/monero` -> `85f036ba...` |
 | Submodule not populated locally | `external-libs/monero` empty |
-| Wallet-API patch series present | `external-libs/patches/0001..0005`, `apply.sh`, `README.md` |
+| Wallet-API patch series present | `external-libs/patches/0001..0008`, `apply.sh`, `README.md` |
 | Patch series applies to the pin | `git apply --index --3way` on a clean `85f036ba` checkout |
 | Native archives and adapter link | build in CI; API 35 smoke test passed on two runs, unstable without KVM |
 | Embedded Tor with mandatory proxy | `TorService.kt`, `AnonWalletHandler.applyProxy`, `WALLET_USE_TOR` default true |
-| Optional LWS over Tor | `PrivacySettings.kt` `LwsConfig`, `AnonWalletHandler.startService` |
+| Optional LWS over the selected transport | `PrivacySettings.kt` `LwsConfig`, `AnonWalletHandler.startService`/`reapplyLightWallet` |
 | Keystore-bound wallet secret | `KeyStoreHelper.kt`, `WalletKey.kt` |
 | PBKDF2 PIN gate and throttle | `PinHash.kt`, `PinThrottle.kt` |
 | Backup v1/v2/v3 compatibility | `EncryptUtil.kt`, `BackupHelper.kt`, tests |
@@ -55,7 +55,8 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
   UTXO freeze/thaw, coin control, send/sweep/pay-to-many, fee display, review,
   signing/verification, key-image/output exchange, UR/QR airgapped flows.
 - Tor service with SOCKS proxy enforcement and fail-closed behavior.
-- Optional LWS with view-key exposure and untrusted-server policy.
+- Optional LWS with view-key exposure and untrusted-server policy; it uses the selected
+  transport and requires TLS for non-loopback clearnet.
 - Keystore-wrapped wallet secret, PIN hash/throttle, legacy PIN migration.
 - Encrypted backups with AEAD v3 writer and v1/v2 readers.
 - Stealth mode, decoy/duress, secure wipe, sensitive clipboard.
@@ -134,13 +135,18 @@ documentation; it did not change Kotlin application source. A documentation pass
 KDoc/comments and Markdown; it did not change behavior. The copyright/newline normalization
 was committed in `52d67d4`. The CI compile-failure fixes were committed afterwards.
 
+- Multi-transport networking is implemented: embedded/external Tor, i2pd/InviZible I2P,
+  system VPN, and custom SOCKS5, with a transport↔node-network matrix. Live provider
+  behavior, wallet2 `socks5://`/HTTPS handling, Android per-app VPN routing, and remote
+  node discovery remain unverified or intentionally limited to the saved-node catalog.
 ## Known gaps and follow-ups
 
-1. **Validate the restored Monero patch series.** The seven patches and their nested
+1. **Validate the restored Monero patch series.** The eight patches and their nested
    submodule pins are checked in; CI builds the native archives, the adapter, and the
    debug APKs. The API 35 smoke test passed on `42874760135` and `43528256395` but remains
-   unstable on the KVM-less runner. The series is adapted from `monero_c` under LGPL-3.0 (see
-   `external-libs/patches/README.md`).
+   unstable on the KVM-less runner. Seven patches are adapted from `monero_c` under
+   LGPL-3.0; `0008-enforce-tls-for-https-daemon-address.patch` is project-original under
+   Apache-2.0 (see `external-libs/patches/README.md`).
 2. **Initialize the Monero submodule for local native work.**
    `git submodule update --init --recursive` is required before patch application or a
    native build. Do not run it as part of an unrelated change.

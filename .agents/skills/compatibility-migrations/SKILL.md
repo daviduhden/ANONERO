@@ -82,6 +82,15 @@ description: "Use when changing persisted formats, legacy compatibility paths, b
 ### Preferences and profiles
 
 - `util/Prefs.kt` keys and `NodeFields` values are persisted.
+- `PREFS_TRANSPORT_MODE`, `PREFS_TRANSPORT_HOST`, `PREFS_TRANSPORT_PORT`,
+  `PREFS_TRANSPORT_NETWORK`, `PREFS_NODE_AUTO_SELECT`, and `PREFS_NODE_PREFER_TRUSTED`
+  are the multitransport policy. `TransportConfig.load` migrates the legacy
+  `WALLET_USE_TOR`/`WALLET_PROXY`/`WALLET_PROXY_PORT` trio; `save` keeps those legacy
+  keys coherent for older readers.
+- `PREFS_LWS_ENABLED`, `PREFS_LWS_HOST`, `PREFS_LWS_PORT`, and `PREFS_LWS_TLS` are the
+  LWS configuration. `lwsTls` defaults to `false` for older installs; a non-loopback
+  clearnet LWS without TLS is rejected and must be re-saved with TLS. `.onion`/`.i2p`
+  endpoints keep `http://` and rely on their transport.
 - Main uses `PREFS_PIN_HASH`, `PREFS_PASSPHRASE_HASH`, `RESTORE_HEIGHT`; decoy uses
   `PREFS_DURESS_PIN_HASH`, `PREFS_DECOY_PASSPHRASE_HASH`,
   `PREFS_DECOY_CONFIGURED`, and its own restore height.

@@ -65,6 +65,10 @@ security, language, build, and Git policy. Read it first.
 - Use `commit = true` for security-relevant writes that must be durable before the
   next step (PIN hash, Keystore migration, profile removal, LWS config).
 - Node and log lists use DataStore (`store/NodeDataStore.kt`, `store/LogsDataStore.kt`).
+- Transport mode, proxy endpoint, custom node network, and auto-select preferences live in
+  `network/TransportModels.kt`; they are shared network identity and are covered by wipe.
+- Node records gain `useTls`; do not change the persisted `host`/`rpcPort`/`network` keys
+  without a migration. `NetworkType_*` names remain part of the JSON contract.
 - Cache files are ephemeral. Any new airgapped export/import file must be covered by
   `AnonConfig.clearSpendCacheFiles` and the wipe path.
 - Never write wallet files, keys, seeds, or decrypted backups outside app-private
@@ -82,6 +86,10 @@ security, language, build, and Git policy. Read it first.
   debugging, or “sharing”.
 - Keep `android:allowBackup="false"` and both backup-exclusion XML files intact.
 - Keep the foreground service `exported="false"` and `stopWithTask="true"`.
+- Never add a clearnet path to Tor/I2P/custom modes. The official I2P Java provider uses a user-created I2PTunnel SOCKS tunnel; package detection alone is not router availability. The system-VPN mode is the only
+  clearnet mode and must check `TRANSPORT_VPN`; Android cannot prove per-app VPN routing.
+- Apply the transport to both `WalletManager` and the live `Wallet`; a transport change
+  must pause refresh, clear incompatible state, and fail closed.
 - Do not add exported components, deep links, implicit intents carrying wallet data,
   or new permissions without a review.
 - Do not add analytics, telemetry, crash reporting, or remote config.

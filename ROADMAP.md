@@ -41,8 +41,10 @@ then maintainability.
 - Add deterministic tests for Tor restart and SOCKS re-application.
 - Keep the Tor SOCKS endpoint transient; never persist it as a manual proxy. The flow is
   nullable and must emit `null` on stop/restart.
-- Validate LWS login failure, trust reset, reconnect, and host/port validation. Trust must
-  be re-cleared after a successful reconnect login.
+- Validate LWS login failure, trust reset, reconnect, host/port/TLS validation, and the
+  per-transport LWS path. Trust must be re-cleared after a successful reconnect login.
+- Verify that a transport change cancels in-flight LWS requests and never reuses the
+  previous transport.
 - Keep the cleartext manifest flag from becoming an implicit clearnet path.
 - Document the remaining metadata exposure to daemons and LWS.
 
@@ -59,6 +61,11 @@ then maintainability.
   diagnosis requires a root cause, a global pattern search, and a regression check.
 - Keep Android Lint green and the project-owned C++ `-Werror` gate green (validated in
   `43521054641`), then add sanitizer/fuzz coverage only with a working native matrix.
+- Validate the multi-transport matrix (embedded/external Tor, i2pd/InviZible/official
+  I2P Java, VPN, custom SOCKS5) on devices, including transport changes during sync and
+  VPN-loss fail-closed behavior.
+- Complete node discovery only with a vetted, privacy-preserving source; keep manual and
+  saved-node selection as the safe baseline.
 - Move instrumented tests to a KVM-capable runner or a device farm. The hosted Linux
   runner passed in `43528256395` but remains non-deterministic under TCG.
 - Add a pinned format/lint gate for Kotlin, C++, Python, shell, and workflows.

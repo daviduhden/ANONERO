@@ -29,7 +29,8 @@ The onboarding graph supports:
 - **Restore from keys.** NERO imports an address and private view key and creates a
   view-only wallet using the restore height supplied in the payload.
 - **Node/proxy setup.** Configures a daemon or LWS endpoint and the network path before the
-  first sync. Tor is started by the app when a node/LWS is configured.
+  first sync. Embedded Tor is started by the app only when it is the selected transport;
+  external Tor, I2P, and custom providers must already be running.
 
 `RestoreTarget.requireEmpty` blocks a new MAIN wallet when files, a wrapped secret, or
 credentials already exist. It refuses symlinked or partially present targets rather than
@@ -105,23 +106,33 @@ signer or that the message is truthful.
   bind removes only MAIN, preserving a configured decoy; backup node settings are applied
   only after the bind succeeds.
 
-## 8. Network: Tor, daemon, and LWS
+## 8. Network: transports, daemon, and LWS
 
-- **Tor** is embedded through `kmp-tor`. The wallet waits for a SOCKS endpoint and fails
-  closed if it does not appear. The daemon is restarted after an unexpected stop while Tor
-  is wanted.
-- **Manual proxy** is available only when Tor is disabled. The proxy host must be a numeric
-  IPv4/full IPv6 address and the port must be in `1..65535`.
-- **Full node** mode connects wallet2 to a Monero daemon over the proxy. The daemon is marked
-  trusted after initialization.
-- **LWS** is optional, opt-in, and requires the built-in Tor endpoint. Host and port are
-  stored separately; the host must be a DNS name, `.onion`, or IPv4 literal with no scheme,
-  credentials, path, or embedded port, and the port must be in `1..65535` (default 8443). The
-  server receives the public address and view key and is kept untrusted
-  (`setTrustedDaemon(false)`) before and after login. LWS sync height may legitimately trail
-  the chain; reconnect logic is separate from full-node height comparison.
+- **Embedded Tor** is the default. The wallet waits for a SOCKS endpoint and fails closed if
+  it does not appear. The daemon restarts after an unexpected stop while wanted.
+- **External Tor** (Orbot or InviZible Pro) and **I2P** (i2pd, InviZible Pro, or the official I2P for Android app) use a
+  user-configured local SOCKS5 endpoint. Ports are not assumed: the UI asks for host and
+  port. `.onion` nodes are accepted only in Tor modes and `.i2p` nodes only in I2P modes.
+- **System VPN** uses clearnet nodes only while Android reports `TRANSPORT_VPN`. It never
+  starts embedded Tor and never falls back to direct traffic when the VPN disappears.
+- **Custom SOCKS5** requires an explicit destination network (clearnet, `.onion`, or
+  `.i2p`); a generic proxy is not assumed to provide Tor/I2P anonymity.
+- **Full node** mode connects wallet2 to a Monero daemon over the selected path. The daemon
+  is marked trusted after initialization for full-node data.
+- **LWS** is optional and opt-in. Host, port, and TLS scheme are stored separately; the
+  destination must match the selected transport network (`.onion` on Tor, `.i2p` on I2P,
+  clearnet on system VPN or an explicit custom-clearnet proxy). Non-loopback clearnet LWS
+  requires TLS. The server receives the public address and view key and is kept untrusted
+  before and after login. The first save of a new server shows a consent dialog; toggling
+  LWS or changing its endpoint takes effect on restart, while a transport change
+  re-applies the endpoint through the same `TransportController` path. LWS sync height
+  may legitimately trail the chain.
 - **Offline signer** mode is selected when ANON has no node host. It does not start network
   synchronization and is intended for airgapped signing.
+- **I2P Java** detects the official `net.i2p.android` app but uses a user-created I2PTunnel SOCKS client tunnel; package presence does not imply a running tunnel. See [`architecture/network-transport.md`](architecture/network-transport.md).
+- **Network & Nodes** exposes transport, proxy, automatic/manual node selection, active
+  node, node network, LWS status, connection state, and security warnings. See
+  [`architecture/network-transport.md`](architecture/network-transport.md).
 
 ## 9. Privacy features
 
@@ -144,7 +155,7 @@ These are privacy and coercion mitigations, not anonymity. See
 
 ## 10. Settings and localization
 
-- Settings exposes theme, language, node, proxy, LWS, accounts, seed (ANON only), change
+- Settings exposes theme, language, Network & Nodes (transport, proxy, node), LWS, accounts, seed (ANON only), change
   PIN, encrypted backup (non-decoy), decoy (ANON non-decoy), sign/verify, logs, and secure
   wipe. Subaddresses are reached from the receive flow.
 - Supported UI locales: English, Spanish (Spain), Russian, and Simplified Chinese. The
@@ -159,10 +170,11 @@ These are privacy and coercion mitigations, not anonymity. See
 - Native build/release validation still requires the manual CI `native` job; the patch
   series is restored and CI builds the native archives and debug APKs. See
   [`architecture/repository-state.md`](architecture/repository-state.md).
-- Manual proxy validation rejects compressed IPv6 forms.
+- Proxy endpoints must be numeric or loopback; external Tor/I2P proxies must be local. Both
+  the legacy proxy screen and Network & Nodes use the shared numeric/loopback validator.
 - The decoy is separation of wallet files and secrets, not plausible deniability.
 - Stealth mode does not defeat root, accessibility services, or screen capture.
-- LWS sees the view key and incoming transaction metadata; Tor does not hide that from the
-  server.
+- LWS sees the view key and incoming transaction metadata; the selected transport does not
+  hide that from the server.
 - No Gradle dependency lockfile or verification metadata is checked in.
 - Runtime/device behavior has not been validated locally; CI is authoritative.

@@ -11,7 +11,8 @@ from the pinned Monero sources and dependency inputs under `external-libs/`.
 
 | Document | Contents |
 | --- | --- |
-| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Modules, state flow, wallet lifecycle, persistence, Tor/LWS, native boundary |
+| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Modules, state flow, wallet lifecycle, persistence, transports, native boundary |
+| [`docs/architecture/network-transport.md`](docs/architecture/network-transport.md) | Transport modes, proxy policy, node selection, VPN/I2P limits |
 | [`docs/architecture/jni-boundary.md`](docs/architecture/jni-boundary.md) | Kotlin/C++/wallet2 contracts, handles, callbacks, errors |
 | [`docs/security-model.md`](docs/security-model.md) | Assets, threat model, invariants, privacy limits, known issues |
 | [`docs/features.md`](docs/features.md) | Implemented features and their limitations |
@@ -41,8 +42,9 @@ or installing outside the official release page.
 ## Main features
 
 - Monero only, with Polyseed and legacy seed restore.
-- Mandatory proxy; embedded Tor by default, with an explicit manual-proxy alternative.
-- Optional self-hosted/opt-in Monero Light Wallet Server (LWS) over Tor.
+- Explicit transport policy: embedded Tor by default, external Tor (Orbot/InviZible), external I2P (i2pd, InviZible, or the official I2P for Android app), system VPN, or a custom SOCKS5 proxy. Tor/I2P/custom fail closed; system VPN is clearnet-only and never falls back.
+- Optional Monero Light Wallet Server (LWS) over the selected transport, with a matching
+  destination network and TLS required for non-loopback clearnet.
 - Passphrase encryption on seeds.
 - No intentional subaddress reuse.
 - Encrypted backups with v3 AEAD and v1/v2 restore compatibility.
@@ -66,8 +68,9 @@ flowchart LR
     Handler --> Wallet["Wallet / WalletManager"]
     Wallet --> JNI["C++ JNI adapter"]
     JNI --> W2["Monero wallet2 static archives"]
-    Handler --> Tor["TorService"]
-    Tor -. SOCKS .-> W2
+    Handler --> Transport["TransportController"]
+    Transport --> Tor["TorService (default)"]
+    Transport -. SOCKS5 / VPN .-> W2
 ```
 
 `WalletState` is the UI-facing source of truth. `AnonWalletHandler` opens/closes the wallet,
@@ -120,8 +123,9 @@ For the full build/release pipeline, including CI jobs, signing, and artifact ch
 - The recovery seed and passphrase are the ultimate recovery path. Back them up offline.
 - The wallet password is a random secret wrapped by Android Keystore; the PIN gates access
   to it. A Keystore reset or device change can make the device-local wallet unreadable.
-- Tor hides the network path, not transaction amounts, timing, or sync patterns.
-- LWS sees the public address and view key and is treated as untrusted. It is optional.
+- Tor hides the network path, not transaction amounts, timing, or sync patterns. I2P and VPN have different properties; a VPN flag does not prove per-app routing or leak protection.
+- LWS sees the public address and view key and is treated as untrusted. It is optional; its
+  destination must match the selected transport and non-loopback clearnet requires TLS.
 - The decoy wallet is separation of wallet files and secrets, **not** plausible deniability.
 - Stealth mode reduces casual exposure; it is not anonymity and does not defeat root,
   accessibility services, or screen capture.

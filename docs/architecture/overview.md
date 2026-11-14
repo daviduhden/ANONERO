@@ -16,7 +16,8 @@ flowchart TB
         MW["WalletManager"]
         Wallet["Wallet facade"]
         JNI["C++ JNI adapter"]
-        Tor["TorService (kmp-tor)"]
+        Transport["TransportController"]
+        Tor["TorService (embedded Tor)"]
         Svc["AnonNeroService (foreground sync)"]
     end
 
@@ -40,9 +41,10 @@ flowchart TB
     Wallet --> JNI
     JNI --> Lib
     Lib --> W2
-    Tor -. "SOCKS proxy" .-> W2
+    Transport -. "SOCKS5 / VPN" .-> W2
     Svc --> State
-    Handler --> Tor
+    Handler --> Transport
+    Transport --> Tor
     Handler --> Pref
     Handler --> KS
     State --> Pref
@@ -59,14 +61,15 @@ alive and publishes notifications.
 | Layer | Main files | Responsibility |
 | --- | --- | --- |
 | Process bootstrap | `AnonApplication.kt`, `AnonConfig.kt`, `di/AppModule.kt` | Context, paths, locale, Koin, logging, crash handler, startup cleanup |
-| Activity and navigation | `ui/MainActivity.kt`, `ui/NavGraph.kt`, `ui/home/graph/`, `ui/onboard/graph/` | Splash, `FLAG_SECURE`, lock overlay, typed navigation graphs |
+| Activity and navigation | `ui/MainActivity.kt`, `ui/home/graph/`, `ui/onboard/graph/` | Splash, `FLAG_SECURE`, lock overlay, typed navigation graphs |
 | UI | `ui/home/`, `ui/onboard/`, `ui/components/`, `ui/theme/` | Compose screens, reusable components, QR/UR UI, theme, strings |
 | Screen state | `ui/viewmodels/`, `ui/home/**/ViewModel` | Screen-scoped orchestration and form state |
 | Wallet state | `services/WalletState.kt` | Single UI-facing source for balances, history, accounts, sync and connection |
 | Wallet lifecycle | `services/AnonWalletHandler.kt` | PIN/profile resolution, open/close, proxy, daemon, LWS, wipe |
 | Sync callbacks | `services/MoneroHandlerThread.kt` | Wallet listener, refresh decisions, reconnect |
 | Foreground service | `services/AnonNeroService.kt` | Persistent notification and sync keep-alive |
-| Tor | `services/TorService.kt` | Embedded daemon, SOCKS endpoint, restart, logs |
+| Transport | `network/TransportController.kt`, `network/TransportModels.kt` | Mode policy, proxy validation, VPN check, node-network matrix |
+| Embedded Tor | `services/TorService.kt` | Embedded daemon, SOCKS endpoint, restart, logs |
 | Wallet facade | `model/Wallet.kt`, `model/WalletManager.kt` | Kotlin view of wallet2 and native handles |
 | Transaction models | `model/PendingTransaction.kt`, `model/UnsignedTransaction.kt`, `model/Coins.kt` | Pending/unsigned/coin-control state |
 | Persistence | `util/Prefs.kt`, `store/*`, `util/backup/*` | Preferences, DataStore, wallet files, encrypted backups |
@@ -83,7 +86,8 @@ alive and publishes notifications.
    The UI decides wallet presence with `WalletProfileStore.anyWalletExists`, not this flag.
 3. Starts Koin with `appModule`.
 4. Installs the log tree and crash handler.
-5. Starts Tor when a node host or LWS is configured.
+5. Starts embedded Tor when it is the selected transport and a node host or LWS is
+   configured; external providers are not started by ANONERO.
 6. Deletes transient spend/export/backup files from the cache.
 7. Recovers an interrupted Keystore migration before any wallet open.
 
@@ -174,45 +178,50 @@ credential. A native failure leaves the wallet locked rather than showing an unl
 Do not add a second preference file for wallet state. Profile-dependent keys must go
 through `WalletProfileStore`, which maps MAIN/DECOY to distinct names.
 
-## 7. Networking: Tor, daemon, and LWS
+## 7. Networking: transports, daemon, and LWS
+
+The transport policy is implemented in `network/TransportController.kt` and described in
+[`network-transport.md`](network-transport.md). The default is embedded Tor; the user may
+select Orbot, InviZible Tor, system VPN, i2pd, InviZible I2P, or a custom SOCKS5 proxy.
 
 ```mermaid
 sequenceDiagram
     participant H as AnonWalletHandler
-    participant T as TorService
+    participant P as TransportController
+    participant T as EmbeddedTorProvider
     participant W as wallet2
-    participant D as Daemon
-    participant L as LWS
+    participant D as Daemon/LWS
 
-    H->>T: start()
-    T-->>H: SOCKS host:port
-    H->>W: setProxy(host:port)
-    alt Full node
-        H->>W: setDaemon(node)
-        W->>D: wallet RPC over SOCKS
-    else LWS
-        H->>W: setTrustedDaemon(false)
-        H->>W: lightWalletLogin()
-        W->>L: address + view key over SOCKS
-        H->>W: setTrustedDaemon(false)
+    H->>P: authorize()
+    alt Embedded Tor
+        P->>T: start + wait for SOCKS
+        T-->>P: SOCKS5 endpoint
+    else External Tor/I2P/custom
+        P->>P: validate + probe configured SOCKS5
+    else System VPN
+        P->>P: require TRANSPORT_VPN
     end
+    P-->>H: Socks5 or Direct
+    H->>W: setProxy(socks5://...)/clearProxy()
+    H->>W: setDaemon(node rpcUrl)
+    W->>D: RPC over the selected path
 ```
 
-- Embedded Tor is started by `TorService`. The wallet path waits for a real SOCKS endpoint
-  and throws if one does not appear within 60 seconds. There is no direct fallback.
-- A manual proxy is allowed only when the user disables Tor; it must be a numeric address
-  and a valid port. LWS rejects a manual proxy and requires the built-in Tor endpoint.
-- A full node is marked trusted after initialization. LWS is kept untrusted before and
-  after login because it is only a remote index, not a trusted daemon.
-- `MoneroHandlerThread` reconnects a full node when the daemon/chain height gap is at least
-  two blocks. LWS is handled separately because its scan height can legitimately trail the
-  chain.
-- The Tor daemon is restarted after an unexpected stop while `wanted` is true; the cached
-  SOCKS endpoint is cleared before the new one is published.
+- Embedded Tor waits for a real SOCKS endpoint and throws after 60 seconds; there is no
+  direct fallback.
+- External Tor/I2P/custom modes use the configured local SOCKS5 proxy and reject
+  cross-network nodes.
+- System VPN uses direct clearnet only while `TRANSPORT_VPN` is active; loss pauses refresh
+  and marks the wallet offline.
+- LWS uses the selected transport and remains untrusted before/after login. Its destination
+  network must match the transport, and non-loopback clearnet requires TLS.
+- `NodeSelectionPolicy` filters saved nodes by transport network and wallet network. Remote
+  discovery is not implemented without a vetted, privacy-preserving source; see the
+  transport document.
 
 Tor hides the network path. It does not hide transaction amounts, timing, sync patterns, or
-the fact that a wallet is in use. LWS additionally sees the view key and incoming
-transaction metadata.
+the fact that a wallet is in use. I2P and VPN provide different properties and no anonymity
+guarantee beyond their documented threat models.
 
 ## 8. UI and navigation
 
@@ -230,8 +239,8 @@ transaction metadata.
 - UI text is localized. All user-visible strings live in Android resources; the static
   `scripts/check-i18n.py` check enforces parity and catches hardcoded text.
 
-`ui/NavGraph.kt` contains no executable code; it has only the license header and a stub
-note. `HomeGraph.kt` and `OnboardingGraph.kt` are the effective graph builders.
+`HomeGraph.kt` and `OnboardingGraph.kt` are the only navigation graph builders. The old
+`ui/NavGraph.kt` stub was removed; do not reintroduce a second navigation source.
 
 ## 9. Native boundary and build
 
@@ -253,8 +262,10 @@ and error mapping.
   seconds if it is still the primary clip.
 - **Backups:** v3 writer with passphrase-keyed wallet files; v1/v2 readers retained. The
   decoy cannot be exported through this path.
-- **Failure policy:** proxy, Tor, LWS login, Keystore load, wallet init, and transaction
-  review fail closed. A static review is not a proof of runtime correctness.
+- **Failure policy:** proxy, Tor, LWS login, Keystore load, wallet init, transport/node
+  validation, and transaction review fail closed. A failed daemon update pauses refresh,
+  marks the wallet offline/disconnected, and clears the active daemon info. A static review
+  is not a proof of runtime correctness.
 
 ## 11. What is not present
 

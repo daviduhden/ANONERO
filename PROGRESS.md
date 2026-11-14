@@ -17,6 +17,29 @@ records progress; it is not a release note and does not claim CI validation.
   invalid wallet before reporting the error.
 - A restored wallet that fails to bind is removed as MAIN; the decoy profile is preserved.
 
+### UI and lifecycle hardening
+
+- Moved remaining wallet2 reads out of composition/main-thread callbacks: `HomeGraph`
+  uses the cached `WalletState.walletStatus`, sign/verify loads the address on IO, seed
+  export and the primary address load on IO, `SendViewModel.setCoins` reads coins/account
+  on IO with cancellation of a stale selection, and the view-only key-image check runs on
+  IO. The PIN change path re-keys `setPassword` on IO and preserves cancellation.
+- `Settings` PIN changes no longer call `setPassword` on the main thread; the dialog shows
+  the result after the native call and prevents a double submission.
+- Raw wallet2 `errorString` text is no longer written to the persisted log from the wallet
+  status path, decoy creation, backup restore, or the native seed/store/login/sign error
+  paths; generic messages avoid leaking a file path or node text.
+- `AnonWalletHandler.updateDaemon` now handles validation failures through one catch:
+  refresh pauses, the wallet becomes offline and disconnected, loading clears, and no
+  stale daemon is left active. The handler lifecycle scope uses the IO pool for blocking
+  wallet/proxy work.
+- Removed the unused `ui/NavGraph.kt` stub.
+- The legacy proxy validator now shares `ProxyEndpoint.isNumericOrLoopback`; compressed
+  IPv6 and loopback names are accepted consistently with Network & Nodes.
+- `TorSplash` now keys its embedded-Tor check off `TransportConfig`, not the legacy
+  `WALLET_USE_TOR` flag, so migrated external-transport installs do not wait on a splash
+  for a daemon that was never started.
+
 ### Transactions and backups
 
 - `ReviewTransactionViewModel` rejects a missing pending transaction, posts success only
@@ -38,6 +61,8 @@ records progress; it is not a release note and does not claim CI validation.
 - `java2cpp_string_array` fails closed on an unreadable element; `java2cpp_set` skips null
   elements; `getElement` initializes and checks its result.
 - JNI creation/open/recovery/init paths use `ScopedUtfChars` instead of manual release pairs.
+- Array and `ArrayList` string readers also use `ScopedUtfChars` and `ScopedLocalRef`;
+  each element is released on success, empty-element, and unreadable-element paths.
 - The Tor SOCKS endpoint is volatile, and restart clears the cached endpoint before the new
   listener is published, avoiding stale proxy reuse.
 
@@ -88,6 +113,10 @@ records progress; it is not a release note and does not claim CI validation.
   encrypted headers/IVs are length-checked.
 - Restored backups are checked against the wallet's address and watch-only mode; restore
   height is bounded; PIN iteration counts, salt, and key lengths are bounded.
+- Backup node records now pass `BackupNodePolicy` before persistence: schemes, credentials,
+  paths, whitespace, embedded ports, malformed IPv6, and out-of-range ports are rejected.
+  Invalid records are dropped instead of becoming the active daemon, and the saved network
+  type comes from the build, not the backup.
 - Tor SOCKS is a nullable `StateFlow`; stop/restart emit `null`, late listener events are
   ignored when Tor is not wanted, and the wallet pauses on loss instead of reusing a stale
   port. Tor endpoints are no longer persisted as a manual proxy.
@@ -199,6 +228,35 @@ records progress; it is not a release note and does not claim CI validation.
   both serializers. `check-jni-contract.py` now matches the exact
   `Java_package_Class_method` export instead of a method-name suffix, so a
   `Wallet_getStatusJ`/`PendingTransaction_getStatusJ` class mismatch cannot pass.
+
+## Network transport implementation
+
+- Added `network/TransportController.kt`, `TransportModels.kt`, and
+  `NodeSelectionPolicy.kt`. The allowed modes are embedded Tor (default), Orbot,
+  InviZible Tor, system VPN, i2pd, InviZible I2P, official I2P for Android, and custom
+  SOCKS5. The official I2P provider detects `net.i2p.android` package variants but uses
+  a user-created I2PTunnel SOCKS client tunnel; package presence is not treated as router
+  or tunnel availability. Tor/I2P/custom
+  require their proxy; system VPN is the only clearnet mode and fails closed when
+  `TRANSPORT_VPN` is absent.
+- `AnonWalletHandler` now acquires a typed endpoint, applies it to the manager and live
+  wallet, clears the proxy for VPN mode, and re-selects a network-compatible node.
+  wallet2 receives explicit `socks5://` URIs so `.onion`/`.i2p` names are resolved by
+  the proxy.
+- `Node` gained `network`, bracket-aware IPv6 `hostPort`, `rpcUrl`, and an opt-in
+  `useTls` flag. Settings → Network & Nodes exposes transport, proxy, node selection,
+  status, and warnings; legacy `useTor`/`proxy` keys migrate into the new config.
+- Added pure JVM tests for the transport↔network matrix, proxy validation/SOCKS5 URIs,
+  and node selection. Live Orbot/InviZible/i2pd/VPN behavior, wallet2 HTTPS, DNS
+  behavior, and Android VPN routing remain unverified until device/CI tests.
+- **LWS uses the selected transport.** Removed the embedded-Tor-only restriction from
+  `TransportController`, `AnonWalletHandler`, and the legacy proxy screen. `LwsConfig`
+  now carries `useTls`, derives the destination network, requires TLS for non-loopback
+  clearnet, and exposes `validateTransport()` as the single transport gate. LWS settings
+  and Network & Nodes show the destination network and compatibility, require explicit
+  consent before a new server receives the view key, and `reapplyLightWallet()` re-applies
+  the endpoint, re-initializes light-wallet mode, and logs in after a transport change.
+  LWS login does not silently switch operator or fall back to a full node.
 
 ## Pending validation
 

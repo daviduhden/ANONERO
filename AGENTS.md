@@ -45,8 +45,9 @@ relying on it after a significant change.
   alternate project-owned native runtime or FFI layer.
 - `external-libs/monero` is a git submodule pinned to
   `85f036ba7019cd36f08e8a38a27c37ea7b522618` (README: Monero `v0.18.5.4`).
-- `external-libs/patches/` contains the seven wallet-API patches plus `apply.sh` and
-  `README.md`. The series is adapted from the `monero_c` Monero patches and applies to
+- `external-libs/patches/` contains the eight wallet-API patches (seven from `monero_c`
+  plus one project-original TLS-enforcement patch), `apply.sh`, and `README.md`. The
+  series is adapted from the `monero_c` Monero patches and applies to
   the pinned commit; see `external-libs/patches/README.md` for provenance and licence.
   The local submodule is still unpopulated, so the native build requires CI or a manual
   `git submodule update --init --recursive` followed by `make -C external-libs patches`.
@@ -68,7 +69,7 @@ relying on it after a significant change.
   airgapped flows.
 - Background sync and a foreground wallet service.
 - Embedded Tor (`io.matthewnelson.kmp-tor`) with a mandatory SOCKS proxy path.
-- Optional Monero Light Wallet Server (LWS) over Tor.
+- Optional Monero Light Wallet Server (LWS) over the selected transport.
 - Android Keystore-bound wallet secret, PBKDF2 PIN gate, legacy PIN migration.
 - Encrypted backups: v3 writer, v1/v2 readers.
 - Stealth mode, decoy wallet, duress PIN, secure wipe, sensitive clipboard handling.
@@ -95,7 +96,7 @@ Compose screens
   -> Monero wallet2 static archives (external-libs/<abi>/monero)
 
 TorService (kmp-tor) -> SOCKS endpoint -> wallet2 proxy
-LWS host:port -> wallet2 light-wallet mode -> SOCKS/Tor -> remote LWS
+LWS endpoint -> wallet2 light-wallet mode -> TransportController proxy/direct -> remote LWS
 ```
 
 Key process facts:
@@ -113,7 +114,8 @@ Key process facts:
 | --- | --- |
 | `app/src/main/java/io/anonero/` | Android application, services, models, UI, utilities |
 | `app/src/main/java/io/anonero/model/` | Wallet2-facing Kotlin models and `external` declarations |
-| `app/src/main/java/io/anonero/services/` | Tor, wallet lifecycle, sync thread, state, foreground service |
+| `app/src/main/java/io/anonero/services/` | Transport, wallet lifecycle, sync thread, state, foreground service |
+| `app/src/main/java/io/anonero/network/` | Transport policy, proxy endpoints, node-network selection |
 | `app/src/main/java/io/anonero/ui/` | Compose screens, navigation, theme, components |
 | `app/src/main/java/io/anonero/util/` | PIN/Keystore, profiles, backups, formatting, privacy settings |
 | `app/src/main/cpp/` | Project-owned C++ JNI adapter |
@@ -152,10 +154,16 @@ decision and documentation, not a local workaround.
 3. **The spend key is only present when the wallet is unlocked.** Background sync must
    not expose spend capability. The lock screen must remain above the UI until
    `stopBackgroundSync` succeeds.
-4. **A proxy is mandatory; Tor is the default and preferred path.** Wallet traffic must
-   use the embedded Tor SOCKS endpoint. The only allowed alternative is an explicitly
-   configured manual proxy when the user disables Tor. Do not add a clearnet fallback.
-   LWS requires the built-in Tor endpoint, not a manual proxy.
+4. **Transport is explicit and fail-closed.** Embedded Tor is the default and preferred
+   path. The allowed transports are embedded Tor, external Tor (Orbot/InviZible),
+   external I2P (i2pd/InviZible/official I2P Java), a custom SOCKS5 proxy, and the user-selected system
+   VPN. Tor, I2P, and custom-proxy modes require the configured proxy and must never
+   fall back to direct clearnet. System VPN is the only clearnet mode: it requires an
+   active `TRANSPORT_VPN`, uses clearnet nodes, and must fail closed when the VPN is
+   absent or lost. LWS uses the same selected transport: Tor modes reach `.onion`,
+   I2P modes reach `.i2p`, system VPN reaches clearnet, and a custom proxy reaches the
+   network the user explicitly chose. An LWS destination whose network does not match
+   the selected transport is rejected; there is no cross-transport or clearnet fallback.
 5. **LWS is untrusted.** Keep `setTrustedDaemon(false)` before and after login. Only
    the public address and view key may be sent.
 6. **Profile isolation.** Main and decoy wallets have separate files, Keystore secrets,
@@ -243,7 +251,7 @@ decision and documentation, not a local workaround.
     next successful unlock;
   - Keystore migration snapshots (`.premigrate`);
   - SharedPreferences keys in `util/Prefs.kt` and `model/node/Node.kt`;
-  - LWS host/port format;
+  - LWS host/port/TLS format and the transport mode/proxy/network keys;
   - JNI constructor signatures and symbol names;
   - Monero submodule commit and patch series.
 - Wallet2 behavior is the reference for transaction construction, fee selection, ring
@@ -369,6 +377,7 @@ Keep instructions close to the code they govern:
 | Dependency/toolchain pin change | `docs/architecture/dependencies.md`, `external-libs/AGENTS.md`, `github-actions` skill |
 | Work status or next priorities | `PROGRESS.md`, `TODO.md`, `ROADMAP.md` |
 | CI failure, warning, or recurring diagnostics | `docs/ci/`, `.github/workflows/AGENTS.md` |
+| New/changed transport mode or proxy policy | `docs/architecture/network-transport.md`, `tor-networking` skill, `docs/security-model.md` |
 | New security boundary or limitation | `AGENTS.md`, relevant skill, `docs/security-model.md`, `docs/architecture/repository-state.md` |
 
 Rules for documentation:
@@ -392,6 +401,10 @@ Rules for documentation:
 - The native toolchain (CMake 4.4.5, NDK r30, Boost 1.92.0, zlib 1.4) and the Android
   toolchain (AGP 9.5.1, Gradle 9.9.0, CMake 4.1.2, NDK 30) build in CI; the project-owned
   adapter uses `-Werror` and compiled without warnings in `43521054641`.
+- Multi-transport support (embedded/external Tor, i2pd/InviZible/official I2P Java, system VPN, custom SOCKS5) is
+  implemented and statically reviewed. Live provider availability, DNS behavior,
+  wallet2 `socks5://`/HTTPS handling, and Android per-app VPN routing remain unverified.
+  `TRANSPORT_VPN` proves a VPN network exists, not that ANONERO is included or leak-free.
 - No Gradle dependency lockfile or dependency verification metadata is checked in;
   generating them requires a resolution step that is not permitted locally.
 - No runtime or device verification was performed for these instructions.
@@ -401,8 +414,9 @@ Rules for documentation:
   screen-capture-privileged apps, accessibility services, root, or forensic imaging.
 - Tor hides the network path, not timing, amounts, or the fact that a wallet is
   syncing. LWS sees the view key and incoming transaction metadata.
-- The patch series is adapted from the `monero_c` lineage and is licensed under
-  LGPL-3.0; see `external-libs/patches/README.md` and `LICENSE-LGPL-3.0`.
+- Seven patches of the series are adapted from the `monero_c` lineage and are licensed
+  under LGPL-3.0; `0008-enforce-tls-for-https-daemon-address.patch` is project-original
+  and Apache-2.0. See `external-libs/patches/README.md` and `LICENSE-LGPL-3.0`.
 - NERO signed-transaction import cannot yet be bound to the reviewed unsigned object:
   wallet2 exposes no signed-file parser in this checkout. A compromised external signer
   can return a different payment; the UI warning/comment is not a substitute for native

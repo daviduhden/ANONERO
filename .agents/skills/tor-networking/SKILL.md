@@ -1,6 +1,6 @@
 ---
 name: tor-networking
-description: "Use when changing ANONERO network connectivity: embedded Tor, SOCKS proxy application, manual proxy, daemon or LWS routing, or fail-closed networking behavior. Use monero-lws for LWS protocol and trust details."
+description: "Use when changing ANONERO network connectivity: embedded/external Tor, I2P, system VPN, SOCKS5 proxies, daemon or LWS routing, or fail-closed networking behavior. Use monero-lws for LWS protocol and trust details."
 ---
 
 # Tor and network privacy
@@ -8,7 +8,7 @@ description: "Use when changing ANONERO network connectivity: embedded Tor, SOCK
 ## When to use
 
 - Starting, stopping, restarting, or observing the embedded Tor daemon.
-- Applying a SOCKS or manual proxy to wallet2.
+- Selecting a transport and applying its SOCKS5 proxy or direct VPN path to wallet2.
 - Changing daemon/LWS routing or the Tor splash/readiness flow.
 - Reviewing a change for a clearnet fallback, DNS leak, or silent privacy downgrade.
 
@@ -27,22 +27,29 @@ Use `monero-lws` in addition when the change is LWS-specific.
 
 ## Invariants
 
-- `WALLET_USE_TOR` defaults to `true`. Do not change that default.
-- Every wallet/daemon/LWS connection must go through the embedded Tor SOCKS endpoint
-  or an explicitly configured manual proxy. There is no clearnet fallback.
-- `AnonWalletHandler.applyProxy()` waits up to 60 seconds for a SOCKS endpoint and
-  throws on timeout. A startup timeout in `TorSplash` must not authorize a direct
-  connection; the wallet path still fails closed.
-- Apply the proxy to both `WalletManager` and the live `Wallet`; if either rejects it,
-  pause refresh and surface a failure.
-- LWS requires the built-in Tor endpoint. A manual proxy is not acceptable for LWS.
-- Manual proxy is only allowed when Tor is disabled; validate numeric IPv4/IPv6 and
-  port range. Do not accept hostnames that would require a DNS lookup before the
-  proxy.
-- `TorService` owns a single `TorRuntime`; `wanted` distinguishes an intentional stop
-  from a crash. On an unexpected stop, clear the cached SOCKS endpoint and retry after
-  ten seconds while still wanted.
+- Embedded Tor is the default (`TransportMode.EMBEDDED_TOR`). Do not change the default.
+- `TransportController` is the single policy owner. Allowed modes: embedded Tor,
+  Orbot, InviZible Tor, system VPN, i2pd, InviZible I2P, official I2P Java, custom SOCKS5. Tor/I2P/custom
+  require their proxy and never fall back to clearnet.
+- `AnonWalletHandler.applyProxy()` acquires the endpoint from `TransportController` and
+  applies it to both `WalletManager` and the live `Wallet`. Embedded Tor waits up to
+  60 seconds; a `TorSplash` timeout must not authorize a direct connection.
+- System VPN is the only clearnet mode. Require `TRANSPORT_VPN`; on loss set the wallet
+  offline and pause refresh. Never fall back to the default network.
+- LWS uses the same selected transport as RPC. Reject an LWS destination whose network
+  does not match the transport (`.onion` on Tor, `.i2p` on I2P, clearnet on system VPN or
+  an explicit custom-clearnet proxy). Non-loopback clearnet LWS requires TLS.
+- Proxy endpoints are numeric/loopback and validated for port 1..65535. External
+  Tor/I2P modes must use loopback. Do not accept a hostname that requires DNS before
+  the proxy.
+- wallet2 receives an explicit `socks5://` URI so `.onion`/`.i2p` resolution happens at
+  the proxy. Do not rely on the default SOCKS4a format for I2P.
+- `TorService` owns the embedded `TorRuntime` only; external modes never start it.
+  `wanted` distinguishes an intentional stop from a crash. On an unexpected stop, clear
+  the cached SOCKS endpoint and retry after ten seconds while still wanted.
 - A stale SOCKS port must never remain usable after Tor dies. Clear it before restart.
+- Transport changes release the old provider, stop embedded Tor when leaving it, clear
+  incompatible proxy state, and re-select a node on the new network.
 - Do not add a new HTTP client, socket, DNS resolver, or download path that bypasses
   wallet2’s proxy setting.
 - Do not log Tor control data or wallet credentials. SOCKS host/port is not a secret,
@@ -60,12 +67,17 @@ Use `monero-lws` in addition when the change is LWS-specific.
    and return an error. Do not set a fallback proxy or connect directly.
 4. **Handle restart.** If the daemon dies, the cached endpoint must be cleared and the
    wallet must be re-proxied when the new endpoint appears.
-5. **Keep LWS on Tor.** If the change touches LWS, require `WALLET_USE_TOR` and the
-   actual built-in SOCKS endpoint, not just a truthy flag.
-6. **Validate manual proxy input.** Numeric address, port 1..65535, no scheme, no
-   credentials in the host.
-7. **Test in CI/device.** Tor behavior, restart, and network transitions cannot be
-   proven statically.
+5. **Keep LWS on the selected transport.** Use `LwsConfig.validateTransport` and let
+   `AnonWalletHandler.reapplyLightWallet()` apply the endpoint on transport changes. LWS
+   must not obtain a proxy from `TorService` directly, and must not start embedded Tor
+   when an external provider is selected.
+6. **Validate proxy input.** Numeric address or loopback, port 1..65535, no scheme or
+   credentials in the host. External Tor/I2P endpoints must be loopback.
+7. **Validate node network.** `.onion` only on Tor modes, `.i2p` only on I2P modes,
+   clearnet only on system VPN/custom-clearnet. Manual and automatic selection share
+   `NodeSelectionPolicy`.
+8. **Test in CI/device.** Tor/I2P/VPN behavior, restart, and transport transitions cannot
+   be proven statically.
 
 ## Threat model
 
@@ -98,6 +110,6 @@ and reviewed as a new trust boundary.
 - [ ] Fail-closed on Tor/LWS failure.
 - [ ] Stale SOCKS port cannot be reused.
 - [ ] Manual proxy is numeric and only used with Tor disabled.
-- [ ] LWS uses built-in Tor.
+- [ ] LWS uses the selected transport and rejects cross-network destinations.
 - [ ] No new unproxied network client or DNS path.
 - [ ] Runtime/network behavior marked unverified until CI/device testing.

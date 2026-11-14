@@ -34,6 +34,11 @@ farm.
 | Nullable model collections | `TransactionInfo.transfers` consumers | Detail screen uses `orEmpty()` |
 | ViewModel properties in `launch` | `this.pendingTransaction` / `this.unsignedTransaction` | Qualified with the ViewModel label |
 | JNI string handling | Every `GetStringUTFChars` and Kotlin `String?` external | Converted to `ScopedUtfChars` with null checks |
+| JNI raw string cleanup | Remaining array/`ArrayList` readers | Converted to `ScopedUtfChars` + `ScopedLocalRef`; no raw release pair remains |
+| Main-thread wallet reads | `WalletManager.instance` call sites in `ui/` | `HomeGraph` uses cached `WalletState.walletStatus`; sign/seed/Send/Settings paths moved to IO |
+| Backup node input | Restored `NodeBackup`/`Node` fields | `BackupNodePolicy` rejects schemes, credentials, paths, embedded ports, bad IPv6, and invalid ports |
+| New coroutine cancellation | `catch (Exception)` in changed UI paths | `CancellationException` is rethrown before generic handling |
+| Native error logging | `LOGE`/`LOGD` with `errorString()` | Seed/store/login/sign paths log the operation only, not wallet2 text |
 | JNI handle lifetime | Every `getHandle` call and `closeJ` | Handle invalidated on close; remaining exports guard `nullptr` |
 | JNI object factories | Every `GetMethodID`/`NewObject` in the adapter | Checked; failures return `nullptr` instead of aborting |
 | Restore-height tests | Tests vs `MAX_RESTORE_HEIGHT` | Stale assertion corrected |
@@ -70,6 +75,11 @@ farm.
   signatures, constructor descriptors, or link-time symbol availability.
 - The native compile and link run in CI: the archives build and the adapter links. The
   patch series is present and applies to the pinned commit.
+- `0008-enforce-tls-for-https-daemon-address.patch` forces epee SSL support for
+  `https://` endpoints. Without it, wallet2's default autodetect retries without TLS after
+  a failed handshake, which would silently expose a clearnet LWS view key. The patch needs
+  a native CI run and a device test against a TLS-only endpoint; a successful patch
+  application is not proof of TLS behavior.
 - No AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, or LeakSanitizer run
   exists.
 

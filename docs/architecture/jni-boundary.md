@@ -34,11 +34,21 @@ by `external-libs/` and linked as static archives. The app does not compile wall
 - If a Kotlin class is renamed or moved, update `JNI_OnLoad` and every `FindClass`/
   `GetMethodID` before expecting the app to start.
 
+## 2.1 Proxy transport strings
+
+`WalletManager.setProxyJ` and `Wallet.setProxyJ` receive the wallet2 proxy URI. ANONERO
+sends an explicit `socks5://host:port` (bracketed IPv6) so `.onion`/`.i2p` names are
+resolved by the proxy, and sends an empty string to clear the proxy in system-VPN mode.
+wallet2 returns `true` when a connector is installed, not when the endpoint is reachable;
+ANONERO validates numeric/loopback endpoints and treats a wallet connection failure as
+fail-closed. There is no JNI getter for the native proxy value, so manager/wallet equality
+remains a code-order invariant, not a runtime assertion.
+
 ## 3. Type mapping
 
 | Kotlin / JNI | Native representation | Notes |
 | --- | --- | --- |
-| `String` / `jstring` | `std::string` | UTF-8; always check `GetStringUTFChars` for null and release it |
+| `String` / `jstring` | `std::string` | UTF-8; use `ScopedUtfChars` and check `get()` for null |
 | `Long` / `jlong` | `int64_t` or pointer | Handles are raw pointers encoded as `jlong` |
 | `Int` / `jint` | `int`/enums | Validate range before casting to unsigned or enum types |
 | `Boolean` / `jboolean` | `bool` | `JNI_TRUE`/`JNI_FALSE` |
@@ -109,8 +119,9 @@ Two positional hazards are deliberate checks:
 
 - Use `ScopedUtfChars` for borrowed UTF-8, `ScopedLocalRef` for local references, and
   `ScopedCallbackEnv` for callbacks.
-- Check every `GetStringUTFChars` result for null before constructing a `std::string`.
-- Release every string/array/local reference on every return path.
+- Check every `ScopedUtfChars::get()` result for null before constructing a `std::string`;
+  the scoped wrapper releases the JNI string on every return path.
+- Release every array/local reference on every return path.
 - `java2cpp_bytes` treats the Java array as input; `slowHash` releases it with `JNI_ABORT`
   because the Java buffer must not be modified.
 - Delete local references for constructed Kotlin objects after adding them to a list.
@@ -153,7 +164,13 @@ Two positional hazards are deliberate checks:
   or wallet passwords unless a reviewed Kotlin flow already requires them.
 - Do not log passwords, PINs, Keystore material, node credentials, or proxy credentials.
   `LOGD` output reaches logcat and may be persisted by `AnonLogTree`.
+- Do not interpolate `wallet->errorString()` into logs; it can contain a file path or node
+  endpoint. Log the operation and use the structured status for the UI.
 - Do not weaken `setTrustedDaemon(false)` for LWS on the native side.
+- LWS and RPC share `Wallet_initJ`, `setProxyJ`, and `setDaemonAddressJ`; there is no
+  LWS-specific native path or JNI symbol. `https://` depends on
+  `0008-enforce-tls-for-https-daemon-address.patch` forcing SSL support in the Monero
+  wallet API; do not reintroduce autodetect for a clearnet endpoint.
 - Keep the wallet's proxy and trust state consistent with the Kotlin security policy; the
   native layer must not silently fall back to a direct connection.
 
