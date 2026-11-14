@@ -215,7 +215,9 @@ decision and documentation, not a local workaround.
   4. a regression test or static check;
   5. an entry in `docs/ci/` for historical or recurring failures.
   A disappearing original diagnostic is not completion. Do not hide warnings with
-  `continue-on-error`, `|| true`, blanket suppressions, or removed checks.
+  `continue-on-error`, `|| true`, blanket suppressions, or removed checks. A type/import
+  error after a refactor is a pattern signal: check every call site, nullable preference
+  read, and injected dependency in the same change.
 - **Evidence levels.** Label conclusions as:
   - *verified static*: directly visible in a file or produced by a static check;
   - *inferred*: follows from code but was not executed;

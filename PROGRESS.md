@@ -39,6 +39,10 @@ records progress; it is not a release note and does not claim CI validation.
 - `TorSplash` now keys its embedded-Tor check off `TransportConfig`, not the legacy
   `WALLET_USE_TOR` flag, so migrated external-transport installs do not wait on a splash
   for a daemon that was never started.
+- CI-033: normalized nullable `SharedPreferences` host/credentials before `nodeFromPrefs`,
+  restored the Koin Java `inject` import in `ReviewTransaction`, and replaced the removed
+  `wallet` local in sign/verify with a dedicated IO-loaded `primaryAddress` state. Static
+  checks pass; a new authorized CI run is pending.
 
 ### Transactions and backups
 
@@ -260,6 +264,9 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## Pending validation
 
+- **Current checkout:** run `43606679969` (`f5e43a5`) failed the Kotlin compile step in
+  unit, lint, and assemble (CI-033). The native job succeeded, including patch `0008`.
+  The compile fixes are in the working tree and need a new authorized CI run.
 - **Native build:** the archives build and the adapter links in CI. `43521054641` compiles
   the adapter under `-Werror` with no warning line.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in

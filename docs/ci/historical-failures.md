@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43606679969` | `f5e43a5` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; Assemble | Native archives (including TLS patch `0008`) succeed; Kotlin compile fails on nullable host/credentials, a removed `wallet` reference, and a missing Koin import; instrumented skipped |
 | `43528256395` | `0cf9db0` | `workflow_dispatch` | success | none | All jobs pass; instrumented anon and nero each ran 1 test with 0 failures; boot 919 s; 62 JVM tests per flavor; lint 0/0; no adapter warnings under `-Werror` |
 | `43521054641` | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
 | `43122308945` | `381d8ab` | `workflow_dispatch` | failure | instrumented | All code gates plus native and assemble pass; `system_server` SIGABRT while Gradle dexed the test APKs; both XML `tests=0`; health gate failed closed |
@@ -600,6 +601,32 @@ historical `push` triggers are no longer present; workflows are manual-only.
   one-test flavor reports with the same script and image. The hosted emulator remains
   non-deterministic; KVM or a device farm is still the reliable option.
 
+### CI-033 — Kotlin compile errors after transport/LWS refactor
+
+- **Run:** `43606679969` (`f5e43a5`), <https://github.com/daviduhden/ANONERO/actions/runs/43606679969>.
+- **Jobs:** JVM unit tests, Android Lint, Assemble debug APKs and link JNI.
+- **Diagnostic:** both `compileAnonDebugKotlin` and `compileNeroDebugKotlin` failed with:
+  - `AnonWalletHandler.kt:329/330`: `Argument type mismatch: actual type is 'String?', but 'String' was expected.`
+  - `SignVerifyScreen.kt:214`: `Unresolved reference 'wallet'.`
+  - `ReviewTransaction.kt:135`: `Unresolved reference 'inject'.`
+- **Root cause:** `SharedPreferences.getString()` returns `String?` and the transport refactor
+  passed the node username/password directly to a non-null helper; the sign/verify refactor
+  removed the local `wallet` but left one address reference; the new `by inject` in
+  `ReviewTransactionViewModel` lacked the Koin Java import. The `host` local was also
+  nullable before normalization.
+- **Pattern search:** all `nodeFromPrefs` call sites, all `by inject` call sites, all
+  `wallet?.address` references in `SignVerifyScreen`, and all preference reads passed to
+  non-null helpers. The other `by inject` users already import the correct Koin extension;
+  no second unresolved local remained.
+- **Correction:** normalize LWS/RPC host, username, and password with `orEmpty()` before
+  `nodeFromPrefs`; add a dedicated `primaryAddress` state loaded on IO in sign/verify; add
+  `org.koin.java.KoinJavaComponent.inject` to `ReviewTransaction`.
+- **Regression check:** `ktlint`, i18n parity, JNI parity, and the existing compile jobs
+  cover the type/import failures. A static grep check remains in the preventive audit.
+- **Status:** fixed in the working tree; CI not rerun pending supervisor authorization.
+- **Evidence:** the native job (`Build native Monero/JNI archives`) succeeded on the same
+  commit, including patch `0008`; the failures are Kotlin-only and occur before lint/assemble.
+
 ## Warning inventory
 
 ### W-001 — `sdkmanager` deprecation
@@ -676,7 +703,9 @@ historical `push` triggers are no longer present; workflows are manual-only.
 - **Correction:** do not impose project `-Werror` on third-party headers; the adapter keeps
   `SYSTEM` includes and now uses `-Werror` only for its own target. Upstream fixes are the
   correct route for the vendored warnings.
-- **Status:** external; monitored, not suppressed.
+- **Status:** external; monitored, not suppressed. The `43606679969` native job also
+  succeeded with the new `0008` TLS patch; the adapter itself was not compiled because the
+  Kotlin job failed first.
 
 ## CI evidence recorded
 
@@ -694,4 +723,7 @@ historical `push` triggers are no longer present; workflows are manual-only.
   `-Wall -Wextra -Wpedantic -Werror`.
 - `43521054641` lost the guest `input`/`overlay` services after boot and produced no
   instrumented reports (CI-032); `43528256395` passed with the same code.
+- `43606679969` (`f5e43a5`) failed the Kotlin compile step in unit, lint, and assemble
+  (CI-033). The same run's native job succeeded, including the new TLS-enforcement patch.
+  The instrumented job was skipped because assemble did not produce APKs.
 - No release, signing, sanitizer, or fuzz run.

@@ -29,7 +29,9 @@ farm.
 | Coroutine imports | All `CancellationException`, `NonCancellable`, `Job`, `withContext`, `Dispatchers` users | Imports present after the fix |
 | Coroutine cancellation | Every `catch (e: Exception)` in `app/src/main/java` | Four suspend/`launch` paths swallowed cancellation; fixed |
 | KTX preference edits | Every `edit(commit = true)` file | All import `androidx.core.content.edit` |
-| Nullable preference values | `proxyHost`, node/LWS hosts, `getString` call sites | Manual proxy branch fixed; remaining reads have defaults |
+| Nullable preference values | `proxyHost`, node/LWS hosts, `getString` call sites | Manual proxy branch fixed; `AnonWalletHandler` normalizes host/username/password with `orEmpty()` before non-null helper calls |
+| Koin `inject` imports | Every `by inject(...)` call site | `ReviewTransaction` now imports `org.koin.java.KoinJavaComponent.inject`; other ViewModels/services were already covered |
+| Refactor-local removal | `wallet`/`address` references after moving loads to IO | `SignVerify` uses separate `primaryAddress` state instead of the removed local |
 | Nullable formatter output | Every `Formats.convertNumber` call | Both call sites have a non-null fallback |
 | Nullable model collections | `TransactionInfo.transfers` consumers | Detail screen uses `orEmpty()` |
 | ViewModel properties in `launch` | `this.pendingTransaction` / `this.unsignedTransaction` | Qualified with the ViewModel label |

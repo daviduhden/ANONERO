@@ -51,7 +51,9 @@ Do not use to claim runtime success, fund safety, or cryptographic proof.
    related files, equivalent patterns, fix, and regression check in `docs/ci/`.
 4. **Search for the pattern, not only the line.** Review declarations, definitions,
    consumers, tests, and the same design in other components. A single fixed warning does
-   not close the audit.
+   not close the audit. For Kotlin type/import failures, inspect every call site of the
+   affected helper, every `by inject(...)` import, preference reads that return nullable
+   values, and locals removed by a refactor; these usually have sibling occurrences.
 5. **Establish the baseline.** Run only allowed static checks:
    - `python3 scripts/check-jni-contract.py`
    - `python3 scripts/check-i18n.py`

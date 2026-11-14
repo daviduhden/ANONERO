@@ -31,6 +31,8 @@ then maintainability.
 ## 3. Android and Compose
 
 - Validate API 37.2/NDK 30/toolchain changes in CI.
+- Require a green Kotlin compile/lint gate after structural refactors; CI-033 was a
+  nullable-preference/import regression, not a runtime-only issue.
 - Add instrumented coverage for the lock overlay, background sync, decoy/duress selection,
   stealth notifications, secure wipe, and backup restore.
 - Review accessibility labels, touch targets, and adaptive layouts.

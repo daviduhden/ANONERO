@@ -52,6 +52,10 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
+- [ ] Re-run the `Tests` workflow after the CI-033 compile fixes in the working tree; the
+      last run (`43606679969`, `f5e43a5`) failed Kotlin compilation while the native job
+      succeeded.
+
 - [ ] Decide the instrumented runner: `43528256395` passed on hosted, but `43521054641`
       failed before the script. Use a self-hosted KVM runner or a device farm for
       deterministic gates; do not add blind retries.
