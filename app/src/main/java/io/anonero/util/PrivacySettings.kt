@@ -26,6 +26,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import androidx.core.content.edit
 import io.anonero.network.NodeNetwork
+import io.anonero.network.ProxyEndpoint
 import io.anonero.network.TransportConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -241,10 +242,7 @@ data class LwsConfig(
                         previous.useTls != next.useTls
                 )
 
-        fun isLocalHost(host: String): Boolean {
-            val h = host.trim().trim('[', ']').lowercase()
-            return h == "localhost" || h == "::1" || h.startsWith("127.")
-        }
+        fun isLocalHost(host: String): Boolean = ProxyEndpoint.isLoopback(host)
 
         private fun clearnetTlsError(
             host: String,

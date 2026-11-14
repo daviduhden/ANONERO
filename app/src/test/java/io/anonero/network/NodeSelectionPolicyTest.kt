@@ -107,4 +107,29 @@ class NodeSelectionPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `URL syntax cannot disguise a node destination network`() {
+        val tor = TransportConfig()
+        listOf(
+            "clearnet.example/path.onion",
+            "clearnet.example?route.onion",
+            "clearnet.example#route.onion",
+            "user@route.onion",
+            "http://route.onion",
+            " route.onion",
+            "route.onion ",
+            "bad..route.onion",
+            "-route.onion",
+        ).forEach { host ->
+            val malformed = node(host)
+            assertFalse(host, NodeSelectionPolicy.accepts(tor, malformed))
+            assertTrue(
+                host,
+                NodeSelectionPolicy.compatibleNodes(listOf(malformed), tor, NetworkType.NetworkType_Mainnet).isEmpty(),
+            )
+        }
+        assertTrue(NodeSelectionPolicy.accepts(tor, node("route.onion.")))
+        assertTrue(NodeSelectionPolicy.accepts(TransportConfig(mode = TransportMode.SYSTEM_VPN), node("2001:db8::1")))
+    }
 }

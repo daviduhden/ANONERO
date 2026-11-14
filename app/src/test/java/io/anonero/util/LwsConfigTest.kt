@@ -155,4 +155,23 @@ class LwsConfigTest {
         assertFalse(LwsConfig.requiresConsent(enabled, enabled))
         assertFalse(LwsConfig.requiresConsent(enabled, enabled.copy(enabled = false)))
     }
+
+    @Test
+    fun `loopback TLS exemption cannot be claimed by a remote DNS name`() {
+        val vpn = TransportConfig(mode = TransportMode.SYSTEM_VPN)
+        listOf("127.attacker.example", "127.0.0.1.attacker.example", "127.999.0.1", "127.0.0.01")
+            .forEach { host ->
+                assertFalse(host, LwsConfig.isLocalHost(host))
+                assertEquals(LwsValidationError.CLEARNET_REQUIRES_TLS, LwsConfig.validate(host, 8443))
+                assertEquals(
+                    LwsValidationError.CLEARNET_REQUIRES_TLS,
+                    LwsConfig.validateTransport(LwsConfig(true, host, 8443), vpn),
+                )
+                assertNull(LwsConfig.validate(host, 8443, useTls = true))
+            }
+        listOf("localhost", "127.0.0.1", "127.255.255.254").forEach { host ->
+            assertTrue(host, LwsConfig.isLocalHost(host))
+            assertNull(LwsConfig.validate(host, 8443))
+        }
+    }
 }

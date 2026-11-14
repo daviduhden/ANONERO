@@ -38,7 +38,7 @@ object NodeSelectionPolicy {
         nodes
             .filter { node ->
                 node.rpcPort in 1..65535 &&
-                    !node.host.isNullOrBlank() &&
+                    validHost(node.host) &&
                     (walletNetwork == null || node.networkType == walletNetwork) &&
                     node.network == config.nodeNetwork
             }.sortedWith(
@@ -71,7 +71,21 @@ object NodeSelectionPolicy {
         node: Node?,
     ): Boolean =
         node != null &&
-            !node.host.isNullOrBlank() &&
+            validHost(node.host) &&
             node.network == config.nodeNetwork &&
             node.rpcPort in 1..65535
+
+    /** A host is an authority component, never a URL, path or credential container. */
+    private fun validHost(host: String?): Boolean {
+        if (host.isNullOrEmpty() || host != host.trim() || host.length > 253) return false
+        if (ProxyEndpoint.isNumericOrLoopback(host)) return true
+        if (host.all { it in '0'..'9' || it == '.' }) return false
+        return host.removeSuffix(".").split('.').all { label ->
+            label.isNotEmpty() && label.length <= 63 &&
+                label.first().isAsciiAlphanumeric() && label.last().isAsciiAlphanumeric() &&
+                label.all { it.isAsciiAlphanumeric() || it == '-' }
+        }
+    }
+
+    private fun Char.isAsciiAlphanumeric(): Boolean = this in 'a'..'z' || this in 'A'..'Z' || this in '0'..'9'
 }

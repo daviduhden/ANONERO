@@ -24,7 +24,6 @@ import io.anonero.model.node.NodeFields
 import io.anonero.util.WALLET_PROXY
 import io.anonero.util.WALLET_PROXY_PORT
 import io.anonero.util.WALLET_USE_TOR
-import java.net.InetAddress
 
 /**
  * Destination network of a Monero RPC endpoint, not the P2P network.
@@ -94,7 +93,7 @@ data class ProxyEndpoint(
 ) {
     val formatted: String
         get() {
-            val clean = host.trim().trim('[', ']')
+            val clean = normalizeHost(host)
             val wrapped = if (':' in clean && !clean.startsWith("[")) "[$clean]" else clean
             // wallet2 defaults an unqualified endpoint to SOCKS4a; I2P proxies and
             // remote .i2p resolution require SOCKS5.
@@ -102,24 +101,66 @@ data class ProxyEndpoint(
         }
 
     companion object {
-        fun normalizeHost(host: String): String = host.trim().trim('[', ']')
+        fun normalizeHost(host: String): String {
+            val clean = host.trim().removeSurrounding("[", "]")
+            return if (clean.equals("localhost", ignoreCase = true)) "127.0.0.1" else clean
+        }
 
         fun isNumericOrLoopback(host: String): Boolean {
             val clean = normalizeHost(host)
-            if (clean.isEmpty()) return false
-            if (clean == "localhost") return true
-            if (clean.contains(':')) {
-                // Avoid a DNS lookup for malformed or hostname-like values.
-                return clean.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it in ":.%" }
+            return isIpv4(clean) || ipv6Groups(clean) != null
+        }
+
+        private fun isIpv4(host: String): Boolean {
+            val octets = host.split('.')
+            return octets.size == 4 &&
+                octets.all {
+                    it.isNotEmpty() && it.length <= 3 && it.all { digit -> digit in '0'..'9' } &&
+                        (it.length == 1 || it[0] != '0') && it.toInt() in 0..255
+                }
+        }
+
+        // Parse without InetAddress: even malformed input must never invoke DNS.
+        private fun ipv6Groups(host: String): List<Int>? {
+            if (':' !in host || '%' in host) return null
+            val expanded =
+                if ('.' in host) {
+                    val tail = host.substringAfterLast(':')
+                    if (!isIpv4(tail)) return null
+                    val bytes = tail.split('.').map { it.toInt() }
+                    host.substringBeforeLast(':') + ":" +
+                        ((bytes[0] shl 8) or bytes[1]).toString(16) + ":" +
+                        ((bytes[2] shl 8) or bytes[3]).toString(16)
+                } else {
+                    host
+                }
+            val halves = expanded.split("::")
+            if (halves.size > 2) return null
+
+            fun parse(part: String): List<Int>? {
+                if (part.isEmpty()) return emptyList()
+                return part.split(':').map {
+                    if (it.isEmpty() || it.length > 4 ||
+                        !it.all { digit -> digit in '0'..'9' || digit in 'a'..'f' || digit in 'A'..'F' }
+                    ) {
+                        return null
+                    }
+                    it.toInt(16)
+                }
             }
-            return clean.all { it.isDigit() || it == '.' } && clean.count { it == '.' } == 3
+            val left = parse(halves[0]) ?: return null
+            if (halves.size == 1) return left.takeIf { it.size == 8 }
+            val right = parse(halves[1]) ?: return null
+            val missing = 8 - left.size - right.size
+            if (missing < 1) return null
+            return left + List(missing) { 0 } + right
         }
 
         fun isLoopback(host: String): Boolean {
-            val clean = normalizeHost(host).lowercase()
-            if (clean == "localhost" || clean == "::1") return true
-            if (!clean.startsWith("127.")) return false
-            return runCatching { InetAddress.getByName(clean).isLoopbackAddress }.getOrDefault(false)
+            val clean = normalizeHost(host)
+            if (isIpv4(clean)) return clean.substringBefore('.') == "127"
+            val groups = ipv6Groups(clean) ?: return false
+            return groups.take(7).all { it == 0 } && groups.last() == 1
         }
     }
 }
@@ -176,14 +217,14 @@ data class TransportConfig(
 
     val proxyEndpoint: ProxyEndpoint?
         get() =
-            if (mode.requiresProxy && proxyHost.isNotBlank() && proxyPort in 1..65535) {
+            if (mode.requiresProxy && ProxyEndpoint.isNumericOrLoopback(proxyHost) && proxyPort in 1..65535) {
                 ProxyEndpoint(ProxyEndpoint.normalizeHost(proxyHost), proxyPort)
             } else {
                 null
             }
 
     fun validationError(): TransportConfigError? {
-        if (!mode.requiresProxy) return null
+        if (mode.usesEmbeddedTor || !mode.requiresProxy) return null
         val host = ProxyEndpoint.normalizeHost(proxyHost)
         if (host.isBlank()) return TransportConfigError.EXTERNAL_PROXY_REQUIRED
         if (!ProxyEndpoint.isNumericOrLoopback(host)) {

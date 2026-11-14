@@ -125,4 +125,41 @@ class TransportPolicyTest {
         assertTrue(base.requiresProviderRelease(base.copy(customNodeNetwork = NodeNetwork.ONION)))
         assertTrue(base.requiresProviderRelease(base.copy(mode = TransportMode.EMBEDDED_TOR)))
     }
+
+    @Test
+    fun `embedded Tor obtains endpoint from runtime without external proxy configuration`() {
+        assertNull(TransportConfig().validationError())
+    }
+
+    @Test
+    fun `proxy input rejects malformed literals before socket resolution`() {
+        listOf(
+            "999.1.2.3",
+            "127.0.0.01",
+            "127..0.1",
+            "127.0.0.1.",
+            "１２７.0.0.1",
+            "1:2:3",
+            ":::1",
+            "::1::",
+            "1:2:3:4:5:6:7:8:9",
+            "fe80::1%2",
+            "[::1",
+            "::ffff:999.0.0.1",
+            "proxy.example.com",
+        ).forEach { host ->
+            assertFalse(host, ProxyEndpoint.isNumericOrLoopback(host))
+            assertFalse(host, ProxyEndpoint.isLoopback(host))
+        }
+    }
+
+    @Test
+    fun `literal parsing supports IPv6 compression and embedded IPv4 without DNS`() {
+        listOf("::", "::1", "2001:db8::1", "1:2:3:4:5:6:7:8", "::ffff:192.0.2.1")
+            .forEach { assertTrue(it, ProxyEndpoint.isNumericOrLoopback(it)) }
+        assertTrue(ProxyEndpoint.isLoopback("0:0:0:0:0:0:0:1"))
+        assertFalse(ProxyEndpoint.isLoopback("2001:db8::1"))
+        assertFalse(ProxyEndpoint.isLoopback("::ffff:192.0.2.1"))
+        assertEquals("127.0.0.1", ProxyEndpoint.normalizeHost("LOCALHOST"))
+    }
 }
