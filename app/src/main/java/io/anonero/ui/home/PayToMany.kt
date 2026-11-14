@@ -73,8 +73,10 @@ import io.anonero.model.WalletManager
 import io.anonero.network.TransportController
 import io.anonero.services.WalletState
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
+import io.anonero.util.AddressValidationSnapshot
 import io.anonero.util.Formats
 import io.anonero.util.MoneroAmount
+import io.anonero.util.MultiPaymentPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -115,6 +117,7 @@ fun parseExactAmount(text: String): Long? = MoneroAmount.parseExact(text)
 
 class PayToManyViewModel : ViewModel() {
     private val transportController: TransportController by inject(TransportController::class.java)
+    private val walletState: WalletState by inject(WalletState::class.java)
     private val _error = MutableStateFlow<PayToManyError?>(null)
     val error: StateFlow<PayToManyError?> = _error
     private val _preparing = MutableStateFlow(false)
@@ -122,11 +125,16 @@ class PayToManyViewModel : ViewModel() {
 
     suspend fun prepare(recipients: List<Pair<String, Long>>): PendingTransaction? =
         withContext(Dispatchers.IO) {
+            if (!_preparing.compareAndSet(false, true)) return@withContext null
+            val request = recipients.toList()
             _error.value = null
-            _preparing.value = true
             try {
                 if (AnonConfig.viewOnly) {
                     _error.value = PayToManyError.VIEW_ONLY
+                    return@withContext null
+                }
+                if (MultiPaymentPolicy.totalOrNull(request) == null) {
+                    _error.value = PayToManyError.CONSTRUCTION_FAILED
                     return@withContext null
                 }
                 val transport = transportController.config.value
@@ -150,10 +158,16 @@ class PayToManyViewModel : ViewModel() {
                     _error.value = PayToManyError.NOT_CONNECTED
                     return@withContext null
                 }
+                if ((walletState.backgroundSync || walletState.backgroundSyncRunning) ||
+                    request.any { !wallet.validateAddress(it.first) }
+                ) {
+                    _error.value = PayToManyError.CONSTRUCTION_FAILED
+                    return@withContext null
+                }
                 val pending =
                     wallet.createTransactionMultDest(
-                        destinations = recipients.map { it.first },
-                        amounts = recipients.map { it.second },
+                        destinations = request.map { it.first },
+                        amounts = request.map { it.second },
                     )
                 if (!pending.getErrorString().isNullOrEmpty()) {
                     throw Exception(pending.getErrorString())
@@ -166,6 +180,10 @@ class PayToManyViewModel : ViewModel() {
                 if (!pending.commit(unsignedFile.path, true)) {
                     Timber.tag(TAG).e("unsigned export failed: %s", pending.getErrorString())
                     _error.value = PayToManyError.EXPORT_FAILED
+                    return@withContext null
+                }
+                if (WalletManager.instance?.wallet !== wallet || (walletState.backgroundSync || walletState.backgroundSyncRunning)) {
+                    _error.value = PayToManyError.WALLET_NOT_OPEN
                     return@withContext null
                 }
                 pending
@@ -201,28 +219,21 @@ fun PayToManyScreen(
 
     BackHandler { onBackPress() }
 
-    val parsed = recipients.map { parseExactAmount(it.amount) }
-    val addressesValid by produceState(
-        initialValue = recipients.map { false },
-        recipients.toList(),
-    ) {
-        value =
+    val inputSnapshot = recipients.toList()
+    val addresses = inputSnapshot.map { it.address }
+    val parsed = inputSnapshot.map { parseExactAmount(it.amount) }
+    val validation by produceState<AddressValidationSnapshot?>(initialValue = null, addresses) {
+        val checked =
             withContext(Dispatchers.IO) {
                 val wallet = WalletManager.instance?.wallet
-                recipients.map { recipient ->
-                    recipient.address.isNotBlank() &&
-                        wallet?.validateAddress(recipient.address) == true
-                }
+                addresses.map { address -> address.isNotBlank() && wallet?.validateAddress(address) == true }
             }
+        value = AddressValidationSnapshot(addresses, checked)
     }
-    val amountsValid = parsed.all { it != null && it > 0L }
-    val total: Long? =
-        runCatching {
-            parsed.filterNotNull().fold(0L) { acc, value -> Math.addExact(acc, value) }
-        }.getOrNull()
-    val valid =
-        recipients.isNotEmpty() && addressesValid.all { it } && amountsValid &&
-            total != null && total <= unlockedBalance
+    val amountsValid = parsed.all { it != null }
+    val request = inputSnapshot.mapIndexed { index, recipient -> recipient.address to (parsed[index] ?: 0L) }
+    val total = MultiPaymentPolicy.totalOrNull(request)
+    val valid = validation?.allValidFor(addresses) == true && amountsValid && total != null && total <= unlockedBalance
 
     Scaffold(
         modifier = modifier,
@@ -231,7 +242,7 @@ fun PayToManyScreen(
                 title = { Text(stringResource(R.string.pay_to_many)) },
                 navigationIcon = {
                     IconButton(onClick = onBackPress) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
             )
@@ -266,20 +277,21 @@ fun PayToManyScreen(
                             modifier = Modifier.weight(1f),
                         )
                         if (recipients.size > 1) {
-                            IconButton(onClick = { recipients.removeAt(index) }) {
+                            IconButton(enabled = !preparing && !submitted, onClick = { recipients.removeAt(index) }) {
                                 Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_recipient))
                             }
                         }
                     }
                     OutlinedTextField(
+                        enabled = !preparing && !submitted,
                         value = recipient.address,
                         onValueChange = {
                             recipients[index] = recipient.copy(address = it.trim())
                         },
                         label = { Text(stringResource(R.string.address)) },
-                        isError = recipient.address.isNotBlank() && !addressesValid[index],
+                        isError = recipient.address.isNotBlank() && validation?.isValidAt(addresses, index) != true,
                         supportingText = {
-                            if (recipient.address.isNotBlank() && !addressesValid[index]) {
+                            if (recipient.address.isNotBlank() && validation?.isValidAt(addresses, index) != true) {
                                 Text(stringResource(R.string.invalid_address))
                             }
                         },
@@ -288,6 +300,7 @@ fun PayToManyScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     )
                     OutlinedTextField(
+                        enabled = !preparing && !submitted,
                         value = recipient.amount,
                         onValueChange = {
                             recipients[index] = recipient.copy(amount = it.trim())
@@ -316,7 +329,7 @@ fun PayToManyScreen(
                 ) {
                     Text(stringResource(R.string.total), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        Formats.getExactDisplayAmount(total ?: 0L),
+                        if (hideAmounts) Formats.maskAmount(total ?: 0L) else Formats.getExactDisplayAmount(total ?: 0L),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -363,8 +376,9 @@ fun PayToManyScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
+                        enabled = !preparing && !submitted && recipients.size < MultiPaymentPolicy.MAX_RECIPIENTS,
                         onClick = {
-                            if (recipients.size < 16) recipients.add(RecipientInput())
+                            if (recipients.size < MultiPaymentPolicy.MAX_RECIPIENTS) recipients.add(RecipientInput())
                         },
                     ) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
@@ -374,18 +388,23 @@ fun PayToManyScreen(
                         modifier = Modifier.weight(1f),
                         onClick = {
                             if (!valid) return@AnonOutlineButton
-                            val parsedAmounts = parsed.filterNotNull()
-                            if (parsedAmounts.size != recipients.size) {
-                                return@AnonOutlineButton
-                            }
+                            val clickInputs = recipients.toList()
+                            val clickAddresses = clickInputs.map { it.address }
+                            if (validation?.allValidFor(clickAddresses) != true) return@AnonOutlineButton
                             val destinations =
-                                recipients.mapIndexed { i, r ->
-                                    r.address to parsedAmounts[i]
+                                clickInputs.map { recipient ->
+                                    recipient.address to (parseExactAmount(recipient.amount) ?: return@AnonOutlineButton)
                                 }
+                            val clickTotal = MultiPaymentPolicy.totalOrNull(destinations) ?: return@AnonOutlineButton
+                            if (clickTotal > unlockedBalance) return@AnonOutlineButton
                             submitted = true
                             scope.launch {
-                                val pending = viewModel.prepare(destinations)
-                                submitted = false
+                                val pending =
+                                    try {
+                                        viewModel.prepare(destinations)
+                                    } finally {
+                                        submitted = false
+                                    }
                                 if (pending != null) {
                                     navigateToReview(
                                         ReviewTransactionRoute(
