@@ -264,9 +264,12 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## Pending validation
 
-- **Current checkout:** run `43606679969` (`f5e43a5`) failed the Kotlin compile step in
-  unit, lint, and assemble (CI-033). The native job succeeded, including patch `0008`.
-  The compile fixes are in the working tree and need a new authorized CI run.
+- **Current checkout:** run `43632817394` (`1faa159`) compiled Kotlin but failed JVM tests
+  because `NodeSelectionPolicyTest` constructed `Node()` and triggered `WalletManager` /
+  `libanonero` loading (CI-034). The model-constructor fix and unused-import cleanup are in
+  the working tree and need a new authorized CI run.
+- **Previous compile failure:** run `43606679969` (`f5e43a5`) failed Kotlin compilation
+  (CI-033); the native job succeeded, including patch `0008`.
 - **Native build:** the archives build and the adapter links in CI. `43521054641` compiles
   the adapter under `-Werror` with no warning line.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in

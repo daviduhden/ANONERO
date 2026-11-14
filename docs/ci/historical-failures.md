@@ -4,6 +4,7 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `43632817394` | `1faa159` | `workflow_dispatch` | failure | JVM unit tests | Kotlin compilation passes; `NodeSelectionPolicyTest` fails in both flavors because `Node()` loads `WalletManager`, which initializes the unavailable `libanonero` in JVM tests. Native/lint/assemble status recorded separately. |
 | `43606679969` | `f5e43a5` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; Assemble | Native archives (including TLS patch `0008`) succeed; Kotlin compile fails on nullable host/credentials, a removed `wallet` reference, and a missing Koin import; instrumented skipped |
 | `43528256395` | `0cf9db0` | `workflow_dispatch` | success | none | All jobs pass; instrumented anon and nero each ran 1 test with 0 failures; boot 919 s; 62 JVM tests per flavor; lint 0/0; no adapter warnings under `-Werror` |
 | `43521054641` | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
@@ -621,11 +622,34 @@ historical `push` triggers are no longer present; workflows are manual-only.
 - **Correction:** normalize LWS/RPC host, username, and password with `orEmpty()` before
   `nodeFromPrefs`; add a dedicated `primaryAddress` state loaded on IO in sign/verify; add
   `org.koin.java.KoinJavaComponent.inject` to `ReviewTransaction`.
-- **Regression check:** `ktlint`, i18n parity, JNI parity, and the existing compile jobs
-  cover the type/import failures. A static grep check remains in the preventive audit.
+- **Regression check:** local `ktlint`, i18n parity, and JNI parity; the compile jobs are
+  the authoritative type/import gate. CI does not yet run `ktlint`.
+- **Status:** fixed in `e203549`; rerun `43632817394` was launched on `1faa159` and is
+  pending. The native job from `43606679969` succeeded with patch `0008`; the failures were
+  Kotlin-only and occurred before lint/assemble.
+
+### CI-034 — JVM tests load `libanonero` through `Node()` construction
+
+- **Run:** `43632817394` (`1faa159`), <https://github.com/daviduhden/ANONERO/actions/runs/43632817394>.
+- **Job:** JVM unit tests, both `anon` and `nero` debug variants.
+- **Diagnostic:** `NodeSelectionPolicyTest` fails in all three tests with
+  `java.lang.UnsatisfiedLinkError: no anonero in java.library.path` at
+  `WalletManager.<clinit>` and then
+  `NoClassDefFoundError: Could not initialize class io.anonero.model.WalletManager`.
+- **Root cause:** the test constructs `Node()` as a pure model. The empty constructor read
+  `WalletManager.instance?.networkType`; touching `WalletManager` initializes the native
+  library, which is not available in JVM tests. The unit-test job never reached this code
+  before CI-033 because the main Kotlin compile failed first.
+- **Pattern search:** `Node()` call sites are `NodeSelectionPolicyTest` and the v1 backup
+  fallback in `BackupHelper`; the latter immediately overwrites `networkType`. `Node(
+  socketAddress)` also delegates to the empty constructor. `Node(JSONObject)` and
+  `Node(nodeString)` do not use the native singleton.
+- **Correction:** initialize the empty `Node()` from `AnonConfig.getNetworkType()`, the same
+  build property `WalletManager` uses, so model construction has no native dependency.
+- **Regression check:** the existing `NodeSelectionPolicyTest` is now a JVM-only regression
+  for model construction without `libanonero`; the unit job still exercises the full test
+  suite for both flavors.
 - **Status:** fixed in the working tree; CI not rerun pending supervisor authorization.
-- **Evidence:** the native job (`Build native Monero/JNI archives`) succeeded on the same
-  commit, including patch `0008`; the failures are Kotlin-only and occur before lint/assemble.
 
 ## Warning inventory
 
@@ -726,4 +750,7 @@ historical `push` triggers are no longer present; workflows are manual-only.
 - `43606679969` (`f5e43a5`) failed the Kotlin compile step in unit, lint, and assemble
   (CI-033). The same run's native job succeeded, including the new TLS-enforcement patch.
   The instrumented job was skipped because assemble did not produce APKs.
+- `43632817394` (`1faa159`) compiled Kotlin and reached JVM tests, but
+  `NodeSelectionPolicyTest` loaded `WalletManager`/`libanonero` through `Node()` (CI-034).
+  The fix keeps model construction on `AnonConfig.getNetworkType()`; rerun pending.
 - No release, signing, sanitizer, or fuzz run.

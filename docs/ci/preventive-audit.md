@@ -32,6 +32,7 @@ farm.
 | Nullable preference values | `proxyHost`, node/LWS hosts, `getString` call sites | Manual proxy branch fixed; `AnonWalletHandler` normalizes host/username/password with `orEmpty()` before non-null helper calls |
 | Koin `inject` imports | Every `by inject(...)` call site | `ReviewTransaction` now imports `org.koin.java.KoinJavaComponent.inject`; other ViewModels/services were already covered |
 | Refactor-local removal | `wallet`/`address` references after moving loads to IO | `SignVerify` uses separate `primaryAddress` state instead of the removed local |
+| Native singleton in model construction | `Node()` and other JVM test fixtures | CI-034: empty `Node()` now uses `AnonConfig.getNetworkType()`, not `WalletManager`/`libanonero` |
 | Nullable formatter output | Every `Formats.convertNumber` call | Both call sites have a non-null fallback |
 | Nullable model collections | `TransactionInfo.transfers` consumers | Detail screen uses `orEmpty()` |
 | ViewModel properties in `launch` | `this.pendingTransaction` / `this.unsignedTransaction` | Qualified with the ViewModel label |
