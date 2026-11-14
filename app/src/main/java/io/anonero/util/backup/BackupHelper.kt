@@ -346,8 +346,8 @@ object BackupHelper {
             if (!committed) throw Exception("could not persist the restored PIN hash")
             bound = true
             true
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "restore: failed to bind wallet to device")
+        } catch (_: Exception) {
+            Timber.tag(TAG).e("restore: failed to bind wallet to device")
             // Best effort: put the in-memory wallet back on the credential that opened it
             // so a later store cannot leave the file keyed to an unrecorded secret.
             val original = if (openedWithPin) pin else passPhrase
@@ -439,6 +439,22 @@ object BackupHelper {
             require(restoreHeight in 0..MAX_RESTORE_HEIGHT) { "Invalid restore height" }
             val v1Node = backupPayload.backup.node
             val nodes = backupPayload.backup.nodes
+            // Backup JSON is untrusted. Do not let a malformed host or port reach wallet2
+            // or SharedPreferences; drop invalid records and keep the wallet restore.
+            val v1Host = BackupNodePolicy.normalizeHost(v1Node.host)
+            val v1Port = BackupNodePolicy.normalizePort(v1Node.rpcPort)
+            val safeNodes =
+                nodes.mapNotNull { node ->
+                    val host = BackupNodePolicy.normalizeHost(node.host) ?: return@mapNotNull null
+                    val port = BackupNodePolicy.normalizePort(node.rpcPort) ?: return@mapNotNull null
+                    node.host = host
+                    node.rpcPort = port
+                    node.networkType = AnonConfig.getNetworkType()
+                    node
+                }
+            if (safeNodes.size != nodes.size) {
+                Timber.tag(TAG).w("restore: dropped malformed backup node records")
+            }
 
             walletPrefs.edit(commit = true) {
                 putString(
@@ -457,8 +473,8 @@ object BackupHelper {
             val bound =
                 try {
                     bindRestoredWallet(passPhrase, pin)
-                } catch (e: Exception) {
-                    Timber.tag(TAG).e(e, "restore: failed to bind restored wallet")
+                } catch (_: Exception) {
+                    Timber.tag(TAG).e("restore: failed to bind restored wallet")
                     false
                 }
             if (bound) {
@@ -477,29 +493,31 @@ object BackupHelper {
                 // Persist node settings only after the wallet is bound. A failed restore must
                 // not leave a malicious or stale v1 node as the active configuration.
                 try {
-                    walletPrefs.edit(commit = true) {
-                        putString(NodeFields.RPC_HOST.value, v1Node.host)
-                        putInt(NodeFields.RPC_PORT.value, v1Node.rpcPort)
-                        putString(NodeFields.RPC_USERNAME.value, v1Node.username)
-                        putString(NodeFields.RPC_PASSWORD.value, v1Node.password)
-                        putString(NodeFields.RPC_NETWORK.value, v1Node.networkType)
+                    if (v1Host != null && v1Port != null) {
+                        walletPrefs.edit(commit = true) {
+                            putString(NodeFields.RPC_HOST.value, v1Host)
+                            putInt(NodeFields.RPC_PORT.value, v1Port)
+                            putString(NodeFields.RPC_USERNAME.value, v1Node.username)
+                            putString(NodeFields.RPC_PASSWORD.value, v1Node.password)
+                            putString(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
+                        }
                     }
-                    nodes.forEach { nodeRepository.addItem(it) }
-                    if (nodes.isEmpty() && v1Node.host.isNotEmpty()) {
+                    safeNodes.forEach { nodeRepository.addItem(it) }
+                    if (safeNodes.isEmpty() && v1Host != null && v1Port != null) {
                         val node =
                             Node().apply {
-                                host = v1Node.host
-                                rpcPort = v1Node.rpcPort
+                                host = v1Host
+                                rpcPort = v1Port
                                 username = v1Node.username
                                 password = v1Node.password
                                 networkType = AnonConfig.getNetworkType()
                             }
                         nodeRepository.addItem(node)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // The wallet is already restored and bound; a node-list failure must not
                     // remove it. The user can configure a node from Settings.
-                    Timber.tag(TAG).w(e, "restore: failed to persist backup node settings")
+                    Timber.tag(TAG).w("restore: failed to persist backup node settings")
                 }
                 return true
             }
