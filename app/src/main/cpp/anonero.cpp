@@ -204,6 +204,8 @@ class ScopedLocalRef {
     ScopedLocalRef(const ScopedLocalRef &) = delete;
     ScopedLocalRef &operator=(const ScopedLocalRef &) = delete;
 
+    jobject get() const noexcept { return ref_; }
+
   private:
     JNIEnv *env_;
     jobject ref_;
@@ -483,8 +485,8 @@ std::vector<std::string> java2cpp_string_array(JNIEnv *env, jobjectArray array) 
         return result;
     result.reserve(len);
     for (jsize i = 0; i < len; i++) {
-        jstring element = static_cast<jstring>(env->GetObjectArrayElement(array, i));
-        if (element == nullptr) {
+        ScopedLocalRef element_ref(env, env->GetObjectArrayElement(array, i));
+        if (element_ref.get() == nullptr) {
             if (env->ExceptionCheck()) {
                 env->ExceptionClear();
                 return {};
@@ -492,16 +494,14 @@ std::vector<std::string> java2cpp_string_array(JNIEnv *env, jobjectArray array) 
             result.emplace_back("");
             continue;
         }
-        const char *pchars = env->GetStringUTFChars(element, nullptr);
-        if (pchars == nullptr) {
+        jstring element = static_cast<jstring>(element_ref.get());
+        ScopedUtfChars chars(env, element);
+        if (chars.get() == nullptr) {
             // Treat an unreadable element as invalid input; callers reject empty vectors.
             env->ExceptionClear();
-            env->DeleteLocalRef(element);
             return {};
         }
-        result.emplace_back(pchars);
-        env->ReleaseStringUTFChars(element, pchars);
-        env->DeleteLocalRef(element);
+        result.emplace_back(chars.get());
     }
     return result;
 }
@@ -534,22 +534,20 @@ bool java2cpp_set(JNIEnv *env, jobject arrayList, std::set<std::string> &result)
         return false;
     }
     for (jint i = 0; i < len; i++) {
-        jstring element =
-            static_cast<jstring>(env->CallObjectMethod(arrayList, java_util_ArrayList_get, i));
-        if (element == nullptr) {
+        ScopedLocalRef element_ref(env,
+                                   env->CallObjectMethod(arrayList, java_util_ArrayList_get, i));
+        if (element_ref.get() == nullptr) {
             if (env->ExceptionCheck())
                 env->ExceptionClear();
             return false;
         }
-        const char *pchars = env->GetStringUTFChars(element, nullptr);
-        if (pchars == nullptr) {
+        jstring element = static_cast<jstring>(element_ref.get());
+        ScopedUtfChars chars(env, element);
+        if (chars.get() == nullptr) {
             env->ExceptionClear();
-            env->DeleteLocalRef(element);
             return false;
         }
-        result.emplace(pchars);
-        env->ReleaseStringUTFChars(element, pchars);
-        env->DeleteLocalRef(element);
+        result.emplace(chars.get());
     }
     return true;
 }
@@ -990,7 +988,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSeed(JNIEnv *env, jobj
         LOGD("_getPolyseed: true");
     } else {
         LOGD("_getPolyseed: false");
-        LOGE("wallet->getSeed() %s", wallet->errorString().c_str());
+        LOGE("wallet->getSeed() failed");
         LOGD("Falling back to normal, boring, seed");
         _seed = wallet->seed(offset);
     }
@@ -1170,7 +1168,7 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_store(JNIEnv *env, jobje
         return JNI_FALSE;
     bool success = wallet->store(std::string(pathChars.get()));
     if (!success) {
-        LOGE("store(): %s", wallet->errorString().c_str());
+        LOGE("store() failed");
     }
     return static_cast<jboolean>(success);
 }
@@ -1220,12 +1218,12 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_lightWalletLogin(JNIEnv 
     bool ok;
     try {
         ok = wallet->lightWalletLogin(isNewWallet);
-    } catch (const std::exception &e) {
-        LOGE("lightWalletLogin: %s", e.what());
+    } catch (const std::exception &) {
+        LOGE("lightWalletLogin threw");
         ok = false;
     }
     if (!ok) {
-        LOGE("lightWalletLogin failed: %s", wallet->errorString().c_str());
+        LOGE("lightWalletLogin failed");
     }
     return static_cast<jboolean>(ok);
 }
@@ -2206,7 +2204,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_signMessageJ(JNIEnv *env,
         signature.clear();
     }
     if (signature.empty() && wallet->status() != Monero::Wallet::Status_Ok) {
-        LOGE("signMessage failed: %s", wallet->errorString().c_str());
+        LOGE("signMessage failed");
     }
     return env->NewStringUTF(signature.c_str());
 }
