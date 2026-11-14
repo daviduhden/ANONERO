@@ -1,8 +1,8 @@
 # ROADMAP
 
 ANONERO is a Kotlin/Compose Android app with a C++/JNI Monero engine. C++ is the permanent
-native language. Priorities are ordered by fund safety, correctness, compatibility, and
-then maintainability.
+native language. Anonymity is the primary design goal, with privacy and fund safety as
+required constraints, alongside correctness, compatibility and maintainability.
 
 ## 1. Fund-safety and lifecycle hardening
 
@@ -38,7 +38,7 @@ then maintainability.
 - Review accessibility labels, touch targets, and adaptive layouts.
 - Keep `FLAG_SECURE`, backup exclusions, and the non-exported service intact.
 
-## 4. Tor, LWS, and privacy
+## 4. Tor, LWS, and anonymity
 
 - Add deterministic tests for Tor restart and SOCKS re-application.
 - Keep the Tor SOCKS endpoint transient; never persist it as a manual proxy. The flow is
@@ -48,6 +48,8 @@ then maintainability.
 - Verify that a transport change cancels in-flight LWS requests and never reuses the
   previous transport.
 - Keep the cleartext manifest flag from becoming an implicit clearnet path.
+- Add an anonymity regression checklist for new transports, LWS changes, logging, and UI:
+  identifiers, DNS, operator switching, metadata, and correlation surfaces.
 - Document the remaining metadata exposure to daemons and LWS.
 
 ## 5. Dependencies and supply chain
@@ -85,3 +87,23 @@ then maintainability.
 - Replacing Monero cryptography with custom primitives.
 - Editing vendored Monero sources outside the patch series.
 - Claiming runtime or security validation without CI/device evidence.
+
+
+## Anonymity architecture gate
+
+For each new feature document additional disclosure, identity/connection/activity linking,
+and exposure reduction compatible with fund safety. The November source hardening is
+implemented but requires explicit CI/device evidence. Prioritize callback/socket lifetime,
+RPC trust consent and unmanaged-close recovery before claiming broader isolation. See
+[`source audit`](docs/architecture/anonymity-audit-2026-11.md); native/transport correctness
+and traffic correlation need independent review.
+
+
+## Next evidence after the continued-development iteration
+
+Validate retained ownership recovery, atomic JNI snapshots and payment/account/output
+failure paths in CI/devices. Validate dispatch-only release job synchronization and the
+static-checker mutation tests. Native listener lifetime/global lifecycle serialization,
+RPC trust consent, signed-file binding, backup-passphrase policy and hosted emulator
+reliability remain higher-risk work. The current toolchain built in existing baseline CI;
+no unvalidated dependency upgrade is introduced by this iteration.

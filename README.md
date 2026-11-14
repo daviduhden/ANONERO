@@ -1,11 +1,34 @@
 # ANONERO
 
-Privacy- and security-focused Monero wallet for Android, with a full wallet flavor (ANON)
-and a view-only flavor (NERO).
+Anonymity-focused Monero wallet for Android, with a full wallet flavor (ANON) and a
+view-only flavor (NERO).
 
 ANONERO is an Android/Kotlin application with a Jetpack Compose UI and a C++/JNI adapter
 over the official Monero `wallet2` engine. The native wallet archives are built separately
 from the pinned Monero sources and dependency inputs under `external-libs/`.
+
+## Design priorities
+
+ANONERO is organized around one primary goal: reducing the linkability of the user's
+wallet activity and network identity. Privacy and security are essential pillars of that
+goal, not substitutes for it.
+
+1. **Anonymity.** Reduce identifiable information, observable metadata, activity
+   correlation, and unnecessary trust in third parties. Network anonymity does not imply
+   transaction privacy, and neither is a guarantee.
+2. **Privacy.** Protect wallet data and metadata from unnecessary disclosure: addresses,
+   amounts, notes, transaction history, logs, clipboard, notifications, and network
+   destinations.
+3. **Security.** Protect funds, keys, backups, software integrity, and communications.
+   A secure wallet can still be non-anonymous; security is a prerequisite, not a
+   replacement for anonymity.
+
+Monero provides ring signatures, stealth addresses, and confidential amounts. ANONERO
+adds explicit transport control, Tor by default, no intentional subaddress reuse, LWS
+consent and trust boundaries, airgapped signing flows, and local-exposure controls. None
+of these properties is absolute: a compromised device, a malicious remote service, traffic
+correlation, or user behavior can still deanonymize activity. See
+[`docs/security-model.md`](docs/security-model.md).
 
 ## Documentation
 
@@ -14,8 +37,8 @@ from the pinned Monero sources and dependency inputs under `external-libs/`.
 | [`docs/architecture/overview.md`](docs/architecture/overview.md) | Modules, state flow, wallet lifecycle, persistence, transports, native boundary |
 | [`docs/architecture/network-transport.md`](docs/architecture/network-transport.md) | Transport modes, proxy policy, node selection, VPN/I2P limits |
 | [`docs/architecture/jni-boundary.md`](docs/architecture/jni-boundary.md) | Kotlin/C++/wallet2 contracts, handles, callbacks, errors |
-| [`docs/security-model.md`](docs/security-model.md) | Assets, threat model, invariants, privacy limits, known issues |
-| [`docs/features.md`](docs/features.md) | Implemented features and their limitations |
+| [`docs/security-model.md`](docs/security-model.md) | Anonymity, privacy, and security model: adversaries, trust boundaries, invariants, limits |
+| [`docs/features.md`](docs/features.md) | Implemented wallet features, anonymity/privacy/security contribution, and limitations |
 | [`docs/development.md`](docs/development.md) | Repository layout, conventions, static checks, extension recipes |
 | [`docs/build-and-release.md`](docs/build-and-release.md) | Gradle, native build, CI, signing, release |
 | [`docs/architecture/repository-state.md`](docs/architecture/repository-state.md) | Audited state, evidence, decisions, blockers |
@@ -42,7 +65,7 @@ or installing outside the official release page.
 ## Main features
 
 - Monero only, with Polyseed and legacy seed restore.
-- Explicit transport policy: embedded Tor by default, external Tor (Orbot/InviZible), external I2P (i2pd, InviZible, or the official I2P for Android app), system VPN, or a custom SOCKS5 proxy. Tor/I2P/custom fail closed; system VPN is clearnet-only and never falls back.
+- Explicit transport policy: embedded Tor by default, external Tor (Orbot/InviZible), external I2P (i2pd, InviZible, or the official I2P for Android app), system VPN, or a custom SOCKS5 proxy. Tor/I2P/custom fail closed; system VPN is clearnet-only and never falls back. VPN and clearnet custom-proxy use are not equivalent to onion/I2P anonymity.
 - Optional Monero Light Wallet Server (LWS) over the selected transport, with a matching
   destination network and TLS required for non-loopback clearnet.
 - Passphrase encryption on seeds.
@@ -56,6 +79,7 @@ or installing outside the official release page.
 - Stealth mode: redacted notifications, hidden amounts, optional auto-lock, no persisted logs.
 - Separate decoy wallet with an optional duress PIN.
 - Secure wipe of the active profile.
+- No analytics, telemetry, crash-reporting SDK, remote config, or tracking identifiers.
 - English, Spanish (Spain), Russian, and Simplified Chinese UI with an in-app language selector.
 
 ## Architecture at a glance
@@ -118,22 +142,28 @@ API 35 smoke tests. See [`external-libs/patches/README.md`](external-libs/patche
 For the full build/release pipeline, including CI jobs, signing, and artifact checks, see
 [`docs/build-and-release.md`](docs/build-and-release.md).
 
-## Security and limitations
+## Anonymity, privacy, security, and limitations
 
+- Anonymity depends on the selected transport, the remote services, the device, and user
+  behavior. Tor hides the network path, not transaction amounts, timing, or sync patterns.
+  I2P and VPN have different trust models; a VPN flag does not prove per-app routing or
+  leak protection.
+- LWS sees the public address and view key and is treated as untrusted. It is optional and
+  is not a full node; its destination must match the selected transport and non-loopback
+  clearnet requires TLS.
+- The decoy wallet is separation of wallet files and secrets, **not** plausible deniability
+  and not network anonymity.
+- Stealth mode reduces casual local exposure; it is not anonymity and does not defeat root,
+  accessibility services, or screen capture.
 - The recovery seed and passphrase are the ultimate recovery path. Back them up offline.
 - The wallet password is a random secret wrapped by Android Keystore; the PIN gates access
   to it. A Keystore reset or device change can make the device-local wallet unreadable.
-- Tor hides the network path, not transaction amounts, timing, or sync patterns. I2P and VPN have different properties; a VPN flag does not prove per-app routing or leak protection.
-- LWS sees the public address and view key and is treated as untrusted. It is optional; its
-  destination must match the selected transport and non-loopback clearnet requires TLS.
-- The decoy wallet is separation of wallet files and secrets, **not** plausible deniability.
-- Stealth mode reduces casual exposure; it is not anonymity and does not defeat root,
-  accessibility services, or screen capture.
 - Existing backups include v1/v2 compatibility paths. Do not write new data with the legacy
   unauthenticated format.
 
 Read [`docs/security-model.md`](docs/security-model.md) before changing key handling,
-transactions, backups, Tor/LWS, or profile isolation.
+transactions, backups, Tor/LWS, profile isolation, logging, or any user-facing behavior
+that can affect linkability.
 
 ## Project layout
 
@@ -166,3 +196,13 @@ encryption on all seeds. The maintainers are not responsible for lost or stolen 
 ANONERO is distributed under the Apache License 2.0. See [`LICENSE`](LICENSE) and
 [`NOTICE`](NOTICE). The project includes code derived from Monerujo; the original copyright
 and license notices apply to those portions.
+
+
+### Continued source hardening (CI pending)
+
+The current working tree adds retained ownership/retry for auxiliary wallets, atomic
+JNI output/history snapshots and four model constructor checks, coherent multi-recipient
+validation, guarded account/output actions and stale signature-result rejection. Legacy
+proxy setup now uses the common transport editor. Both workflows are dispatch-only;
+release embeds the synchronized required suite. See
+[iteration report](docs/development-iteration-2026-11.md) for evidence and limitations.

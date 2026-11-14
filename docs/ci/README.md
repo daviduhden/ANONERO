@@ -48,3 +48,13 @@ reviewed statically only. Native and instrumented behavior remains unverified: t
 series is checked in and applies to the pinned commit, but the local Monero submodule is
 uninitialized locally; CI builds the archives and APKs, while the instrumented smoke test
 is unstable on the KVM-less runner.
+
+
+## Read-only evidence refresh, 2026-11-14
+
+Run [43633496677](https://github.com/daviduhden/ANONERO/actions/runs/43633496677) on a2c9cfb
+passed JVM, lint, native, assemble, JNI, localization and architecture jobs. Instrumentation
+failed before the repository script during the runner's optional settings write, with
+Broken pipe (32)/adb 224 and no reports. Do not interpret it as executed/passing device tests
+or evidence for the uncommitted working tree. Current CI source uses only workflow_dispatch;
+release embeds synchronized required jobs. See [iteration](../development-iteration-2026-11.md).

@@ -46,6 +46,9 @@ adapter plus the prebuilt Monero archives.
   recursion fallback and Logs-screen severity constants.
 - Do not log seeds, passphrases, PINs, wallet passwords, Keystore material, node
   credentials, or proxy credentials.
+- Evaluate anonymity impact for every change: no tracking, telemetry, analytics, new
+  persistent identifiers, transport bypass, or new correlation metadata. Document residual
+  linkability and limits.
 - Use string resources for user-visible text. Add every new string to all supported locales
   and preserve format placeholders.
 - Comments explain *why*, contracts, invariants, or non-obvious failure behavior. Do not
@@ -201,7 +204,7 @@ CI jobs (manual dispatch only; every job other than `authorize` needs the owner 
   authorization.
 - Keep commits small and grouped by component.
 - Update the affected docs and `AGENTS.md`/skill when behavior, architecture, formats, or
-  security boundaries change.
+  anonymity/privacy/security boundaries change.
 - Remove stale documentation rather than leaving contradictory instructions.
 
 ## 10. Current tooling oddities
@@ -216,3 +219,14 @@ CI jobs (manual dispatch only; every job other than `authorize` needs the owner 
 - No Gradle dependency lockfile or verification metadata is checked in.
 - `kotlinx.coroutines` is a direct declaration at 1.11.0, even though earlier versions
   resolved it transitively.
+
+
+## Continued-development source checks
+
+Use `python3 scripts/check-kotlin-cancellation.py` for cancellation imports and
+`python3 scripts/sync-release-test-jobs.py --check` for dispatch-only shared jobs.
+After editing test jobs, `--write` regenerates only release's marked suite. Both workflows
+use manual dispatch exclusively. Python regression tests under scripts/tests, JVM tests
+and Android tests are prepared/executed only in authorized CI. New strings*.xml feature
+catalogs are discovered in every supported locale. Follow the ownership/UI contracts in
+[iteration report](development-iteration-2026-11.md); do not infer runtime correctness.

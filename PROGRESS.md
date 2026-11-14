@@ -70,6 +70,15 @@ records progress; it is not a release note and does not claim CI validation.
 - The Tor SOCKS endpoint is volatile, and restart clears the cached endpoint before the new
   listener is published, avoiding stale proxy reuse.
 
+### Documentation and anonymity framing
+
+- Reoriented the README, contributor contract, anonymity/privacy/security model, features,
+  transport documentation, skills, and CI instructions around the hierarchy anonymity →
+  privacy → security. Added an adversary/observation matrix, transport trust comparison,
+  and explicit non-guarantees for VPN, custom proxies, LWS, stealth, and decoy controls.
+- Added a local-anonymity/coercion distinction to the wallet-privacy skill and an
+  anonymity regression checklist item to the roadmap/TODO.
+
 ### CI and release controls
 
 - Both workflows are now `workflow_dispatch` only. `test.yml` retains `workflow_call` only
@@ -264,12 +273,14 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## Pending validation
 
-- **Current checkout:** run `43632817394` (`1faa159`) compiled Kotlin but failed JVM tests
-  because `NodeSelectionPolicyTest` constructed `Node()` and triggered `WalletManager` /
-  `libanonero` loading (CI-034). The model-constructor fix and unused-import cleanup are in
-  the working tree and need a new authorized CI run.
-- **Previous compile failure:** run `43606679969` (`f5e43a5`) failed Kotlin compilation
-  (CI-033); the native job succeeded, including patch `0008`.
+- **Current checkout:** run `43633496677` (`a2c9cfb`) passed owner authorization, JVM
+  tests, Android Lint, JNI contract, localization, architecture policy, native archives and
+  assemble/link. The API 35 emulator failed with adb exit 224 before the test script
+  (CI-035), the same KVM-less runner instability.
+- **Previous failures:** `43632817394` (`1faa159`) failed JVM tests because `Node()`
+  loaded `WalletManager`/`libanonero` (CI-034); `43606679969` (`f5e43a5`) failed Kotlin
+  compilation (CI-033). Both fixes are in `500a1a9`/`1faa159` and validated by all
+  non-instrumented jobs in `43633496677`.
 - **Native build:** the archives build and the adapter links in CI. `43521054641` compiles
   the adapter under `-Werror` with no warning line.
 - **Android build:** AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, and CMake 4.1.2 build in
@@ -301,3 +312,30 @@ See [`ROADMAP.md`](ROADMAP.md) and [`TODO.md`](TODO.md). The immediate order is:
 
 Commits through `52d67d4` were pushed. The CI compile-failure fixes, workflow gates, and
 documentation were committed afterwards.
+
+
+## 2026-11-14 — source anonymity hardening, uncommitted / CI pending
+
+Implemented transport/host validation, stale authorization/session rejection, independent
+LWS configuration/consent for DECOY, minimized Kotlin/native diagnostics and exports,
+sanitized Java crash forwarding, startup diagnostic cleanup, SECRET notification previews and removal of the notification service's periodic RPC probe.
+JVM/instrumented regressions and static CI guards are prepared. The localization checker now
+includes `strings_development.xml`; it caught and resolved two unresolved
+`wallet_operation_failed` references. No build/test/Actions, commit or push was performed.
+Full findings, evidence and residual risks:
+[`docs/architecture/anonymity-audit-2026-11.md`](docs/architecture/anonymity-audit-2026-11.md).
+
+
+## 2026-11-14 — continued Kotlin/C++ development, uncommitted
+
+Added retained auxiliary ownership/close retries and guarded profile deletion, safer
+backup/decoy completion and restore cache disposal, atomic native coin/history snapshots
+and model constructor checks, coherent payment validation, guarded account/output UI and
+stale signature rejection. Proxy onboarding shares NetworkSettings; transport writes
+report disk failure and VPN transitions invalidate authorization. Both workflows now use
+only workflow_dispatch, with synchronized required release jobs. New tests are prepared,
+not executed locally. See [iteration report](docs/development-iteration-2026-11.md).
+
+Read-only gh review: 43633496677 on a2c9cfb passed JVM/lint/native/assemble/static jobs;
+instrumentation failed during an optional emulator settings write before tests. Its source
+baseline does not include these changes. No workflow was started/retried/cancelled here.

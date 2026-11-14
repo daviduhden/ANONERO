@@ -39,10 +39,8 @@ the rationale to `ROADMAP.md`.
       `TRANSPORT_VPN` does not prove per-app inclusion or DNS protection.
 - [ ] Validate wallet2 `socks5://` remote resolution and the opt-in `https://` daemon path
       against the pinned native build.
-- [ ] Move onboarding proxy setup onto `TransportController` or Network & Nodes. The
-      legacy `ProxySettings` screen writes `WALLET_USE_TOR`/`WALLET_PROXY` directly and does
-      not choose a custom-proxy destination network, so its state can be stale relative to
-      `TransportConfig` after startup.
+- [x] Move onboarding proxy setup onto the common Network & Nodes editor. Legacy direct
+      proxy/preference mutation APIs were removed; device validation remains pending.
 - [ ] Add automatic recovery/re-apply for external Orbot, InviZible, i2pd, and custom proxy
       failures; today the user must re-apply after a startup failure.
 - [ ] Add a vetted, privacy-preserving node-discovery source or keep the saved-node
@@ -52,9 +50,9 @@ the rationale to `ROADMAP.md`.
 
 ## Correctness and tests
 
-- [ ] Re-run the `Tests` workflow after the CI-033/CI-034 fixes in the working tree; the
-      last run (`43632817394`, `1faa159`) compiled Kotlin but failed JVM tests because
-      `Node()` loaded `libanonero` (CI-034).
+- [x] Re-run the `Tests` workflow after the CI-033/CI-034 fixes. `43633496677`
+      (`a2c9cfb`) passed all non-instrumented jobs; only the API 35 emulator failed with
+      adb exit 224 (CI-035).
 
 - [ ] Decide the instrumented runner: `43528256395` passed on hosted, but `43521054641`
       failed before the script. Use a self-hosted KVM runner or a device farm for
@@ -65,8 +63,8 @@ the rationale to `ROADMAP.md`.
       yamllint, zizmor, and actionlint versions.
 - [ ] Add sanitizer/fuzz jobs (ASan/UBSan/TSan/LeakSanitizer) after native inputs are
       restored; document emulator/runtime limits.
-- [ ] Extend JNI contract checks to signatures/constructor descriptors where derivable
-      statically.
+- [x] Check four JNI model constructor descriptors and parameter order statically.
+- [ ] Extend signature checking to remaining exports and verify bytecode/linkage in CI.
 - [ ] Add a restore fixture for a v2 PIN-keyed backup whose external passphrase differs
       from the PIN, and verify both open attempts and the rollback path.
 - [x] Move remaining main-thread wallet reads out of composition (`HomeGraph`, seed/key
@@ -88,8 +86,11 @@ the rationale to `ROADMAP.md`.
 - [x] Convert remaining raw JNI string paths to `ScopedUtfChars` (array and `ArrayList`
       readers now use `ScopedUtfChars` + `ScopedLocalRef`; native CI still required).
 
-## Security and privacy
+## Anonymity, privacy, and security
 
+- [ ] Add an anonymity regression checklist/test where practical: no new persistent
+      identifiers, no transport bypass, no DNS leak, no silent LWS operator switch, and no
+      new correlation metadata.
 - [ ] Validate Tor restart/SOCKS re-application and LWS trust reset on a device, including
       LWS over external Tor/I2P, system VPN, and a custom proxy.
 - [ ] Decide whether a failed `startBackgroundSync` should close/reset the wallet or keep
@@ -119,3 +120,25 @@ the rationale to `ROADMAP.md`.
 - [x] Remove the `ui/NavGraph.kt` stub; the active graphs are `HomeGraph.kt` and
       `OnboardingGraph.kt`.
 - [ ] Do not commit or push without explicit supervisor authorization.
+
+
+## November source-audit follow-up
+
+- [ ] Obtain explicitly authorized CI evidence for the new anonymity regressions; no run
+      was started. Validate API 29+, packet-level DNS/VPN behavior and stale socket closure.
+- [ ] Stress delayed callbacks and profile/transport transitions; entry guards are not
+      native lifetime synchronization.
+- [ ] Redesign RPC trust with upstream fixtures while preserving trusted-daemon-dependent
+      UR key-image import; do not blindly flip all RPC trust flags.
+- [x] Retain/recover unmanaged wallets on close failure and guard profile deletion;
+      failure-injection regression sources are prepared, execution remains pending.
+- [ ] Assess authenticated SOCKS circuit isolation against actual wallet2/Tor capabilities.
+      Current shared transport/RPC contexts can still link profiles.
+
+## Continued-development validation
+
+- [ ] Exercise retained-close retries, cancelled provisioning, atomic JNI snapshot failure,
+      payment edits during address validation and failed freeze persistence on devices.
+- [ ] Validate the dispatch-only embedded release suite and Python checker regressions.
+- [ ] Resolve hosted-emulator system-service instability; optional animation writes were
+      removed, but no passing instrumented result is claimed for this change.

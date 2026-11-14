@@ -4,7 +4,8 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `43632817394` | `1faa159` | `workflow_dispatch` | failure | JVM unit tests | Kotlin compilation passes; `NodeSelectionPolicyTest` fails in both flavors because `Node()` loads `WalletManager`, which initializes the unavailable `libanonero` in JVM tests. Native/lint/assemble status recorded separately. |
+| `43632817394` | `1faa159` | `workflow_dispatch` | cancelled | JVM unit tests | Kotlin compilation passes; `NodeSelectionPolicyTest` fails in both flavors because `Node()` loads `WalletManager`, which initializes the unavailable `libanonero` in JVM tests. Android Lint passes; native/assemble were cancelled by the superseding run `43633496677`. |
+| `43633496677` | `a2c9cfb` | `workflow_dispatch` | failure | Instrumented tests (API 35) | All JVM, lint, JNI, i18n, architecture, native and assemble jobs pass. The API 35 emulator fails before the test script with adb exit 224 and produces no reports; the same KVM-less runner instability as CI-032/035. |
 | `43606679969` | `f5e43a5` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; Assemble | Native archives (including TLS patch `0008`) succeed; Kotlin compile fails on nullable host/credentials, a removed `wallet` reference, and a missing Koin import; instrumented skipped |
 | `43528256395` | `0cf9db0` | `workflow_dispatch` | success | none | All jobs pass; instrumented anon and nero each ran 1 test with 0 failures; boot 919 s; 62 JVM tests per flavor; lint 0/0; no adapter warnings under `-Werror` |
 | `43521054641` | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
@@ -624,9 +625,9 @@ historical `push` triggers are no longer present; workflows are manual-only.
   `org.koin.java.KoinJavaComponent.inject` to `ReviewTransaction`.
 - **Regression check:** local `ktlint`, i18n parity, and JNI parity; the compile jobs are
   the authoritative type/import gate. CI does not yet run `ktlint`.
-- **Status:** fixed in `e203549`; rerun `43632817394` was launched on `1faa159` and is
-  pending. The native job from `43606679969` succeeded with patch `0008`; the failures were
-  Kotlin-only and occurred before lint/assemble.
+- **Status:** fixed in `e203549`; Kotlin compilation passed in `43632817394`. That run then
+  failed JVM tests for the separate CI-034 model/native issue; `43633496677` validates the
+  final tree. The native job from `43606679969` succeeded with patch `0008`.
 
 ### CI-034 — JVM tests load `libanonero` through `Node()` construction
 
@@ -649,7 +650,27 @@ historical `push` triggers are no longer present; workflows are manual-only.
 - **Regression check:** the existing `NodeSelectionPolicyTest` is now a JVM-only regression
   for model construction without `libanonero`; the unit job still exercises the full test
   suite for both flavors.
-- **Status:** fixed in the working tree; CI not rerun pending supervisor authorization.
+- **Status:** fixed in `500a1a9`; `43633496677` passed JVM, lint, native, assemble and all other non-instrumented jobs. Only the API 35 emulator failed (CI-035).
+- **Superseding run:** the old run's native and assemble jobs were cancelled by the
+  workflow concurrency group when `43633496677` started; Android Lint passed.
+
+### CI-035 — API 35 emulator adb failure after all code gates pass
+
+- **Run:** `43633496677` (`a2c9cfb`), <https://github.com/daviduhden/ANONERO/actions/runs/43633496677>.
+- **Job:** Instrumented tests (API 35).
+- **Diagnostic:** owner authorization, JVM unit tests, Android Lint, JNI contract,
+  localization, architecture policy, native archives and assemble/link all pass. The
+  emulator job fails in `Run instrumented tests on API 35` with adb exit code 224; no XML
+  reports or diagnostics are uploaded, and the result verifier fails closed.
+- **Root cause:** the hosted runner has no KVM; the software x86_64 emulator/guest adb
+  transport fails before the project test script. This is the same runner family as
+  CI-032.
+- **Correction:** none applied. Do not add blind retries or remove the result gate; use a
+  KVM runner or device farm for deterministic instrumented evidence.
+- **Regression check:** all non-instrumented jobs green on this run; next instrumented run
+  must execute both flavor reports or fail with guest diagnostics.
+- **Status:** infrastructure failure, not a project-code failure. The commit contains the
+  CI-034 model-constructor fix and passed every code gate.
 
 ## Warning inventory
 
@@ -752,5 +773,41 @@ historical `push` triggers are no longer present; workflows are manual-only.
   The instrumented job was skipped because assemble did not produce APKs.
 - `43632817394` (`1faa159`) compiled Kotlin and reached JVM tests, but
   `NodeSelectionPolicyTest` loaded `WalletManager`/`libanonero` through `Node()` (CI-034).
-  The fix keeps model construction on `AnonConfig.getNetworkType()`; rerun pending.
+  Android Lint passed; native/assemble were cancelled by the superseding run. The fix keeps
+  model construction on `AnonConfig.getNetworkType()`; `43633496677` is the validation run.
 - No release, signing, sanitizer, or fuzz run.
+
+
+## 2026-11-14 — static anonymity diagnosis (no Actions run)
+
+Source review found malformed-proxy DNS risk, LWS TLS-prefix bypass, RPC URL-authority
+spoofing, shared LWS consent, stale authorization/session callbacks and arbitrary diagnostic
+text. Root causes and sibling pattern searches, corrections and pending evidence are in
+[`source audit`](../architecture/anonymity-audit-2026-11.md). The manual owner-gated JNI job
+now also checks native diagnostics and selected Android anonymity source boundaries.
+JVM/instrumented regression sources were added but not executed. Static validation is not
+build, runtime, network-anonymity or fund-safety evidence.
+
+
+## 2026-11-14 — continued-development static diagnoses and 43633496677
+
+Existing a2c9cfb run passed JVM, Android Lint, native, assemble and static jobs, validating
+the earlier CI-033/CI-034 baseline fixes. Instrumentation booted in about 605 seconds,
+then failed settings animator_duration_scale with Broken pipe (32), adb exit 224, before
+the repository test script. No test reports were produced. Optional animation mutation
+is disabled; test readiness/result gates remain mandatory. Root guest instability is
+unproven by these logs and still requires runner/device evidence.
+
+New static diagnoses: asynchronous recipient validation indexed stale lists and mixed
+current addresses with older amounts; snapshots now match and submission recaptures the
+whole request. Void freeze APIs could report success without observed state; refreshed
+postconditions now guard both methods. Failed native constructors previously skipped
+records; snapshots now fail atomically. False auxiliary close previously discarded
+ownership before deleting files; retained ownership and retry precede cleanup/success.
+
+Integration caught an unqualified cancellation catch without an import; the equivalent
+pattern scan found no sibling unresolved catches after correction. A source guard and
+CI-only regression cases now cover it. i18n's explicit catalog list initially missed new
+feature strings; discovery now covers strings*.xml in every locale, keeps primary files
+mandatory and has CI-only regression sources. See the [report](../development-iteration-2026-11.md)
+for root causes, files, limits and unexecuted tests. No local compilation or test occurred.
