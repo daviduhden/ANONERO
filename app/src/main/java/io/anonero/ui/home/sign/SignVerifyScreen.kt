@@ -105,19 +105,34 @@ fun SignVerifyScreen(
     BackHandler { onBackPress() }
 
     LaunchedEffect(locked) {
-        if (locked) confirmSign = false
+        if (locked) {
+            confirmSign = false
+            signature = ""
+            verifyResult = null
+        }
     }
 
     fun doSign() {
-        if (message.isEmpty() || signing) return
+        if (message.isEmpty() || signing || locked || walletState.backgroundSyncRunning) return
+        val requestedMessage = message
         signing = true
         errorRes = null
         scope.launch {
             try {
+                val wallet = withContext(Dispatchers.IO) { WalletManager.instance?.wallet }
                 val result =
                     withContext(Dispatchers.IO) {
-                        WalletManager.instance?.wallet?.signMessage(message)
+                        if (walletState.backgroundSync || walletState.backgroundSyncRunning) {
+                            null
+                        } else {
+                            wallet?.signMessage(requestedMessage)
+                        }
                     }
+                if (message != requestedMessage || WalletManager.instance?.wallet !== wallet ||
+                    walletState.backgroundSync || walletState.backgroundSyncRunning
+                ) {
+                    return@launch
+                }
                 if (result.isNullOrEmpty()) {
                     errorRes = R.string.signing_failed
                 } else {
@@ -134,20 +149,26 @@ fun SignVerifyScreen(
     }
 
     fun doVerify() {
-        if (verifyMessage.isEmpty() || verifyAddress.isEmpty() || verifySignature.isEmpty()) return
+        if (verifying || locked || verifyMessage.isEmpty() || verifyAddress.isEmpty() || verifySignature.isEmpty()) return
+        val requestedMessage = verifyMessage
+        val requestedAddress = verifyAddress
+        val requestedSignature = verifySignature
         verifying = true
         verifyResult = null
         errorRes = null
         scope.launch {
             try {
-                verifyResult =
+                val wallet = withContext(Dispatchers.IO) { WalletManager.instance?.wallet }
+                val result =
                     withContext(Dispatchers.IO) {
-                        WalletManager.instance?.wallet?.verifySignedMessage(
-                            verifyMessage,
-                            verifyAddress,
-                            verifySignature,
-                        ) ?: false
+                        wallet?.verifySignedMessage(requestedMessage, requestedAddress, requestedSignature) ?: false
                     }
+                if (verifyMessage == requestedMessage && verifyAddress == requestedAddress &&
+                    verifySignature == requestedSignature && WalletManager.instance?.wallet === wallet &&
+                    !walletState.backgroundSync && !walletState.backgroundSyncRunning
+                ) {
+                    verifyResult = result
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
@@ -188,7 +209,7 @@ fun SignVerifyScreen(
                 title = { Text(stringResource(R.string.sign_verify_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackPress) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
             )
@@ -219,7 +240,11 @@ fun SignVerifyScreen(
             item {
                 OutlinedTextField(
                     value = message,
-                    onValueChange = { message = it },
+                    onValueChange = {
+                        message = it
+                        signature = ""
+                    },
+                    enabled = !signing,
                     label = { Text(stringResource(R.string.message_to_sign)) },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
@@ -227,7 +252,7 @@ fun SignVerifyScreen(
             }
             item {
                 AnonOutlineButton(
-                    enabled = message.isNotEmpty() && !signing,
+                    enabled = message.isNotEmpty() && !signing && !locked,
                     onClick = { confirmSign = true },
                 ) {
                     if (signing) CircularProgressIndicator() else Text(stringResource(R.string.sign))
@@ -258,7 +283,11 @@ fun SignVerifyScreen(
             item {
                 OutlinedTextField(
                     value = verifyAddress,
-                    onValueChange = { verifyAddress = it.trim() },
+                    onValueChange = {
+                        verifyAddress = it.trim()
+                        verifyResult = null
+                    },
+                    enabled = !verifying,
                     label = { Text(stringResource(R.string.address)) },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth(),
@@ -267,7 +296,11 @@ fun SignVerifyScreen(
             item {
                 OutlinedTextField(
                     value = verifyMessage,
-                    onValueChange = { verifyMessage = it },
+                    onValueChange = {
+                        verifyMessage = it
+                        verifyResult = null
+                    },
+                    enabled = !verifying,
                     label = { Text(stringResource(R.string.message)) },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
@@ -276,7 +309,11 @@ fun SignVerifyScreen(
             item {
                 OutlinedTextField(
                     value = verifySignature,
-                    onValueChange = { verifySignature = it.trim() },
+                    onValueChange = {
+                        verifySignature = it.trim()
+                        verifyResult = null
+                    },
+                    enabled = !verifying,
                     label = { Text(stringResource(R.string.signature)) },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
