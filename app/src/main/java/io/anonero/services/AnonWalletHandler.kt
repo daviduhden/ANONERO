@@ -19,7 +19,6 @@
 package io.anonero.services
 
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.core.content.edit
 import io.anonero.AnonConfig
 import io.anonero.model.Wallet
@@ -46,7 +45,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.json.JSONObject
