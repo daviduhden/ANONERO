@@ -2,7 +2,9 @@
 
 This document describes the code as it exists in the repository. It intentionally avoids
 claims about runtime behavior that have not been verified by a build or device test. For the
-audited state and known gaps, see [`repository-state.md`](repository-state.md).
+audited state and known gaps, see [`repository-state.md`](repository-state.md). ANONERO's
+primary product goal is anonymity; privacy and security are required pillars, not
+synonyms.
 
 ## 1. Runtime layers
 
@@ -178,7 +180,7 @@ credential. A native failure leaves the wallet locked rather than showing an unl
 Do not add a second preference file for wallet state. Profile-dependent keys must go
 through `WalletProfileStore`, which maps MAIN/DECOY to distinct names.
 
-## 7. Networking: transports, daemon, and LWS
+## 7. Networking: transports, anonymity, daemon, and LWS
 
 The transport policy is implemented in `network/TransportController.kt` and described in
 [`network-transport.md`](network-transport.md). The default is embedded Tor; the user may
@@ -219,9 +221,11 @@ sequenceDiagram
   discovery is not implemented without a vetted, privacy-preserving source; see the
   transport document.
 
-Tor hides the network path. It does not hide transaction amounts, timing, sync patterns, or
-the fact that a wallet is in use. I2P and VPN provide different properties and no anonymity
-guarantee beyond their documented threat models.
+Tor hides the network path. It does not hide transaction amounts, timing, sync patterns,
+the fact that a wallet is in use, or guarantee resistance to traffic correlation. I2P and
+VPN provide different properties and no anonymity guarantee beyond their documented threat
+models. System VPN and a custom clearnet proxy are not equivalent to onion/I2P destinations;
+they shift trust rather than providing network anonymity.
 
 ## 8. UI and navigation
 
@@ -272,15 +276,37 @@ and error mapping.
 - An alternate native runtime, FFI layer, or project-owned Java.
 - A checked-in Gradle dependency lockfile or verification metadata.
 - Runtime, device, or cryptographic validation performed by this documentation pass.
+- A measured traffic-correlation or anonymity study; the transport design is not an
+  anonymity proof.
 - A compiled native build from this checkout; the patch series is present, but the
   archives require the manual CI `native` job.
 
 ## 12. Related documents
 
 - [JNI boundary](jni-boundary.md)
-- [Security model](../security-model.md)
+- [Anonymity, privacy, and security model](../security-model.md)
 - [Features](../features.md)
 - [Development](../development.md)
 - [Build and release](../build-and-release.md)
 - [Repository state](repository-state.md)
 - [Dependencies](dependencies.md)
+
+
+## Reviewed anonymity boundaries (2026-11-14)
+
+LWS configuration is owned per profile through `LwsConfig`; transport and RPC catalog remain
+process/shared contexts. `WalletState.resetSession` clears every new session after previous
+close, and listeners check their captured managed wallet. `DiagnosticPolicy` constrains
+persisted messages before asynchronous writes; clearing invalidates old queued writes.
+See [source audit](anonymity-audit-2026-11.md); these boundaries do not establish native
+lifetime synchronization or independent Tor circuits.
+
+
+## Auxiliary ownership and shared editor iteration
+
+WalletManager retains every unmanaged wallet until native close succeeds. Backup exports
+serialize scratch use and profile removal runs through a closed-path registry action.
+This is auxiliary ownership, not a global lease over all wallet/native operations.
+Legacy proxy onboarding now delegates to NetworkSettings. Native snapshots propagate
+failure atomically, and UI actions bind validation/results to their input context.
+See [iteration](../development-iteration-2026-11.md).

@@ -1,9 +1,36 @@
-# Security and privacy model
+# Anonymity, privacy, and security model
 
-This document describes the security properties the code is designed to provide, the trust
-boundaries it assumes, and the limits that remain. It is a design review, not an independent
-security audit. A static review cannot prove runtime behavior, side-channel resistance, or
-fund safety.
+This document describes the anonymity properties ANONERO is designed to preserve, the
+privacy and security boundaries it assumes, and the limits that remain. It is a design
+review, not an independent audit. A static review cannot prove runtime behavior,
+side-channel resistance, anonymity against traffic correlation, or fund safety.
+
+## Priority and scope
+
+ANONERO is an anonymity-focused Monero wallet. The priority order is:
+
+1. **Anonymity.** Reduce identifiable information, observable metadata, activity
+   correlation, and unnecessary trust in third parties.
+2. **Privacy.** Protect wallet and network data from unnecessary collection, persistence,
+   or disclosure.
+3. **Security.** Protect funds, keys, backups, software integrity, and communications.
+
+Privacy and security are indispensable, but they are not synonyms for anonymity. These
+properties are distinct:
+
+- **Network anonymity:** the difficulty of linking a connection to the user's identity.
+- **Transaction privacy:** the on-chain unlinkability provided by Monero, plus wallet
+  behavior such as subaddress handling and input selection.
+- **Data confidentiality:** protection of seeds, keys, notes, backups, and local metadata.
+- **Fund security:** protection against theft, loss, corruption, and unauthorized spend.
+- **Local anonymity:** resistance to observation by people or apps with device access.
+- **Correlation resistance:** resistance to linking separate sessions, transactions,
+  addresses, or network flows by timing, amounts, or infrastructure.
+
+A secure wallet can be non-anonymous. A private transaction can be correlated by IP or
+timing. An anonymous network path does not protect a compromised key. ANONERO therefore
+evaluates changes against all of these properties instead of treating one as a substitute
+for another.
 
 ## 1. Assets
 
@@ -16,8 +43,9 @@ fund safety.
 | PIN | user input; stored as PBKDF2 hash | PBKDF2-HMAC-SHA256, throttle, constant-time compare |
 | Encrypted backup | user-selected file | PBKDF2 600k + AES-256-GCM; v1/v2 read compatibility |
 | Transaction authenticity | wallet2 construction, review, signing | Review from `confirmationMessage`; sign the loaded object |
+| Network identity | IP address, DNS, destinations, timing, and connection metadata | Transport policy, proxy/DNS rules, no silent fallback |
 | Node credentials | `SharedPreferences` and DataStore | App sandbox only; not Keystore-encrypted |
-| Local privacy metadata | notifications, logs, clipboard, recents | Stealth mode, `FLAG_SECURE`, log suppression, sensitive clipboard |
+| Local identifying metadata | notifications, logs, clipboard, recents | Stealth mode, `FLAG_SECURE`, log suppression, sensitive clipboard |
 | Build integrity | Gradle/Monero/dependency pins; CI | Version catalog, hashes, pinned Actions, protected release signing |
 
 ## 2. Trust boundaries
@@ -28,12 +56,25 @@ fund safety.
 | Android Keystore/TEE/StrongBox | Non-exportable key storage, AES-GCM wrapping | A fully compromised app process that can call the key |
 | wallet2 | Key derivation, transaction construction, signing, wallet file format | UI policy, network proxy, PIN gate |
 | Monero daemon | Chain data and wallet RPC | Honesty about chain state; it can lie or be malicious |
-| Transport (Tor/I2P/VPN/custom) | Network-path confidentiality according to the selected mode | Timing, amounts, sync patterns; a VPN cannot prove per-app routing |
+| Transport (Tor/I2P/VPN/custom) | Network-path anonymity/confidentiality according to the selected mode | Timing, amounts, sync patterns; correlation; a VPN cannot prove per-app routing |
 | LWS | Remote indexing | Trust; it sees the view key and incoming metadata and can lie |
 | Backup file | Portability | Confidentiality if the passphrase is weak; integrity for v1 only |
 | CI/release chain | Artifact provenance | A compromised dependency, action, runner, or signing secret |
 
 ## 3. Threat model
+
+### Adversaries and observations
+
+| Adversary | Can observe | ANONERO mitigation | Residual risk |
+| --- | --- | --- | --- |
+| Monero RPC node operator | Source IP (unless proxied), RPC queries, broadcast timing, transaction set | Tor/I2P/custom proxy, fail-closed transport, node-network filtering, no clearnet fallback in Tor/I2P modes | The node can lie about chain state and correlate queries; traffic analysis remains |
+| LWS operator | Public address, view key, incoming amounts/timing, connection IP unless proxied | Selected transport, TLS for non-loopback clearnet, untrusted-daemon policy, explicit consent, no automatic operator switch | The view key reveals incoming activity; the operator can lie or correlate |
+| VPN provider | Source IP, DNS, destinations, connection metadata | Explicit system-VPN mode, TLS for clearnet LWS, no silent fallback | VPN can log; Android cannot prove per-app inclusion or leak-free DNS |
+| Network/ISP observer | Destination IP, DNS/SNI, timing, volume where not encrypted | Tor/I2P paths, TLS, remote SOCKS resolution, no direct fallback | VPN/clearnet modes and traffic correlation remain observable |
+| Correlation adversary | Repeated destinations, timing, amounts, sync patterns, reuse | Tor by default, no intentional subaddress reuse, LWS consent, airgapped flows | Monero graph analysis, timing correlation, and off-device identity links remain |
+| Malicious app on device | Screen, clipboard, notifications, accessibility, logs | `FLAG_SECURE`, stealth mode, clipboard timeout, log suppression | Root, accessibility, screen capture, and privileged apps can defeat these |
+| Person with physical access | Device, wallet files, recents, coercion | Keystore-wrapped secret, PIN gate, decoy/duress, wipe | Coercion and forensic access; decoy is not plausible deniability |
+| Build/release compromise | Source, build artifacts, signing | Pinned inputs, hashes, manual CI, protected signing | Compromised runner, dependency, action, or signing secret |
 
 ### Considered
 
@@ -46,6 +87,8 @@ fund safety.
 - A weak or reused backup passphrase, and a corrupted/tampered backup.
 - A supply-chain compromise in a dependency, Gradle wrapper, Monero pin, or GitHub Action.
 - Accidental secret leakage through logs, notifications, clipboard, or crash text.
+- Correlation of separate sessions or transactions through timing, amounts, reuse, or
+  shared infrastructure.
 
 ### Not fully mitigated
 
@@ -53,7 +96,10 @@ fund safety.
 - Screen capture by a privileged app, accessibility services, or a camera pointed at the
   screen.
 - Correlation of timing, amounts, IP metadata, or LWS view-key data by an external observer.
-- A user who chooses a weak PIN/passphrase or shares a seed.
+- Traffic correlation and endpoint compromise even when Tor or I2P is used; no transport
+  provides guaranteed anonymity.
+- A user who chooses a weak PIN/passphrase, shares a seed, reuses an address, or links
+  wallet activity to an identity outside ANONERO.
 - A compromised build runner or release signing secret.
 - Plausible deniability of the decoy wallet (see below).
 
@@ -125,6 +171,17 @@ path.
 - A broadcast must come from a real pending/unsigned transaction and must only report
   success after wallet2 succeeds.
 
+### Anonymity properties and limits
+
+- Monero supplies ring signatures, stealth addresses, and confidential amounts; ANONERO
+  does not reimplement consensus or transaction privacy.
+- The wallet avoids intentional subaddress reuse. External addresses, exchange records,
+  and on-chain graph analysis remain outside its control.
+- Pay-to-many reduces the number of transactions but links the outputs in one set.
+- Coin control and freeze/thaw can reduce unintended input linkage, but incorrect manual
+  selection can worsen it. There is no automatic anonymity guarantee.
+- Sign/verify flows provide authenticity, not transaction anonymity.
+
 ## 8. Backups
 
 - The current writer emits v3: PBKDF2-HMAC-SHA256 at 600,000 iterations, AES-256-GCM, a
@@ -144,10 +201,13 @@ path.
   whitespace, embedded ports, malformed IPv6, and out-of-range ports are dropped, and the
   saved network type is the build's network rather than the backup's value.
 
-## 9. Transports, Tor, I2P, VPN, and LWS
+## 9. Network anonymity: transports, Tor, I2P, VPN, and LWS
 
 - Transport is explicit: embedded Tor (default), external Tor, external I2P (i2pd, InviZible, official I2P Java), custom SOCKS5,
   or system VPN. Tor/I2P/custom require their proxy and never fall back to clearnet.
+- Transport modes are not equivalent for anonymity. Tor modes target `.onion`, I2P modes
+  target `.i2p`, system VPN is a clearnet mode that shifts trust to the VPN operator, and a
+  custom proxy provides only what its operator provides. None is a guarantee.
 - Embedded Tor waits up to 60 seconds for SOCKS and throws on timeout. A `TorSplash` timeout
   does not authorize a direct connection.
 - System VPN is the only clearnet mode. It requires an active `TRANSPORT_VPN` and fails
@@ -168,15 +228,17 @@ path.
   reconnection to the already authorized server is allowed.
 - `setTrustedDaemon(false)` is set before and after LWS login, including failure paths. A
   LWS login failure does not fall back to a full node.
-- Tor hides the network path, not timing, amounts, sync patterns, or the use of Tor. I2P and
-  VPN have their own, narrower properties and are not interchangeable with Tor.
+- Tor hides the network path, not timing, amounts, sync patterns, the use of Tor, or
+  guarantee resistance to traffic correlation. I2P and VPN have their own, narrower
+  properties and are not interchangeable with Tor. VPN and clearnet custom-proxy use are
+  not equivalent to onion/I2P destinations.
 - `AndroidManifest.xml` permits cleartext traffic for node/LWS compatibility. That flag is
   not a proxy bypass or a TLS guarantee; Android will not enforce HTTPS for those endpoints.
   The app-level transport rule keeps wallet traffic on the selected path.
 
-## 10. Stealth, decoy, and duress
+## 10. Local anonymity, stealth, decoy, and duress
 
-Stealth mode is a casual-exposure reduction:
+Stealth mode is a casual local-exposure reduction:
 
 - redacted notification title/body;
 - hidden amounts;
@@ -184,7 +246,8 @@ Stealth mode is a casual-exposure reduction:
 - no persisted logs;
 - `FLAG_SECURE` for recents and screenshots.
 
-It is not anonymity and does not defeat root, accessibility services, or a camera.
+It is not network anonymity, transaction unlinkability, or plausible deniability, and does
+not defeat root, accessibility services, or a camera.
 
 The decoy is a separate wallet file (`anon-alt`) with a separate Keystore secret, PIN hash,
 passphrase hash, and restore height. `WalletSession.profile` is not persisted; every process
@@ -201,6 +264,8 @@ correlate the two profiles.
 
 - Logs are persisted in DataStore and are user-shareable. Never log seeds, passphrases,
   PINs, wallet passwords, Keystore material, node credentials, or proxy credentials.
+- No analytics, telemetry, crash-reporting SDK, remote config, or tracking identifiers.
+  Do not add a client-side identifier that can link sessions or devices.
 - Android backup is disabled (`allowBackup=false`); both backup rule files exclude all
   domains. Do not re-enable cloud/device-transfer backup for wallet data.
 - `AnonLogTree` persists info and above in release builds, debug and above in debug builds,
@@ -242,6 +307,9 @@ separately below.
    path.
 9. **No runtime validation.** The Android, native, cryptographic, Tor/LWS, and UI behavior
    described here has been inspected statically. CI and device tests remain authoritative.
+10. **No measured anonymity.** Traffic correlation, endpoint compromise, VPN logging, and
+    LWS metadata exposure are not quantified. The transport design reduces linkability; it
+    does not prove anonymity against a capable observer.
 
 ### Fixed in the current development cycle
 
@@ -265,13 +333,13 @@ separately below.
 
 ## 13. Review rules
 
-1. Identify the asset and the attacker capability.
+1. Identify the asset, the adversary, and the linkability/metadata exposure.
 2. Trace the data flow across every boundary.
 3. Check failure behavior; it must fail closed.
-4. Check profile isolation and secret redaction.
+4. Check profile isolation, local exposure, and secret redaction.
 5. Check the persisted format and migration path.
 6. Check the JNI handle/lifetime contract if native code is involved.
-7. Require CI evidence; do not present static review as security proof.
+7. Require CI evidence; do not present static review as anonymity or security proof.
 
 ## 14. Related documents
 
@@ -281,3 +349,35 @@ separately below.
 - [`build-and-release.md`](build-and-release.md)
 - [`architecture/repository-state.md`](architecture/repository-state.md)
 - [`architecture/dependencies.md`](architecture/dependencies.md)
+
+
+## November 2026 source hardening
+
+[Audit and residual risks](architecture/anonymity-audit-2026-11.md) record the source
+findings, pre-edit threat models and required dynamic matrix. LWS settings/consent are
+profile-specific (legacy MAIN preserved; DECOY disabled initially). Strict host/loopback
+validation closes URL-network and TLS-exemption spoofing; stale transport authorization
+and session callbacks are rejected at the reviewed boundaries. This does not prove native
+socket/callback lifetime, per-wallet Tor circuits or VPN routing.
+
+Persisted diagnostics are fixed reviewed warning/error events with generic fallback/tag,
+minute timing and no hardware fingerprint; no debug logcat tree exists. Old diagnostic
+files are removed at startup before consumers. Java crash forwarding uses a fixed exception;
+native fixed errors/OS tombstones still remain outside Kotlin stealth suppression. Both
+wallet notifications request SECRET lock-screen visibility; device policy can affect behavior.
+No cryptographic or consensus rules were changed. Every future feature must answer what
+information it reveals, what identities/connections/activities it can link, and how to reduce
+that exposure without compromising funds.
+
+
+## Continued lifecycle and UI hardening
+
+Auxiliary wallets remain reachable after failed close and their backing files/credentials
+are preserved until confirmed closure/recovery. Registry-guarded deletion serializes with
+auxiliary opens/closes, but not the complete pre-registry Keystore provisioning phase.
+Failed native snapshot conversion now raises an error rather than returning incomplete
+coin/history data. Payment checks bind to exact inputs; freeze/thaw checks observed flags;
+locked mutation guards and visible errors reduce stale-state decisions. Signing/verification
+results are withheld after input/session changes. None of these establishes native lifetime,
+cryptographic correctness, memory zeroization or fund safety. Retained tmp_backup files are
+purged at process startup; failed password transitions and flash erasure remain unproven.

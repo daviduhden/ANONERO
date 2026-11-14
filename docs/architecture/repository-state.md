@@ -70,8 +70,8 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
   adapter, and the debug APKs. The API 35 smoke test passed on `42874760135` and
   `43528256395` but is not stable on the KVM-less hosted runner.
 - Documentation: `docs/` was empty; this audit adds the documentation index, architecture
-  and JNI docs, security model, features, development, build/release, state, dependency
-  record, progress/roadmap/todo files, and the instruction system.
+  and JNI docs, anonymity/privacy/security model, features, development, build/release,
+  state, dependency record, progress/roadmap/todo files, and the instruction system.
 - No evidence of runtime/device validation of the current working tree.
 
 ### Pending or out of scope
@@ -80,7 +80,8 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 - Another native runtime or FFI layer. Kotlin/Compose and C++/JNI are the permanent
   architecture.
 - Removal of legacy compatibility formats. No deprecation decision exists.
-- A full threat model document beyond the security sections in the skills.
+- A quantified traffic-correlation study or an independent external threat-model review
+  beyond the adversary matrix in `docs/security-model.md`.
 
 ## Decisions
 
@@ -152,8 +153,9 @@ was committed in `52d67d4`. The CI compile-failure fixes were committed afterwar
    native build. Do not run it as part of an unrelated change.
 3. **Validate instructions in CI.** Markdown/YAML/frontmatter were checked statically.
    Skill discovery and agent behavior still need a real agent run.
-4. **Runtime privacy validation.** Tor restart, LWS reconnect, background-sync lock,
-   notifications, decoy switching, and wipe need device/instrumented validation.
+4. **Runtime anonymity/privacy validation.** Tor restart, LWS reconnect, background-sync
+   lock, notifications, decoy switching, and wipe need device/instrumented validation;
+   traffic correlation and remote-service observations remain unverified.
 5. **Cryptographic review.** The PIN/Keystore/backup design is documented from code,
    not independently audited. Side-channel and Keystore behavior remain unverified.
 6. **README accuracy.** `README.md` describes a build flow that depends on missing
@@ -175,9 +177,34 @@ Update this document and the affected instructions when:
 - the Monero pin, patch series, native dependency pins, NDK, SDK, AGP, Gradle, or
   Kotlin version changes;
 - a persisted format or migration is added/removed;
-- a security invariant or threat-model limitation changes;
+- an anonymity, privacy, or security invariant or threat-model limitation changes;
 - a CI gate, signing step, or release invariant changes;
 - a new skill is added or a directory gains subtree-specific rules.
 
 Do not update this document with unverified claims. Record the evidence source and the
 date.
+
+
+## Working-tree source hardening (2026-11-14, CI pending)
+
+Implemented strict proxy/RPC/loopback validation, stale transport authorization rejection,
+Tor listener invalidation, every-session state reset, captured-wallet callback guards,
+profile-specific LWS configuration/consent, minimized diagnostic storage/export/native
+logging, sanitized Java crash forwarding and SECRET notification previews. Added JVM and
+instrumented regressions plus two static source guards in the manual JNI job. No new CI
+run was initiated. See [audit](anonymity-audit-2026-11.md) for exact scope and pending risks;
+upstream Monero and dynamic network behavior are not exhaustively verified.
+
+
+## Continued development after the source audit (2026-11-14)
+
+Implemented retained auxiliary ownership/close retry and atomic deletion guards; backup/
+decoy success waits for closure; NERO/DECOY export is refused before MAIN scratch access.
+Native snapshots fail atomically and four model constructors have static ABI guards.
+Payment validation uses checked input snapshots; account/output errors are visible and
+signature results are tied to input/session. Onboarding uses the common transport editor;
+transport persistence/VPN state is hardened. Both workflows are dispatch-only, with a
+synchronized embedded release suite. See [report](../development-iteration-2026-11.md).
+Existing run 43633496677 passed source compilation, native/JVM/lint/assemble gates on
+committed a2c9cfb, but instrumentation failed before test execution. It does not validate
+this uncommitted tree.

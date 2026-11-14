@@ -1,4 +1,4 @@
-# Network transport and node selection
+# Network transport, node selection, and anonymity
 
 This document describes the transport boundary introduced for ANONERO. It separates five
 concerns that were previously implicit in `WALLET_USE_TOR` and a single manual proxy:
@@ -24,6 +24,37 @@ The code lives in `app/src/main/java/io/anonero/network/` and
 | `INVIZIBLE_I2P` | InviZible Pro I2P module | user-configured local SOCKS5 | `.i2p` only |
 | `I2P_JAVA` | official I2P for Android (`net.i2p.android`) | user-configured local SOCKS5 from its I2PTunnel | `.i2p` only |
 | `CUSTOM_PROXY` | external SOCKS5 | user-configured, numeric host | explicit choice |
+
+## Anonymity and trust model
+
+The transport is the primary network-anonymity control, but the modes are not equivalent.
+Do not describe VPN or clearnet custom-proxy use as equivalent to onion/I2P destinations.
+
+| Mode | Network-anonymity model | Additional trust and limits |
+| --- | --- | --- |
+| Embedded Tor | Tor path from the app to the destination; `.onion` nodes only | No traffic-correlation or endpoint-compromise guarantee |
+| Orbot / InviZible Tor | Tor path provided by an external local app | External app configuration, logs, and lifecycle; ANONERO does not start it |
+| System VPN | Not network anonymity; it shifts trust to the VPN operator | Clearnet destinations, clearnet DNS, no per-app routing proof |
+| i2pd / InviZible I2P / I2P Java | I2P path within the I2P network; `.i2p` nodes only | Different threat model from Tor; router, tunnel, and external-app trust |
+| Custom SOCKS5 | Whatever the operator provides; not anonymity by itself | The user chooses the network; proxy operator can observe destinations |
+
+LWS and RPC nodes are services, not transports. Tor/I2P can hide the user's IP from the
+service, but the service still sees the queries it handles. A VPN hides the user's IP from
+the destination but exposes it to the VPN operator. A custom proxy may expose both.
+
+### Remote services and linkability
+
+- A full RPC node sees the wallet's source IP unless proxied, the RPC queries, and the
+  approximate time of transaction broadcasts. It can lie about chain state. A remote node
+  is not trusted for chain validity.
+- An LWS receives the public address and view key, and therefore incoming amounts and
+  approximate timing. It is an index, not a full node, and remains untrusted before and
+  after login.
+- The selected transport hides the network path from the service only as far as its model
+  allows. It does not hide amounts, transaction graph, timing, or the fact that a wallet is
+  syncing.
+- Prefer a self-operated node or LWS where possible. Changing LWS operator requires explicit
+  user consent; ANONERO does not silently switch operators.
 
 `TransportController` persists the mode and endpoints in `anonPref`. A legacy
 `useTor`/`proxy`/`proxyPort` configuration is migrated: a valid legacy manual proxy
@@ -163,7 +194,8 @@ VPN operator included ANONERO, that every socket is routed through it, or that D
 protected. Android supports per-app allow/disallow lists and `allowBypass()`. ANONERO
 therefore treats VPN mode as an explicit user choice and fails closed on the absence of
 the transport, but does not claim a leak-proof VPN guarantee. The UI must keep this
-warning.
+warning. VPN mode is a clearnet trust shift, not network anonymity; it is not equivalent
+to onion/I2P routing.
 
 ## Node catalog and selection
 
@@ -197,10 +229,10 @@ Settings → Connection → **Network & Nodes** exposes:
 - proxy host/port and custom node network;
 - automatic selection and trusted-node preference;
 - LWS enabled/disabled status, address, destination network, transport compatibility,
-  privacy warning, and a link to the LWS settings screen;
+  anonymity/privacy warning, and a link to the LWS settings screen;
 - connection status, active node, node network;
 - compatible saved nodes and a link to node management;
-- VPN/I2P/custom warnings and configuration errors.
+- VPN/I2P/custom trust and anonymity warnings and configuration errors.
 
 The old `ProxySettings` screen remains for onboarding compatibility but is no longer the
 primary entry point. It writes the legacy `WALLET_USE_TOR`/`WALLET_PROXY` keys directly and
@@ -225,7 +257,8 @@ because they require CI or a device:
 A static review cannot prove the absence of leaks. In particular, a VPN can exclude
 ANONERO, a malicious proxy can lie about the destination network, and wallet2's TLS
 support must be verified against the pinned native build. Do not describe the VPN mode
-as leak-proof.
+as leak-proof or anonymous. Tor/I2P modes also remain subject to traffic correlation and
+endpoint compromise.
 
 ## References
 
@@ -233,3 +266,24 @@ as leak-proof.
 - I2P SOCKS proxy documentation: <https://geti2p.net/en/docs/api/socks/>
 - I2P SAM v3 documentation: <https://geti2p.net/en/docs/api/samv3>
 - I2P port assignments: <https://i2p.net/en/docs/overview/ports/>
+
+
+## Source hardening, 2026-11-14
+
+Proxy literals now use a DNS-free IPv4/IPv6 parser (scoped IPv6 rejected, localhost canonicalized).
+Manual/automatic RPC selection validates the whole host before network suffix classification.
+Authorization generation rejects obsolete provider results; empty Tor listeners clear SOCKS.
+LWS settings/consent are profile-specific and the TLS exemption requires actual loopback.
+No operator rotation, probing of candidate RPC nodes or circuit-isolation claim is added.
+See [audit](anonymity-audit-2026-11.md) for threats and socket/VPN/runtime limits.
+
+
+## Common setup and durability iteration
+
+ProxySettings is now a transport-only presentation of NetworkSettings, with no independent
+proxy setters or provider start paths. Configuration mutations are serialized per editor;
+preference-only changes merge the current policy and retain an available provider. Failed
+commit is a failure even if SharedPreferences changed in memory: restore only network
+settings, keep prior controller policy and invalidate authorization. VPN loss invalidates
+pending authorization; recovery needs authorization again. This does not revoke endpoints
+already in use. See [network iteration](../development-iteration-network.md).

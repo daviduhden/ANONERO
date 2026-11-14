@@ -1,7 +1,8 @@
 # Implemented features
 
 This document describes behavior visible in the source. Runtime behavior still requires CI
-and device validation. For design rationale and threat boundaries, see
+and device validation. ANONERO is an anonymity-focused wallet; privacy and security are
+required pillars. For design rationale and threat boundaries, see
 [`security-model.md`](security-model.md) and
 [`architecture/overview.md`](architecture/overview.md).
 
@@ -58,6 +59,9 @@ overwriting them.
   overflowing values before construction.
 - **Coin control** lists unspent outputs, supports freeze/thaw by output public key, and
   passes selected key images to wallet2 for construction.
+- Pay-to-many reduces the number of transactions but links its outputs in one set. Coin
+  control can reduce unintended input linkage only when used correctly; a poor manual
+  selection can worsen linkability. Neither is an anonymity guarantee.
 - **Review** displays amount, fee, total, txid (when available), and destination rows. For
   imported unsigned transactions, rows come from wallet2's `confirmationMessage`; if it
   cannot be parsed, the raw sentence is shown. The advisory destination/amount getters are
@@ -86,12 +90,16 @@ The airgapped flow uses the UR registry types in `AnonUrRegistryTypes`:
 fragments. Imported files are written to cache under the fixed names in `AnonConfig` and
 cleaned at startup, after wipe, or by `AnonConfig.clearSpendCacheFiles`.
 
+Airgapping keeps signing keys away from the networked device and can reduce key-exposure
+and identity-correlation risk when the workflow is disciplined. It does not hide on-chain
+data, the eventual broadcast path, or a compromised signer/recipient.
+
 ## 6. Message signing and verification
 
 `SignVerifyScreen` uses wallet2's `signMessage`/`verifySignedMessage`. The message is encoded
 as UTF-8 in Kotlin before crossing JNI so non-BMP text is signed exactly as displayed. A
 valid signature proves possession of the signing key; it does not prove the identity of the
-signer or that the message is truthful.
+signer or that the message is truthful. It contributes authenticity, not anonymity.
 
 ## 7. Backups
 
@@ -106,7 +114,10 @@ signer or that the message is truthful.
   bind removes only MAIN, preserving a configured decoy; backup node settings are applied
   only after the bind succeeds.
 
-## 8. Network: transports, daemon, and LWS
+Backups protect wallet data at rest. They do not change on-chain privacy or network
+anonymity, and a weak seed passphrase weakens the backup encryption.
+
+## 8. Network: transports, anonymity, daemon, and LWS
 
 - **Embedded Tor** is the default. The wallet waits for a SOCKS endpoint and fails closed if
   it does not appear. The daemon restarts after an unexpected stop while wanted.
@@ -114,7 +125,9 @@ signer or that the message is truthful.
   user-configured local SOCKS5 endpoint. Ports are not assumed: the UI asks for host and
   port. `.onion` nodes are accepted only in Tor modes and `.i2p` nodes only in I2P modes.
 - **System VPN** uses clearnet nodes only while Android reports `TRANSPORT_VPN`. It never
-  starts embedded Tor and never falls back to direct traffic when the VPN disappears.
+  starts embedded Tor and never falls back to direct traffic when the VPN disappears. It is
+  not network anonymity; it shifts trust to the VPN operator and does not prove per-app
+  routing or leak-free DNS.
 - **Custom SOCKS5** requires an explicit destination network (clearnet, `.onion`, or
   `.i2p`); a generic proxy is not assumed to provide Tor/I2P anonymity.
 - **Full node** mode connects wallet2 to a Monero daemon over the selected path. The daemon
@@ -131,10 +144,25 @@ signer or that the message is truthful.
   synchronization and is intended for airgapped signing.
 - **I2P Java** detects the official `net.i2p.android` app but uses a user-created I2PTunnel SOCKS client tunnel; package presence does not imply a running tunnel. See [`architecture/network-transport.md`](architecture/network-transport.md).
 - **Network & Nodes** exposes transport, proxy, automatic/manual node selection, active
-  node, node network, LWS status, connection state, and security warnings. See
-  [`architecture/network-transport.md`](architecture/network-transport.md).
+  node, node network, LWS status, connection state, and anonymity/privacy/security
+  warnings. See [`architecture/network-transport.md`](architecture/network-transport.md).
 
-## 9. Privacy features
+## 9. Anonymity, privacy, and coercion features
+
+ANONERO's primary product goal is anonymity. The features below contribute in different
+ways; they are not interchangeable and none is an anonymity guarantee.
+
+| Feature | Primary contribution | Limits |
+| --- | --- | --- |
+| Tor/I2P transport | Network-path anonymity | Traffic correlation, endpoint compromise, service metadata |
+| System VPN / custom proxy | Trust shift; may hide IP from the destination | Not anonymity; VPN/proxy operator sees the connection |
+| No intentional subaddress reuse | Reduces on-chain linkability | Wallet behavior and external identity links remain |
+| Coin control / freeze-thaw | Avoids unintended input linkage | User must understand selection; not automatic |
+| Airgapped signing | Keeps keys off networked devices | Does not hide on-chain data; workflow discipline required |
+| LWS | Faster scanning; optional external index | Server sees address/view key and incoming metadata |
+| Stealth mode | Local visual/notification exposure | Not network anonymity; root/accessibility can defeat it |
+| Decoy wallet / duress PIN | Coercion and physical-access mitigation | Not plausible deniability or network anonymity |
+| Secure wipe | Reduces residual local data | Cannot erase backups, remote copies, or forensic traces |
 
 - **Stealth mode** redacts notification title/body, hides amounts, can auto-lock on
   `onStop`, and suppresses persisted logs. `FLAG_SECURE` is always set regardless of stealth.
@@ -150,7 +178,8 @@ signer or that the message is truthful.
 - **Secure clipboard** marks text sensitive on API 33+ and clears it after 60 seconds if it
   is still the primary clip.
 
-These are privacy and coercion mitigations, not anonymity. See
+These are local-exposure, privacy, and coercion mitigations. They do not provide network
+anonymity, transaction unlinkability, or plausible deniability. See
 [`security-model.md`](security-model.md) for limits.
 
 ## 10. Settings and localization
@@ -174,7 +203,34 @@ These are privacy and coercion mitigations, not anonymity. See
   the legacy proxy screen and Network & Nodes use the shared numeric/loopback validator.
 - The decoy is separation of wallet files and secrets, not plausible deniability.
 - Stealth mode does not defeat root, accessibility services, or screen capture.
+- VPN and clearnet custom-proxy modes are not network anonymity; Tor/I2P still face
+  traffic correlation and endpoint compromise.
+- No traffic-correlation, VPN-routing, or LWS-metadata measurement has been performed.
 - LWS sees the view key and incoming transaction metadata; the selected transport does not
   hide that from the server.
 - No Gradle dependency lockfile or verification metadata is checked in.
 - Runtime/device behavior has not been validated locally; CI is authoritative.
+
+
+## November 2026 hardening (source implemented, runtime pending)
+
+MAIN and DECOY choose LWS independently; DECOY begins disabled and does not inherit MAIN's
+operator consent. Reopening a wallet resets account/sync/UI shortcuts. Log sharing contains
+reviewed fixed warnings/errors, coarse UTC times and API level, without hardware metadata;
+unknown diagnostic text is withheld. Both wallet notifications request hidden lock-screen
+content. Existing wallet, airgapped and alternative transport features remain; see the
+[audit](architecture/anonymity-audit-2026-11.md) for compatibility and unverified limits.
+
+
+## Continued feature integration (source only)
+
+Accounts and output actions now reject locked sessions, prevent repeated UI actions and
+show translated failures. Coin selections drop frozen/spent/missing outputs; freeze/thaw
+checks wallet2's refreshed flag. Pay to Many handles changing recipient lists safely,
+revalidates immutable submission inputs, prevents concurrent preparation and masks totals
+when amounts are hidden. Message inputs are captured before work and stale results are
+not published. Back navigation has accessible labels in the edited screens.
+Decoy provisioning and backup exports require successful auxiliary close before success,
+and incomplete decoys expose explicit removal/recovery. Legacy proxy setup offers the
+same transport/network choices as Network & Nodes. See the
+[feature-state table](development-iteration-2026-11.md); runtime behavior remains pending.
