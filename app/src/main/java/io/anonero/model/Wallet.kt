@@ -287,6 +287,8 @@ class Wallet {
 
     fun setProxy(address: String?): Boolean = setProxyJ(address)
 
+    fun clearProxy(): Boolean = setProxyJ("")
+
     private external fun setProxyJ(address: String?): Boolean
 
     val balance: Long

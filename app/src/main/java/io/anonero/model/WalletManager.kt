@@ -317,7 +317,7 @@ class WalletManager {
     fun setDaemon(node: Node?) {
         if (node != null) {
             require(networkType === node.networkType) { "network type does not match" }
-            daemonAddress = node.address
+            daemonAddress = node.rpcUrl
             daemonUsername = node.username
             daemonPassword = node.password
             daemonAddress?.let { addr -> setDaemonAddressJ(addr) }
@@ -366,6 +366,16 @@ class WalletManager {
     fun setProxy(address: String): Boolean {
         val accepted = setProxyJ(address)
         if (accepted) proxy = address
+        return accepted
+    }
+
+    /**
+     * Disables the wallet manager proxy. wallet2 treats an empty proxy address as
+     * "direct"; the JNI boundary still receives a non-null string.
+     */
+    fun clearProxy(): Boolean {
+        val accepted = setProxyJ("")
+        if (accepted) proxy = ""
         return accepted
     }
 

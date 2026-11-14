@@ -34,12 +34,12 @@ import io.anonero.TX_CHANNEL
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
 import io.anonero.model.node.NodeFields
+import io.anonero.network.TransportConfig
 import io.anonero.store.NodesRepository
 import io.anonero.ui.MainActivity
 import io.anonero.util.Formats
 import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WALLET_USE_TOR
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -183,7 +183,9 @@ class AnonNeroService : Service() {
             }
         val socks = torService.socks
         var torSate =
-            if (socks != null && !StealthMode.isEnabled(prefs)) {
+            if (TransportConfig.load(prefs).mode.usesEmbeddedTor &&
+                socks != null && !StealthMode.isEnabled(prefs)
+            ) {
                 getString(R.string.tor_daemon_suffix, socks.port.toString())
             } else {
                 ""

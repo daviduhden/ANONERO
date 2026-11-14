@@ -21,6 +21,7 @@ package io.anonero.model.node
 import io.anonero.AnonConfig
 import io.anonero.model.NetworkType
 import io.anonero.model.WalletManager
+import io.anonero.network.NodeNetwork
 import kotlinx.serialization.Serializable
 import org.json.JSONException
 import org.json.JSONObject
@@ -40,6 +41,7 @@ enum class NodeFields(
     RPC_PASSWORD("passphrase"),
     RPC_NETWORK("network"),
     NODE_TRUSTED("trusted"),
+    NODE_TLS("tls"),
     NODE_NAME("name"),
     ;
 
@@ -68,6 +70,8 @@ open class Node {
     var username = ""
     var password = ""
     var trusted = true
+        private set
+    var useTls = false
         private set
 
     internal constructor(nodeString: String?) {
@@ -104,10 +108,7 @@ open class Node {
             daemonAddress.split("/".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
         require(!(daParts.size > 3 || daParts.isEmpty())) { "Too many '/' or too few" }
         daemonAddress = daParts[0]
-        val da = daemonAddress.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-
-        require(!(da.size > 2 || da.isEmpty())) { "Too many ':' or too few" }
-        val host = da[0]
+        val (host, parsedPort) = parseDaemonAddress(daemonAddress)
 
         this.networkType =
             if (daParts.size == 1) {
@@ -131,22 +132,12 @@ open class Node {
             }
         }
         this.name = name
-        val port: Int =
-            if (da.size == 2) {
-                try {
-                    da[1].toInt()
-                } catch (ex: NumberFormatException) {
-                    throw IllegalArgumentException("Port not numeric")
-                }
-            } else {
-                defaultRpcPort
-            }
         try {
             this.host = host
         } catch (ex: UnknownHostException) {
             throw IllegalArgumentException("cannot resolve host $host")
         }
-        this.rpcPort = port
+        this.rpcPort = parsedPort
         this.levinPort = this.defaultLevinPort
     }
 
@@ -191,6 +182,9 @@ open class Node {
         if (jsonObject.has(NodeFields.NODE_TRUSTED.value)) {
             this.trusted = jsonObject.getBoolean(NodeFields.NODE_TRUSTED.value)
         }
+        if (jsonObject.has(NodeFields.NODE_TLS.value)) {
+            this.useTls = jsonObject.getBoolean(NodeFields.NODE_TLS.value)
+        }
     }
 
     constructor() {
@@ -211,18 +205,19 @@ open class Node {
         overwriteWith(anotherNode)
     }
 
-    override fun hashCode(): Int = host.hashCode()
+    override fun hashCode(): Int = host.orEmpty().hashCode()
 
     // Nodes are equal if they are the same host address:port & are on the same network
     override fun equals(other: Any?): Boolean {
         if (other !is Node) return false
-        return trusted == other.trusted && host == other.host && address == other.address && rpcPort == other.rpcPort &&
+        return trusted == other.trusted && useTls == other.useTls && host == other.host &&
+            address == other.address && rpcPort == other.rpcPort &&
             networkType == other.networkType &&
             username == other.username &&
             password == other.password
     }
 
-    fun toNodeString(): String = "http://$host:$rpcPort"
+    fun toNodeString(): String = rpcUrl
 
     fun toJson(): JSONObject {
         val jsonObject = JSONObject()
@@ -239,6 +234,7 @@ open class Node {
             }
             if (name?.isNotEmpty() == true) jsonObject.put("name", name)
             jsonObject.put("trusted", trusted)
+            if (useTls) jsonObject.put(NodeFields.NODE_TLS.value, true)
         } catch (e: JSONException) {
             throw RuntimeException(e)
         }
@@ -254,7 +250,7 @@ open class Node {
                 .append(password)
                 .append("@")
         }
-        sb.append(host).append(":").append(rpcPort)
+        sb.append(hostPort)
         sb.append("/")
         when (networkType) {
             NetworkType.NetworkType_Mainnet -> sb.append(MAINNET)
@@ -272,8 +268,19 @@ open class Node {
         return sb.toString()
     }
 
-    val address: String
-        get() = "$host:$rpcPort"
+    val hostPort: String
+        get() {
+            val value = host.orEmpty()
+            val formatted = if (value.contains(':') && !value.startsWith("[")) "[$value]" else value
+            return "$formatted:$rpcPort"
+        }
+
+    val address: String get() = hostPort
+
+    /** wallet2 daemon URL; TLS is opt-in per node. */
+    val rpcUrl: String get() = "${if (useTls) "https" else "http"}://$hostPort"
+
+    val network: NodeNetwork get() = NodeNetwork.fromHost(host)
 
     private fun overwriteWith(anotherNode: Node) {
         check(networkType == anotherNode.networkType) { "network types do not match" }
@@ -283,7 +290,44 @@ open class Node {
         levinPort = anotherNode.levinPort
         username = anotherNode.username
         password = anotherNode.password
+        useTls = anotherNode.useTls
         trusted = anotherNode.trusted
+    }
+
+    private fun parseDaemonAddress(address: String): Pair<String, Int> {
+        if (address.startsWith("[")) {
+            val end = address.indexOf(']')
+            require(end > 1) { "Invalid IPv6 host" }
+            val host = address.substring(1, end)
+            val rest = address.substring(end + 1)
+            val port =
+                if (rest.isEmpty()) {
+                    defaultRpcPort
+                } else {
+                    require(rest.startsWith(":")) { "Port not numeric" }
+                    rest.drop(1).toIntOrNull() ?: throw IllegalArgumentException("Port not numeric")
+                }
+            return host to port
+        }
+        val colonCount = address.count { it == ':' }
+        return when (colonCount) {
+            0 -> {
+                address to defaultRpcPort
+            }
+
+            1 -> {
+                val separator = address.lastIndexOf(':')
+                require(separator > 0) { "Invalid host" }
+                val port =
+                    address.substring(separator + 1).toIntOrNull()
+                        ?: throw IllegalArgumentException("Port not numeric")
+                address.substring(0, separator) to port
+            }
+
+            else -> {
+                throw IllegalArgumentException("IPv6 hosts must be bracketed")
+            }
+        }
     }
 
     companion object {

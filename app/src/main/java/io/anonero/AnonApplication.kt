@@ -25,6 +25,7 @@ import android.content.SharedPreferences
 import io.anonero.di.appModule
 import io.anonero.model.WalletManager
 import io.anonero.model.node.NodeFields
+import io.anonero.network.TransportConfig
 import io.anonero.services.TorService
 import io.anonero.store.LogRepository
 import io.anonero.store.NodesRepository
@@ -78,7 +79,9 @@ class AnonApplication :
         val prefs: SharedPreferences = get(named(WALLET_PREFERENCES))
         val host = prefs.getString(NodeFields.RPC_HOST.value, "")
         val lwsEnabled = prefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false)
-        if (lwsEnabled || !host.isNullOrEmpty()) {
+        if ((lwsEnabled || !host.isNullOrEmpty()) &&
+            TransportConfig.load(prefs).mode.usesEmbeddedTor
+        ) {
             torService.start()
         }
         AnonConfig.clearSpendCacheFiles(this)

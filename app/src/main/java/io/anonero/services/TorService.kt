@@ -32,7 +32,6 @@ import io.matthewnelson.kmp.tor.runtime.core.net.IPSocketAddress
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -129,6 +128,7 @@ class TorService(
         }
 
     fun start() {
+        if (wanted) return
         wanted = true
         scope.launch {
             runtime.startDaemonAsync()
@@ -154,14 +154,12 @@ class TorService(
     fun dispose() {
         wanted = false
         _socksState.value = null
-        scope
-            .launch {
-                runtime.stopDaemonAsync()
-            }.invokeOnCompletion {
-                it?.let {
-                    Timber.tag(TAG).i("Tor dispose exception: ${it.message}")
-                }
-                scope.cancel()
-            }
+        scope.launch {
+            runCatching { runtime.stopDaemonAsync() }
+                .onFailure { Timber.tag(TAG).i("Tor dispose exception: ${it.message}") }
+        }
+        // Keep the scope reusable: Koin owns this process singleton and Android may keep
+        // the process alive after the foreground service task is removed. Cancelling the
+        // scope here would make every later start() a silent no-op until process death.
     }
 }

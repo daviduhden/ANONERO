@@ -160,7 +160,7 @@ class WalletState {
                 address?.let {
                     _connectedDaemon.update {
                         DaemonInfo(
-                            address,
+                            address.substringAfter("://"),
                             connectionStatus =
                                 wallet.fullStatus.connectionStatus
                                     ?: Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
