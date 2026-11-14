@@ -455,7 +455,7 @@ private fun createDecoy(
                 ) ?: throw DecoyException(DecoyError.CREATION_FAILED)
             created = wallet
             if (wallet.status.isOk != true) {
-                Timber.tag(TAG).e("decoy creation status: %s", wallet.status.errorString)
+                Timber.tag(TAG).e("decoy creation status is not OK")
                 throw DecoyException(DecoyError.CREATION_FAILED)
             }
             // A brand-new decoy has no history. Start scanning near the current tip so it
@@ -465,7 +465,7 @@ private fun createDecoy(
                     .getOrNull() ?: 0L
             if (chainHeight > 1L) wallet.setRestoreHeight(chainHeight)
             if (!wallet.store()) {
-                Timber.tag(TAG).e("decoy store failed: %s", wallet.status.errorString)
+                Timber.tag(TAG).e("decoy store failed")
                 throw DecoyException(DecoyError.WRITE_FAILED)
             }
             val words = wallet.getSeed(passphrase)?.split(" ").orEmpty()

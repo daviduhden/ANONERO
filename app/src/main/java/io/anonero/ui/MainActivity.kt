@@ -42,6 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import io.anonero.AnonApplication
 import io.anonero.R
 import io.anonero.model.WalletManager
+import io.anonero.network.TransportConfig
 import io.anonero.services.AnonNeroService
 import io.anonero.services.TorService
 import io.anonero.services.WalletState
@@ -59,7 +60,6 @@ import io.anonero.ui.theme.ThemeStore
 import io.anonero.util.LocaleController
 import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WALLET_USE_TOR
 import io.anonero.util.WalletProfileStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -177,12 +177,13 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(key1 = true) {
                 scope.launch(Dispatchers.IO) {
                     walletExist = WalletProfileStore.anyWalletExists(context, anonPrefs)
-                    useTor = anonPrefs.getBoolean(WALLET_USE_TOR, true)
+                    useTor = TransportConfig.load(anonPrefs).mode.usesEmbeddedTor
                     isAppReady = true
                 }
             }
             TorSplash(enableTor = useTor) {
                 val themeMode by ThemeStore.mode.collectAsState()
+                val walletStatus by walletState.walletStatus.collectAsState(initial = null)
                 AnonNeroTheme(mode = themeMode) {
                     val navController = rememberNavController()
                     DisposableEffect(navController) {
@@ -214,7 +215,10 @@ class MainActivity : ComponentActivity() {
                             // landing screen and onboarding screens
                             onboardingGraph(navController, onboardViewModel)
                             // home bottom navigation
-                            homeGraph(navController)
+                            homeGraph(
+                                navController,
+                                startAtHome = walletStatus?.isOk == true,
+                            )
                         }
                         if (showLockScreen) {
                             LockScreen(

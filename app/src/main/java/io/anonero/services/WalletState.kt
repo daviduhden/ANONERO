@@ -149,7 +149,9 @@ class WalletState {
                 }
                 _walletStatus.update { wallet.fullStatus }
                 if (wallet.status.errorString.isNotEmpty()) {
-                    Timber.tag(TAG).i("StatusError %s", wallet.status.errorString)
+                    // Do not persist wallet2's raw error text: it can include a node or
+                    // file path. The UI still receives the structured status.
+                    Timber.tag(TAG).i("Wallet status reports an error")
                 }
                 val address =
                     try {

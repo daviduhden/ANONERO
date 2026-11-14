@@ -114,8 +114,10 @@ import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import kotlin.random.Random
 
+/** Blocking wallet2 seed read; call only from a background dispatcher. */
 fun getWalletSeed(passPhrase: String): String? = WalletManager.instance?.wallet?.getSeed(passPhrase)
 
+/** Blocking wallet2 legacy-seed read; call only from a background dispatcher. */
 fun getLegacySeed(passPhrase: String): String? = WalletManager.instance?.wallet?.getLegacySeed(passPhrase)
 
 fun generatePlaceHolderSeed(): List<String> =
@@ -149,6 +151,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     var viewKeyText by remember { mutableStateOf("") }
     var spendKeyText by remember { mutableStateOf("") }
     var restoreHeightText by remember { mutableStateOf("") }
+    var primaryAddress by remember { mutableStateOf("") }
 
     val walletState = koinInject<WalletState>()
     val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
@@ -169,10 +172,18 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             viewKeyText = ""
             spendKeyText = ""
             restoreHeightText = ""
+            primaryAddress = ""
             // Dialogs have their own window and must not cover the PIN overlay.
             passPhraseDialog = false
         } else if (!verified) {
             passPhraseDialog = true
+        }
+        if (!locked) {
+            // wallet2 address access is a native call; keep it off the main thread.
+            primaryAddress =
+                withContext(Dispatchers.IO) {
+                    WalletManager.instance?.wallet?.address ?: ""
+                }
         }
     }
 
@@ -209,13 +220,26 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
 
     fun exportForNero() {
         if (walletState.backgroundSync) return
-        val wallet = WalletManager.instance?.wallet ?: return
         if (!verified) {
             passPhraseDialog = true
             return
         }
-        val payload = Json.encodeToString(NeroKeyPayload.fromWallet(wallet))
-        neroPayload = payload
+        // Reading the keys and encoding the payload are both off-main; the dialog can stay
+        // open while the native calls complete.
+        scope.launch {
+            val payload =
+                withContext(Dispatchers.IO) {
+                    val wallet = WalletManager.instance?.wallet ?: return@withContext null
+                    try {
+                        Json.encodeToString(NeroKeyPayload.fromWallet(wallet))
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            if (payload != null) neroPayload = payload
+        }
     }
 
     LaunchedEffect(passPhraseDialog, locked) {
@@ -439,7 +463,6 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
 
     var showLegacy by remember { mutableStateOf(false) }
 
-    val wallet = WalletManager.instance?.wallet
     Scaffold(
         topBar = {
             TopAppBar(
@@ -478,7 +501,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         supportingContent = {
                             SelectionContainer {
                                 Text(
-                                    text = "${wallet?.address ?: ""}",
+                                    text = primaryAddress,
                                     modifier = Modifier.padding(start = 4.dp),
                                 )
                             }

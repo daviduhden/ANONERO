@@ -65,6 +65,7 @@ import io.anonero.services.WalletState
 import io.anonero.ui.home.LockScreen
 import io.anonero.ui.home.LockScreenMode
 import io.anonero.util.SecureClipboard
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -78,10 +79,11 @@ fun SignVerifyScreen(
     modifier: Modifier = Modifier,
     onBackPress: () -> Unit = {},
 ) {
-    val wallet = WalletManager.instance?.wallet
+    val walletState = koinInject<WalletState>()
+    val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
     var message by remember { mutableStateOf("") }
     var signature by remember { mutableStateOf("") }
-    var verifyAddress by remember { mutableStateOf(wallet?.address ?: "") }
+    var verifyAddress by remember { mutableStateOf("") }
     var verifyMessage by remember { mutableStateOf("") }
     var verifySignature by remember { mutableStateOf("") }
     var verifyResult by remember { mutableStateOf<Boolean?>(null) }
@@ -91,8 +93,15 @@ fun SignVerifyScreen(
     var confirmSign by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val walletState = koinInject<WalletState>()
-    val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
+
+    LaunchedEffect(Unit) {
+        // wallet2 address access is a native call; never run it during composition.
+        val address =
+            withContext(Dispatchers.IO) {
+                WalletManager.instance?.wallet?.address ?: ""
+            }
+        if (verifyAddress.isEmpty()) verifyAddress = address
+    }
 
     BackHandler { onBackPress() }
 
@@ -115,6 +124,8 @@ fun SignVerifyScreen(
                 } else {
                     signature = result
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 errorRes = R.string.signing_failed
             } finally {
@@ -138,6 +149,8 @@ fun SignVerifyScreen(
                             verifySignature,
                         ) ?: false
                     }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 errorRes = R.string.signing_failed
             } finally {

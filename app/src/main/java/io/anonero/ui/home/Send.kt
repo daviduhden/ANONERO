@@ -96,6 +96,7 @@ import io.anonero.model.CoinsInfo
 import io.anonero.model.PendingTransaction
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
+import io.anonero.network.TransportController
 import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
@@ -110,6 +111,7 @@ import io.anonero.util.MoneroAmount
 import io.anonero.util.backup.BackupHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -117,6 +119,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.java.KoinJavaComponent.inject
 import timber.log.Timber
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "Send"
 
@@ -146,9 +149,12 @@ enum class SendError(
  */
 class SendViewModel : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
+    private val transportController: TransportController by inject(TransportController::class.java)
     private val _balance = walletState.unLockedBalance.asLiveData()
     private val _paymentUri = MutableLiveData<SendScreenRoute?>(null)
     private val _coinsSelected = MutableLiveData<Set<CoinsInfo>>(emptySet())
+    private var coinsJob: Job? = null
+    private val coinsRequest = AtomicInteger(0)
     private val _txComposeError = MutableLiveData<SendError?>(null)
     private val _spendType = MutableLiveData(SpendType.NORMAL)
     val paymentUri = _paymentUri as LiveData<SendScreenRoute?>
@@ -178,6 +184,17 @@ class SendViewModel : ViewModel() {
     ): PendingTransaction? {
         val wallet = WalletManager.instance?.wallet
         val isSweep = spendType.value == SpendType.SWEEP
+        val transport = transportController.config.value
+        if (transport.validationError() != null) {
+            _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
+            return null
+        }
+        if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
+            !transportController.isVpnActive()
+        ) {
+            _txComposeError.postValue(SendError.NOT_CONNECTED)
+            return null
+        }
         return withContext(Dispatchers.IO) {
             try {
                 // Sweep ignores the amount; a normal send must never pass through Double or
@@ -310,23 +327,37 @@ class SendViewModel : ViewModel() {
     }
 
     fun setCoins(coins: List<String>) {
-        val walletCoins =
-            WalletManager.instance
-                ?.wallet
-                ?.coins
-                ?.all ?: listOf()
-        // Frozen outputs must never be preselected, even if a stale route or QR payload
-        // names one. wallet2 also refuses them, but silently letting the UI show a
-        // spendable selection would be misleading.
-        val selectedCoins =
-            walletCoins
-                .filter {
-                    coins.contains(it.pub_key) && !it.frozen && !it.spent &&
-                        it.subaddrAccount == (WalletManager.instance?.wallet?.getAccountIndex() ?: 0)
-                }.toSet()
-        _coinsSelected.postValue(
-            selectedCoins,
-        )
+        // wallet2 coins/account reads are native calls; keep them off the main thread and
+        // let a newer selection cancel an older, slower one.
+        coinsJob?.cancel()
+        val request = coinsRequest.incrementAndGet()
+        coinsJob =
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val wallet = WalletManager.instance?.wallet
+                    val walletCoins = wallet?.coins?.all ?: listOf()
+                    val accountIndex = wallet?.getAccountIndex() ?: 0
+                    // Frozen outputs must never be preselected, even if a stale route or QR
+                    // payload names one. wallet2 also refuses them, but silently letting the UI
+                    // show a spendable selection would be misleading.
+                    val selectedCoins =
+                        walletCoins
+                            .filter {
+                                coins.contains(it.pub_key) && !it.frozen && !it.spent &&
+                                    it.subaddrAccount == accountIndex
+                            }.toSet()
+                    if (coinsRequest.get() == request) {
+                        _coinsSelected.postValue(selectedCoins)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "coin selection failed")
+                    if (coinsRequest.get() == request) {
+                        _coinsSelected.postValue(emptySet())
+                    }
+                }
+            }
     }
 }
 
@@ -742,28 +773,38 @@ fun SendScreen(
                                 MoneroAmount.parseExact(amountField) ?: return@AnonOutlineButton
                             }
                         if (AnonConfig.viewOnly) {
-                            val needsKeyImages =
-                                if (isSweep) {
-                                    wallet.hasUnknownKeyImages()
-                                } else {
-                                    // Reserve a fee for the key-image check without letting a
-                                    // near-Long.MAX amount wrap negative.
-                                    val withFee =
-                                        runCatching {
-                                            Math.addExact(spendAmount, 1_000_000_000L)
-                                        }.getOrDefault(Long.MAX_VALUE)
-                                    withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
-                                }
+                            scope.launch {
+                                try {
+                                    val needsKeyImages =
+                                        withContext(Dispatchers.IO) {
+                                            if (isSweep) {
+                                                wallet.hasUnknownKeyImages()
+                                            } else {
+                                                // Reserve a fee for the key-image check without
+                                                // letting a near-Long.MAX amount wrap negative.
+                                                val withFee =
+                                                    runCatching {
+                                                        Math.addExact(spendAmount, 1_000_000_000L)
+                                                    }.getOrDefault(Long.MAX_VALUE)
+                                                withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
+                                            }
+                                        }
 
-                            if (needsKeyImages) {
-                                qrScannerParam =
-                                    SpendQRExchangeParam(
-                                        exportType = ExportType.OUTPUT,
-                                        title = resources.getString(R.string.outputs),
-                                        ctaText = resources.getString(R.string.scan_key_images),
-                                    )
-                            } else {
-                                prepare()
+                                    if (needsKeyImages) {
+                                        qrScannerParam =
+                                            SpendQRExchangeParam(
+                                                exportType = ExportType.OUTPUT,
+                                                title = resources.getString(R.string.outputs),
+                                                ctaText = resources.getString(R.string.scan_key_images),
+                                            )
+                                    } else {
+                                        prepare()
+                                    }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (e: Exception) {
+                                    Timber.tag(TAG).e(e, "view-only key image check failed")
+                                }
                             }
 
                             return@AnonOutlineButton

@@ -52,6 +52,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +102,9 @@ import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletSession
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import timber.log.Timber
@@ -136,6 +140,8 @@ fun SettingsPage(
     val walletState = koinInject<WalletState>()
     val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
     val offline by walletState.offlineFlow.collectAsState(walletState.offline)
+    val settingsScope = rememberCoroutineScope()
+    var pinChangeInProgress by remember { mutableStateOf(false) }
     LaunchedEffect(locked) {
         if (locked) {
             showLockScreen = false
@@ -180,58 +186,77 @@ fun SettingsPage(
                     securePolicy = SecureFlagPolicy.SecureOn,
                 ),
             onDismissRequest = {
-                newPinDialog = false
+                if (!pinChangeInProgress) newPinDialog = false
             },
         ) {
             PinSetup(
                 changePin = true,
-                onNext = {
-                    try {
-                        // A keystore-bound wallet is encrypted with the device secret W, so
-                        // changing the PIN only re-writes the gate hash and W is untouched.
-                        // A wallet whose migration has not happened yet is still encrypted
-                        // with the PIN itself: re-key it first, or the next open with the
-                        // new PIN fails and the user is locked out.
-                        val duressHash =
-                            prefs.getString(
-                                io.anonero.util.PREFS_DURESS_PIN_HASH,
-                                "",
-                            )
-                        if (!WalletSession.isDecoy && !duressHash.isNullOrEmpty() &&
-                            PinHash.matches(it, duressHash)
-                        ) {
-                            throw Exception("The normal PIN must differ from the duress PIN")
-                        }
-                        if (WalletSession.isDecoy &&
-                            PinHash.matches(it, prefs.getString(PREFS_PIN_HASH, ""))
-                        ) {
-                            throw Exception("The duress PIN must differ from the normal PIN")
-                        }
-                        val context = AnonConfig.context!!
-                        val walletName =
-                            io.anonero.util.WalletProfileStore
-                                .activeWalletName(context)
-                        if (!WalletKey.exists(context, walletName)) {
-                            val wallet =
-                                WalletManager.instance?.wallet
-                                    ?: throw Exception("wallet not open")
-                            if (!wallet.setPassword(it)) {
-                                throw Exception("setPassword failed: ${wallet.status.errorString}")
+                onNext = { newPin ->
+                    if (!pinChangeInProgress) {
+                        pinChangeInProgress = true
+                        settingsScope.launch {
+                            // setPassword and the Keystore/wallet checks are blocking native
+                            // or file operations; never run them on the main thread.
+                            val changed =
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        // A keystore-bound wallet is encrypted with the device
+                                        // secret W, so changing the PIN only re-writes the gate
+                                        // hash and W is untouched. A wallet whose migration has
+                                        // not happened yet is still encrypted with the PIN
+                                        // itself: re-key it first, or the next open with the
+                                        // new PIN fails and the user is locked out.
+                                        val duressHash =
+                                            prefs.getString(
+                                                io.anonero.util.PREFS_DURESS_PIN_HASH,
+                                                "",
+                                            )
+                                        if (!WalletSession.isDecoy && !duressHash.isNullOrEmpty() &&
+                                            PinHash.matches(newPin, duressHash)
+                                        ) {
+                                            throw Exception("The normal PIN must differ from the duress PIN")
+                                        }
+                                        if (WalletSession.isDecoy &&
+                                            PinHash.matches(newPin, prefs.getString(PREFS_PIN_HASH, ""))
+                                        ) {
+                                            throw Exception("The duress PIN must differ from the normal PIN")
+                                        }
+                                        val context = AnonConfig.context!!
+                                        val walletName =
+                                            io.anonero.util.WalletProfileStore
+                                                .activeWalletName(context)
+                                        if (!WalletKey.exists(context, walletName)) {
+                                            val wallet =
+                                                WalletManager.instance?.wallet
+                                                    ?: throw Exception("wallet not open")
+                                            if (!wallet.setPassword(newPin)) {
+                                                throw Exception("setPassword failed: ${wallet.status.errorString}")
+                                            }
+                                        }
+                                        prefs.edit(commit = true) {
+                                            putString(
+                                                io.anonero.util.WalletProfileStore
+                                                    .activePinHashKey(),
+                                                PinHash.hash(newPin),
+                                            )
+                                        }
+                                        true
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        // Do not log wallet2's raw error text.
+                                        Timber.tag(TAG).e("PIN change failed")
+                                        false
+                                    }
+                                }
+                            if (changed) {
+                                toastState.show(pinChangedMessage, type = ToastType.Success)
+                            } else {
+                                toastState.show(pinChangeErrorMessage, type = ToastType.Error)
                             }
+                            newPinDialog = false
+                            pinChangeInProgress = false
                         }
-                        prefs.edit(commit = true) {
-                            putString(
-                                io.anonero.util.WalletProfileStore
-                                    .activePinHashKey(),
-                                PinHash.hash(it),
-                            )
-                        }
-                        toastState.show(pinChangedMessage, type = ToastType.Success)
-                    } catch (e: Exception) {
-                        toastState.show(pinChangeErrorMessage, type = ToastType.Error)
-                        Timber.tag(TAG).e(e)
-                    } finally {
-                        newPinDialog = false
                     }
                 },
             )

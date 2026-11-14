@@ -54,9 +54,9 @@ import androidx.lifecycle.asLiveData
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.node.NodeFields
+import io.anonero.network.TransportConfig
 import io.anonero.services.TorService
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WALLET_USE_TOR
 import io.anonero.util.WalletProfileStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -95,8 +95,8 @@ fun TorSplash(
             }
             scope.launch(Dispatchers.IO) {
                 walletExist = WalletProfileStore.anyWalletExists(context, anonPrefs)
-                // if user disabled tor and uses manual proxy, skip tor splash
-                if (!anonPrefs.getBoolean(WALLET_USE_TOR, true)) {
+                // if user selected an external transport, skip tor splash
+                if (!TransportConfig.load(anonPrefs).mode.usesEmbeddedTor) {
                     isAppReady = true
                 } else {
                     if ((socks != null)) {
@@ -119,7 +119,8 @@ fun TorSplash(
     // no need to show tor splash if user disabled tor
     // if there is no wallet file, skip tor splash
     val lwsEnabled = anonPrefs.getBoolean(io.anonero.util.PREFS_LWS_ENABLED, false)
-    if (!enableTor || !walletExist || !hasNetWork || !anonPrefs.getBoolean(WALLET_USE_TOR, true) ||
+    if (!enableTor || !walletExist || !hasNetWork ||
+        !TransportConfig.load(anonPrefs).mode.usesEmbeddedTor ||
         (!lwsEnabled && anonPrefs.getString(NodeFields.RPC_HOST.value, "").isNullOrEmpty())
     ) {
         return content()

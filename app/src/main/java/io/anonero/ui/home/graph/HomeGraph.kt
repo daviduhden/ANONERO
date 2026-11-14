@@ -22,7 +22,6 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
-import io.anonero.model.WalletManager
 import io.anonero.ui.home.HomeScreenComposable
 import io.anonero.ui.home.LockScreen
 import io.anonero.ui.home.graph.routes.Home
@@ -36,14 +35,12 @@ import io.anonero.ui.home.graph.routes.LockScreenRoute
  * the lock screen. The lock route is part of the graph so a process that was launched
  * without a wallet can still reach onboarding from the landing graph.
  */
-fun NavGraphBuilder.homeGraph(navController: NavHostController) {
-    val walletStatus =
-        WalletManager.instance
-            ?.wallet
-            ?.status
-            ?.isOk
+fun NavGraphBuilder.homeGraph(
+    navController: NavHostController,
+    startAtHome: Boolean,
+) {
     navigation<Home>(
-        startDestination = if (walletStatus == true) HomeScreenRoute() else LockScreenRoute,
+        startDestination = if (startAtHome) HomeScreenRoute() else LockScreenRoute,
     ) {
         composable<HomeScreenRoute> {
             HomeScreenComposable(mainNavController = navController)
