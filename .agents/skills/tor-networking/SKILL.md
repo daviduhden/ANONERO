@@ -3,7 +3,22 @@ name: tor-networking
 description: "Use when changing ANONERO network connectivity: embedded/external Tor, I2P, system VPN, SOCKS5 proxies, daemon or LWS routing, or fail-closed networking behavior. Use monero-lws for LWS protocol and trust details."
 ---
 
-# Tor and network privacy
+# Tor and network anonymity
+
+## Anonymity hierarchy
+
+Network anonymity is the primary goal of transport policy. Tor, I2P, VPN, and custom
+proxies are not equivalent:
+
+- Tor modes target `.onion` services and are the preferred path.
+- I2P modes target `.i2p` services with I2P's separate threat model.
+- System VPN is a clearnet mode that shifts trust to the VPN operator; it is not network
+  anonymity.
+- A custom SOCKS5 proxy provides only what its operator provides and is not anonymity by
+  itself.
+
+Do not add a path that silently bypasses the selected transport. Do not describe VPN or
+clearnet custom-proxy use as anonymous or equivalent to onion/I2P.
 
 ## When to use
 
@@ -82,8 +97,10 @@ Use `monero-lws` in addition when the change is LWS-specific.
 ## Threat model
 
 - Tor hides the network path from the destination and local network observers. It does
-  not hide timing, transaction amounts, wallet sync patterns, or the fact that Tor is
-  used.
+  not hide timing, transaction amounts, wallet sync patterns, the fact that Tor is used,
+  or guarantee resistance to traffic correlation.
+- I2P provides a different anonymity model and is not interchangeable with Tor. A VPN
+  hides the path from the destination but exposes it to the VPN operator.
 - A malicious or compromised daemon/LWS can lie about chain state. LWS additionally
   sees the view key and incoming transaction metadata.
 - A proxy bypass leaks the user’s IP to the node/LWS. Treat it as a critical defect.
@@ -111,5 +128,21 @@ and reviewed as a new trust boundary.
 - [ ] Stale SOCKS port cannot be reused.
 - [ ] Manual proxy is numeric and only used with Tor disabled.
 - [ ] LWS uses the selected transport and rejects cross-network destinations.
+- [ ] VPN and custom-proxy modes are documented as trust shifts, not network anonymity.
 - [ ] No new unproxied network client or DNS path.
 - [ ] Runtime/network behavior marked unverified until CI/device testing.
+
+
+The November source guards validate full numeric proxy literals without InetAddress,
+canonicalize localhost, validate complete RPC hosts in both selection gates, invalidate
+missing Tor listeners and reject stale suspended authorization publication. Keep cancellation
+propagation. These guards cannot revoke an endpoint already returned, prove socket closure
+or provide authenticated SOCKS circuit isolation; see `docs/network-anonymity-audit.md`.
+
+
+Onboarding ProxySettings delegates to the common editor; do not restore handler-level
+manual proxy mutation or independent legacy preference writes. TransportConfig.save must
+report Editor.commit failure; controller keeps the prior authoritative config, attempts
+network-only restoration and drops authorization. VPN loss invalidates generations; VPN
+reappearance alone does not authorize traffic. Preference-only changes preserve the current
+provider. These guards do not prove old native sockets have closed or per-app VPN routing.

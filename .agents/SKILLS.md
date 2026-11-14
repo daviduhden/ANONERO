@@ -2,7 +2,7 @@
 
 Skills are procedures, not substitutes for `AGENTS.md`. Read the root `AGENTS.md`
 first, then the closest directory `AGENTS.md`, then the skill. If a skill conflicts
-with a security invariant in `AGENTS.md`, the invariant wins.
+with an anonymity, privacy, or security invariant in `AGENTS.md`, the invariant wins.
 
 **Git authorization:** no skill authorizes a commit, push, tag, or publication.
 `AGENTS.md` §8.1 requires prior, explicit human authorization for each operation.
@@ -16,9 +16,9 @@ with a security invariant in `AGENTS.md`, the invariant wins.
 | `native-jni` | C++ JNI adapter, handles, callbacks, symbol contract | `.agents/skills/native-jni/SKILL.md` | Changing `external` declarations, JNI exports, native memory, or `app/CMakeLists.txt` |
 | `monero-wallet` | Wallet2 behavior: create/restore, accounts, UTXOs, transactions, signing | `.agents/skills/monero-wallet/SKILL.md` | Changing wallet operations, fees, coin control, sync, or transaction review |
 | `cryptographic-security` | PIN, Keystore, wallet secret, backups, randomness, secret handling | `.agents/skills/cryptographic-security/SKILL.md` | Reviewing or changing any cryptographic boundary or secret lifecycle |
-| `tor-networking` | Embedded Tor, SOCKS/manual proxy, fail-closed networking | `.agents/skills/tor-networking/SKILL.md` | Changing connectivity, proxy application, Tor lifecycle, or network privacy |
-| `monero-lws` | Optional LWS configuration, login, trust, sync, UI | `.agents/skills/monero-lws/SKILL.md` | Changing LWS behavior or reviewing view-key/Tor/trust rules |
-| `wallet-privacy` | Stealth mode, decoy wallet, duress PIN, lock, wipe, notifications | `.agents/skills/wallet-privacy/SKILL.md` | Changing privacy features or reviewing profile isolation |
+| `tor-networking` | Embedded Tor, SOCKS/manual proxy, fail-closed networking, network anonymity hierarchy | `.agents/skills/tor-networking/SKILL.md` | Changing connectivity, proxy application, Tor lifecycle, or network anonymity |
+| `monero-lws` | Optional LWS configuration, login, trust, sync, UI | `.agents/skills/monero-lws/SKILL.md` | Changing LWS behavior or reviewing view-key/transport/trust rules |
+| `wallet-privacy` | Local anonymity, stealth mode, decoy wallet, duress PIN, lock, wipe, notifications | `.agents/skills/wallet-privacy/SKILL.md` | Changing local-exposure or coercion controls and profile isolation |
 | `github-actions` | CI/CD, build gates, signing, artifacts, releases | `.agents/skills/github-actions/SKILL.md` | Editing workflows or auditing build/sign/publish behavior |
 | `static-analysis` | Audits without building or running tests | `.agents/skills/static-analysis/SKILL.md` | Reviewing references, JNI parity, i18n, manifest, dependencies, or diffs |
 | `compatibility-migrations` | Persisted formats, legacy paths, Monero/toolchain upgrades | `.agents/skills/compatibility-migrations/SKILL.md` | Changing backups, PIN/Keystore migration, preferences, pins, SDK/AGP/Gradle |
@@ -72,3 +72,12 @@ When adding a skill:
 
 When changing architecture, update the affected skill and this index in the same
 change. Do not leave a skill describing a subsystem that no longer exists.
+
+
+The November anonymity hardening record is
+[`docs/architecture/anonymity-audit-2026-11.md`](../docs/architecture/anonymity-audit-2026-11.md).
+Relevant skills describe profile-scoped LWS consent, diagnostic policy and transport limits.
+
+
+[Continued-development iteration](../docs/development-iteration-2026-11.md) records retained
+auxiliary ownership, snapshot contracts, UI/payment correctness and dispatch-only CI rules.

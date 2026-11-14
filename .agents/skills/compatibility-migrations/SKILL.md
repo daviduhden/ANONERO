@@ -91,6 +91,10 @@ description: "Use when changing persisted formats, legacy compatibility paths, b
   LWS configuration. `lwsTls` defaults to `false` for older installs; a non-loopback
   clearnet LWS without TLS is rejected and must be re-saved with TLS. `.onion`/`.i2p`
   endpoints keep `http://` and rely on their transport.
+- Legacy `lws*` keys belong to MAIN only. DECOY uses `decoyLwsEnabled`,
+  `decoyLwsHost`, `decoyLwsPort`, and `decoyLwsTls`, defaulting to disabled and an
+  empty host. Never copy MAIN endpoint consent into DECOY. `LwsConfig` reads/writes
+  the active profile; `removeProfile` removes only that profile's LWS keys.
 - Main uses `PREFS_PIN_HASH`, `PREFS_PASSPHRASE_HASH`, `RESTORE_HEIGHT`; decoy uses
   `PREFS_DURESS_PIN_HASH`, `PREFS_DECOY_PASSPHRASE_HASH`,
   `PREFS_DECOY_CONFIGURED`, and its own restore height.

@@ -1,7 +1,7 @@
 # Android application — Agent Instructions
 
 These instructions apply to `app/`. The root `AGENTS.md` remains authoritative for
-security, language, build, and Git policy. Read it first.
+anonymity, privacy, security, language, build, and Git policy. Read it first.
 
 ## 1. Module facts
 
@@ -80,8 +80,11 @@ security, language, build, and Git policy. Read it first.
   - a clear/default value and a migration note;
   - inclusion in the correct wipe/remove path.
 
-## 5. Security in the Android layer
+## 5. Anonymity, privacy, and security in the Android layer
 
+- Treat anonymity as the primary product goal. Do not add analytics, telemetry, crash
+  reporting, remote config, persistent tracking identifiers, or new correlation surfaces.
+  Review any new log, notification, clipboard use, or network identifier for linkability.
 - Keep `FLAG_SECURE` set on the main window. Do not remove it for screenshots,
   debugging, or “sharing”.
 - Keep `android:allowBackup="false"` and both backup-exclusion XML files intact.
@@ -153,3 +156,20 @@ security, language, build, and Git policy. Read it first.
 - [ ] Persisted keys have defaults, profile behavior, and wipe coverage.
 - [ ] No new dependency outside the version catalog.
 - [ ] Static checks pass; runtime claims are marked unverified.
+
+## November 2026 anonymity implementation
+
+Use `LwsConfig.load/save` with the intended profile; never read legacy MAIN LWS keys in
+consumers or copy MAIN consent into DECOY. Diagnostic persistence uses `DiagnosticPolicy`
+reviewed constants in all builds; do not plant another logcat tree or forward arbitrary
+throwables to system logging. Both notification builders require SECRET lock-screen
+visibility. Every authenticated wallet open resets session state after previous close
+succeeds. These guards do not prove native callback lifetime or transport socket closure.
+
+
+Auxiliary wallet paths must use WalletManager retained ownership. Profile deletion uses
+`withUnmanagedPathClosed`; checking a path before a separate deletion is insufficient.
+Backups/decoys report success only after confirmed auxiliary close. Account/output mutations
+reject locked sessions; freeze/thaw verifies the refreshed flag rather than trusting a void
+JNI call. Payment address checks must be bound to the exact immutable input snapshot and
+revalidated at submission. Background/IO failures must surface through localized UI state.

@@ -101,3 +101,10 @@ fixture.
 - [ ] Migration/rollback path is defined.
 - [ ] Tests/vectors are in CI, not run locally.
 - [ ] Remaining side-channel/runtime risk is stated, not hand-waved.
+
+
+Auxiliary backup/decoy lifecycle must not discard a native wallet or delete its recovery
+files/Keystore wrapping after false/throwing close. Use retained ownership and confirmed
+closure before success; no KDF/backup-format change is implied. Backup export rejects NERO
+and DECOY before inspecting MAIN scratch state. Retained scratch password transitions are
+not independently proven atomic; do not claim stronger at-rest/zeroization guarantees.

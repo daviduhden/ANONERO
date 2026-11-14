@@ -2,18 +2,20 @@
 
 This is the repository-wide contract for human and AI contributors. Read it before
 changing code. More specific `AGENTS.md` files in subdirectories add constraints for
-their subtree; they never weaken the security rules in this file. Reusable procedures
-live in `.agents/skills/*/SKILL.md`; the index is `.agents/SKILLS.md`.
+their subtree; they never weaken the anonymity, privacy, or security rules in this file.
+Reusable procedures live in `.agents/skills/*/SKILL.md`; the index is
+`.agents/SKILLS.md`.
 
 When instructions conflict, apply this order:
 
-1. Security and fund-safety invariants in this file.
+1. The anonymity, privacy, and security invariants in this file. Preserve anonymity as the
+   primary product goal; fund safety and key integrity are non-negotiable constraints.
 2. The closest `AGENTS.md` to the file being changed.
 3. The relevant skill.
 4. General conventions.
 
 If a requested change cannot satisfy all four, stop and report the conflict instead of
-silently weakening a guarantee.
+silently weakening a protection or guarantee.
 
 > **Git authorization is mandatory.** Never run `git commit` (including `--amend`),
 > `git push` (including force variants), create/publish tags, or use an equivalent
@@ -22,11 +24,24 @@ silently weakening a guarantee.
 
 ## 1. Project
 
-ANONERO is a privacy- and security-focused Monero wallet for Android. It is a
-single-application repository with two product flavors:
+ANONERO is an anonymity-focused Monero wallet for Android. Privacy and security are
+required pillars: privacy protects the information and metadata that can link activity,
+and security protects funds, keys, software integrity, and communications. The repository
+has two product flavors:
 
 - `anon` — full wallet (ANON).
 - `nero` — view-only wallet (NERO), built with `VIEW_ONLY = true`.
+
+### Priority hierarchy
+
+- **Anonymity (primary).** Reduce identifiable information, observable metadata, activity
+  correlation, and unnecessary trust in third parties. Network anonymity, transaction
+  privacy, local anonymity, and data confidentiality are distinct properties; none is
+  guaranteed by the others.
+- **Privacy.** Minimize the collection, persistence, and disclosure of wallet and network
+  metadata. Privacy supports anonymity but is not a synonym for it.
+- **Security.** Protect funds, keys, backups, software integrity, and communications.
+  Security is a prerequisite for a usable wallet, not a substitute for anonymity.
 
 The application is Kotlin + Jetpack Compose. The only project-owned native layer is a
 C++ JNI adapter in `app/src/main/cpp/`. Monero itself is consumed as prebuilt static
@@ -52,8 +67,8 @@ relying on it after a significant change.
   The local submodule is still unpopulated, so the native build requires CI or a manual
   `git submodule update --init --recursive` followed by `make -C external-libs patches`.
 - `docs/` had no documentation before this audit. It now contains a documentation index
-  and the architecture, security, features, development, build, state, and dependency
-  documents.
+  and the architecture, anonymity/privacy/security, features, development, build, state,
+  and dependency documents.
 - The CI workflow `test.yml` has a `native-language-policy` job that enforces the
   Kotlin/C++ source layout; the release workflow repeats the same check.
 
@@ -139,22 +154,27 @@ Key process facts:
   sync with `kotlin` in `gradle/libs.versions.toml` (the catalog accessor is not
   available there).
 
-## 4. Security invariants
+## 4. Anonymity, privacy, and security invariants
 
-These are non-negotiable. A change that weakens one requires an explicit security
-decision and documentation, not a local workaround.
+These are non-negotiable. A change that weakens one requires an explicit decision and
+documentation, not a local workaround. The conceptual priority is anonymity, then privacy,
+then security; when they conflict, do not silently trade one for another: stop and report.
 
-1. **Funds first.** Prefer refusing an operation to guessing. Fail closed on missing
-   keys, missing proxies, failed wallet init, failed login, or unknown transaction
-   state.
-2. **Private keys and seeds never leave wallet2** except through the explicit
+1. **Anonymity is the primary design goal.** Minimize linkable identifiers, observable
+   metadata, correlation surfaces, and unnecessary trust in third parties. Do not add
+   tracking, persistent identifiers, or network paths outside the selected transport.
+   Document residual linkability and never claim guaranteed anonymity.
+2. **Fund safety is non-negotiable.** Prefer refusing an operation to guessing. Fail
+   closed on missing keys, missing proxies, failed wallet init, failed login, or unknown
+   transaction state.
+3. **Private keys and seeds never leave wallet2** except through the explicit
    encrypted-backup or seed-display flows. Never log, persist in plaintext, send, or
    put them in intents, clipboard, notifications, crash messages, navigation arguments,
    saved state, or test fixtures.
-3. **The spend key is only present when the wallet is unlocked.** Background sync must
+4. **The spend key is only present when the wallet is unlocked.** Background sync must
    not expose spend capability. The lock screen must remain above the UI until
    `stopBackgroundSync` succeeds.
-4. **Transport is explicit and fail-closed.** Embedded Tor is the default and preferred
+5. **Transport is explicit and fail-closed.** Embedded Tor is the default and preferred
    path. The allowed transports are embedded Tor, external Tor (Orbot/InviZible),
    external I2P (i2pd/InviZible/official I2P Java), a custom SOCKS5 proxy, and the user-selected system
    VPN. Tor, I2P, and custom-proxy modes require the configured proxy and must never
@@ -164,23 +184,34 @@ decision and documentation, not a local workaround.
    I2P modes reach `.i2p`, system VPN reaches clearnet, and a custom proxy reaches the
    network the user explicitly chose. An LWS destination whose network does not match
    the selected transport is rejected; there is no cross-transport or clearnet fallback.
-5. **LWS is untrusted.** Keep `setTrustedDaemon(false)` before and after login. Only
+6. **LWS is untrusted.** Keep `setTrustedDaemon(false)` before and after login. Only
    the public address and view key may be sent.
-6. **Profile isolation.** Main and decoy wallets have separate files, Keystore secrets,
+7. **Profile isolation.** Main and decoy wallets have separate files, Keystore secrets,
    PIN hashes, passphrase hashes, and restore heights. Never read, copy, back up, or
    wipe the other profile implicitly.
-7. **Encryption stays authenticated.** New backups use the v2/v3 AEAD format. Do not
+8. **Encryption stays authenticated.** New backups use the v2/v3 AEAD format. Do not
    write new data with the legacy unauthenticated CBC format. Do not lower KDF
    iteration counts or key sizes. A plaintext backup archive may exist only in the
    transient `tmp_backup` directory and must be purged at startup.
-8. **JNI boundaries are hostile.** Validate nulls, lengths, handles, and exceptions.
+9. **JNI boundaries are hostile.** Validate nulls, lengths, handles, and exceptions.
    Never let a C++ exception cross into Kotlin. Never expose raw pointers to UI code.
-9. **Secrets stay out of logs.** `Timber` output is persisted and shareable. Never log
+10. **Secrets stay out of logs.** `Timber` output is persisted and shareable. Never log
    seeds, passphrases, PINs, wallet passwords, Keystore material, node credentials, or
    full addresses/amounts in sensitive paths.
-10. **No silent downgrade.** A failure in Tor, Keystore, backup authentication, or
+11. **No silent downgrade.** A failure in Tor, Keystore, backup authentication, or
     transaction review must surface as an error, not as a less private or less safe
     mode.
+
+### Required anonymity review for every feature
+
+Before implementing any new feature, answer: (1) what additional information does it
+reveal; (2) can it link identities, connections or activities; (3) how can that exposure
+be reduced without harming fund safety? Record the answers for new/changed boundaries.
+Persist only reviewed fixed diagnostic events. LWS configuration and consent are per
+profile: MAIN keeps legacy `lws*` keys; DECOY uses separate `decoyLws*` keys, disabled by
+default. Shared transport/RPC contexts and unauthenticated SOCKS do not provide circuit
+isolation. See `docs/architecture/anonymity-audit-2026-11.md` for implemented controls,
+threat models, regression requirements and remaining boundaries.
 
 ## 5. Build, test, and evidence policy
 
@@ -191,8 +222,9 @@ decision and documentation, not a local workaround.
 - **Static analysis is allowed and expected.** Reading files, `git` inspection,
   `grep`/`rg`, Python static checks in `scripts/`, XML/TOML/YAML parsing, `bash -n`,
   and `git diff --check` do not execute the application. Use them.
-- **CI is manual-only.** Workflows use `workflow_dispatch` (and the guarded
-  `workflow_call` used by the manual release workflow). Do not trigger, rerun, or cancel a
+- **CI is manual-only.** Both workflows use only `workflow_dispatch`. Release embeds
+  the required test jobs from Tests; no callable or automatic entry point is allowed.
+  Do not trigger, rerun, or cancel a
   workflow without explicit authorization; the agent is not authorized to start Actions.
   The owner gate and repository protections are described in `.github/workflows/AGENTS.md`.
 - **Static linting and formatting are allowed.** Run the checked-in linters without
@@ -322,7 +354,7 @@ Good splits:
 - one subagent inventories a subsystem and returns file/line evidence;
 - one audits a security boundary (JNI, Keystore, Tor/LWS, backups);
 - one implements a UI-only change while another implements its state layer;
-- one reviews a diff against the security invariants.
+- one reviews a diff against the anonymity, privacy, and security invariants.
 
 Rules:
 
@@ -338,7 +370,7 @@ Rules:
    authorization rules. They must never commit, push, tag, or publish, and must not be
    asked to do so to bypass the main agent’s restriction.
 
-## 10. Critical security tasks
+## 10. Critical anonymity, privacy, and security tasks
 
 The following changes require an explicit threat-model and regression review before
 editing:
@@ -349,22 +381,27 @@ editing:
 - signing, unsigned/signed transaction exchange, key-image/output import/export;
 - serialization/deserialization of wallet or backup data;
 - PIN verification, Keystore wrapping, duress PIN, decoy wallet;
-- Tor start/stop/proxy application;
+- Tor/I2P/VPN/custom-proxy start, stop, routing, or proxy application;
 - LWS configuration, login, trust, or sync;
+- node selection, DNS behavior, or any new network identifier;
+- logging, notifications, clipboard, analytics-like state, or persistent identifiers;
+- local-exposure UI such as stealth, decoy, duress, screenshots, and recents;
 - JNI handle lifetime, callbacks, and native memory;
 - release signing and artifact verification.
 
 For each, document:
 
 1. the asset being protected;
-2. the threat and attacker capability;
+2. the adversary and attacker capability, including linkability/correlation;
 3. the data flow and trust boundaries;
 4. the failure mode if the change is wrong;
-5. the compatibility surface;
-6. the CI evidence that will be required;
-7. the rollback plan.
+5. the residual anonymity, privacy, and security limits;
+6. the compatibility surface;
+7. the CI evidence that will be required;
+8. the rollback plan.
 
-A static review is not a security proof. State that limitation in the final report.
+A static review is not a security or anonymity proof. State that limitation in the final
+report.
 
 ## 11. Documentation maintenance
 
@@ -380,7 +417,7 @@ Keep instructions close to the code they govern:
 | Work status or next priorities | `PROGRESS.md`, `TODO.md`, `ROADMAP.md` |
 | CI failure, warning, or recurring diagnostics | `docs/ci/`, `.github/workflows/AGENTS.md` |
 | New/changed transport mode or proxy policy | `docs/architecture/network-transport.md`, `tor-networking` skill, `docs/security-model.md` |
-| New security boundary or limitation | `AGENTS.md`, relevant skill, `docs/security-model.md`, `docs/architecture/repository-state.md` |
+| New anonymity, privacy, or security boundary/limitation | `AGENTS.md`, relevant skill, `docs/security-model.md`, `docs/architecture/repository-state.md` |
 
 Rules for documentation:
 
@@ -427,3 +464,15 @@ Rules for documentation:
 - Encrypted backup strength is tied to the seed passphrase used to re-key the copy. A
   short or empty seed passphrase yields a weakly keyed backup; a separate backup
   passphrase policy is still pending.
+
+### Continued-development contracts (2026-11-14)
+
+Auxiliary wallets remain owned until native close explicitly succeeds. Use the retained
+registry and its deletion guard; never discard a failed-close wrapper, delete its backing
+files/credentials or publish backup/decoy success first. Backup export rejects NERO and
+DECOY before accessing MAIN scratch state. Native output/history conversion is atomic:
+failed allocation/conversion must raise an error, never expose a partial successful list.
+Four JNI model constructor contracts are checked statically; full export signatures and
+native lifetime still require CI/device review. Legacy proxy onboarding uses the common
+transport editor. See `docs/architecture/anonymity-audit-2026-11.md` and the
+`docs/development-iteration-*.md` records for scope and limitations.

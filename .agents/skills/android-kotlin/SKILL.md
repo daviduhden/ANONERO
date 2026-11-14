@@ -46,6 +46,9 @@ Do not use for pure Compose layout changes (use `jetpack-compose`) or C++/JNI ch
 - Use `commit = true` for security-relevant preference writes.
 - Never log seeds, passphrases, PINs, wallet passwords, Keystore material, or node
   credentials. `Timber` output is persisted.
+- No analytics, telemetry, crash reporting, remote config, tracking IDs, or new
+  persistent identifiers. Review every new preference key, log line, and network value
+  for linkability and metadata exposure.
 - Main/decoy profiles must never read, copy, or wipe each other implicitly.
 
 ## Procedure
@@ -94,3 +97,11 @@ Review every new preference key for profile isolation and wipe coverage.
 - [ ] New persisted keys have defaults, profile behavior, and wipe coverage.
 - [ ] Static checks pass.
 - [ ] Runtime claims are marked unverified until CI.
+
+
+For auxiliary wallets use retained ownership and an atomic closed-path deletion action.
+Keep resource ownership after false/throwing close; do not merely log and forget it. Account
+and output mutation methods reject locked sessions, preserve cancellation and surface failure.
+Use immutable snapshots across IO dispatch, bind asynchronous validation to checked inputs,
+and discard results after wallet/input changes. `scripts/check-kotlin-cancellation.py`
+guards unqualified catch imports; it is not Kotlin compilation.

@@ -59,12 +59,14 @@ Do not use to claim runtime success, fund safety, or cryptographic proof.
    - `python3 scripts/check-i18n.py`
    - `git diff --check`
    - manifest/resource/dependency parsing.
-6. **Trace invariants.** Use the root security invariants and the relevant skill as
-   the checklist. For each, find the enforcing code or state clearly that it is
-   absent.
+6. **Trace invariants.** Use the root anonymity, privacy, and security invariants and the
+   relevant skill as the checklist. For each, find the enforcing code or state clearly
+   that it is absent.
 7. **Search for high-risk patterns.**
    - secrets in logs, prefs, intents, clipboard, notifications, tests;
-   - cleartext/network clients outside wallet2;
+   - new persistent identifiers, analytics, tracking, or correlation surfaces;
+   - cleartext/network clients outside wallet2 or paths that bypass the selected transport;
+   - DNS resolution before the proxy, redirects, retries, or silent fallback;
    - `setTrustedDaemon(true)` in LWS paths;
    - `Double`/`getAmountFromDouble` for new amounts;
    - unchecked JNI strings/arrays/handles;
@@ -121,3 +123,17 @@ grep -rn "getSecretViewKey\|getSecretSpendKey\|getSeed" app/src/main/java/io/ano
 - [ ] References and paths are real.
 - [ ] No build/test was run.
 - [ ] Limitations and recommended CI verification are explicit.
+
+
+For every new feature ask what information it reveals, which identities/connections/
+activities it links, and how to reduce exposure without harming fund safety. Run the
+allowed source guards `python3 scripts/check-native-diagnostics.py` and
+`python3 scripts/check-anonymity-boundaries.py`. Review narrow textual guards alongside
+code; they do not prove packet routing, concurrency or native correctness.
+
+
+Also run `python3 scripts/check-kotlin-cancellation.py` and
+`python3 scripts/sync-release-test-jobs.py --check` as allowed source checks. Constructor
+contracts cover four reviewed model constructors, not all JNI signatures. i18n discovers
+all strings*.xml feature catalogs while keeping strings.xml mandatory. Static-checker
+regressions under scripts/tests execute only in CI, not locally.

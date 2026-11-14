@@ -17,6 +17,21 @@ description: "Use when implementing or reviewing Monero wallet behavior: create 
 Do not use for UI-only changes, Keystore/PIN internals, or Tor proxying; use the
 matching skill.
 
+## Anonymity properties and limits
+
+Monero supplies ring signatures, stealth addresses, and confidential amounts. ANONERO
+supports anonymity by avoiding intentional subaddress reuse, exposing freeze/thaw and coin
+control, keeping wallet2 as the transaction authority, and offering airgapped signing.
+These are linkability-reduction measures, not guarantees:
+
+- Pay-to-many reduces the number of transactions but still links the outputs in one set.
+- Coin control can reduce unintended input linkage only when the user chooses inputs
+  correctly; incorrect selection can worsen linkability.
+- No intentional subaddress reuse is a wallet policy; external addresses, exchange
+  records, and on-chain graph analysis remain outside its control.
+- Sign/verify and message features provide authenticity, not anonymity.
+- Transaction construction, fees, and ring size must remain wallet2 behavior.
+
 ## Read first
 
 - `AGENTS.md`
@@ -94,6 +109,8 @@ python3 scripts/check-jni-contract.py
 
 - [ ] No floating-point amount path added.
 - [ ] No subaddress reuse.
+- [ ] Anonymity effects and limits are documented for coin control, pay-to-many, and
+      airgapped flows.
 - [ ] wallet2 remains authoritative for fees, selection, and signing.
 - [ ] Unsigned review uses wallet2's confirmation summary.
 - [ ] Failure values cannot be mistaken for success.
@@ -101,3 +118,11 @@ python3 scripts/check-jni-contract.py
 - [ ] `anon` and `nero` behavior considered.
 - [ ] No secret logging.
 - [ ] CI evidence required; static review is not fund-safety proof.
+
+
+Multi-recipient UI checks are bound to their address snapshot; submission recaptures and
+revalidates the full request, and preparation refuses concurrent requests. The app form's
+16-recipient bound does not replace wallet2 validation/fees. Freeze/thaw verifies the
+refreshed native flag and publishes observed state even if persistence later fails, while
+returning failure. Failed account snapshot refresh must not display prior-account funds
+under the new index. Use the retained auxiliary-wallet registry for backup/decoy files.

@@ -19,7 +19,6 @@ Do not use for wallet state, Tor/LWS, JNI, or cryptographic changes.
 - `AGENTS.md`
 - `app/AGENTS.md`
 - `app/src/main/java/io/anonero/ui/MainActivity.kt`
-- `app/src/main/java/io/anonero/ui/NavGraph.kt`
 - `app/src/main/java/io/anonero/ui/home/graph/HomeGraph.kt`
 - `app/src/main/java/io/anonero/ui/onboard/graph/OnboardingGraph.kt`
 - `app/src/main/java/io/anonero/ui/home/graph/routes/HomeRoutes.kt`
@@ -51,7 +50,7 @@ Do not use for wallet state, Tor/LWS, JNI, or cryptographic changes.
 ## Procedure
 
 1. **Locate the route and graph.** Find the existing route in `HomeRoutes.kt`,
-   `HomeGraph.kt`, `NavGraph.kt`, or `OnboardingGraph.kt`. Reuse the route pattern.
+   `HomeGraph.kt` or `OnboardingGraph.kt`. Reuse the route pattern.
 2. **Identify the ViewModel.** Use `koinViewModel`/`koinInject` as the surrounding
    screens do. Do not instantiate a repository or wallet directly in a composable.
 3. **Collect state correctly.** Use `collectAsState` or `asLiveData().observeAsState`
@@ -93,3 +92,10 @@ Review any `contentDescription = null` to confirm the element is decorative.
 - [ ] Destructive/completed flows cannot be re-triggered by back navigation.
 - [ ] No secret or real wallet data in previews.
 - [ ] `check-i18n.py` passes; rendering remains unverified until CI/device testing.
+
+
+Guard asynchronous validation with immutable input snapshots, including list shape and
+content. Indexing an older validation list after adding/removing a row is unsafe. Snapshot
+inputs again at submission, block repeated mutations and clear signature/verification
+results when inputs change. On account/output action failures show localized feedback;
+catch disposal cleanup refusals without crashing the UI. Updated back buttons use a11y_back.

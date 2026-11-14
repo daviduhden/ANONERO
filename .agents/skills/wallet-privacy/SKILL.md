@@ -1,9 +1,17 @@
 ---
 name: wallet-privacy
-description: "Use when implementing or reviewing Stealth Mode, Decoy Wallet, Duress PIN, lock and auto-lock behavior, notifications, logs, clipboard handling, or secure wipe. Includes threat modeling and the limits of each protection."
+description: "Use when implementing or reviewing Stealth Mode, Decoy Wallet, Duress PIN, lock and auto-lock behavior, notifications, logs, clipboard handling, or secure wipe. Distinguishes local anonymity and coercion mitigation from network anonymity."
 ---
 
-# Wallet privacy: stealth, decoy, duress, wipe
+# Wallet anonymity, privacy, and coercion controls
+
+## Scope and priority
+
+ANONERO's primary goal is anonymity, with privacy and security as required pillars. This
+skill covers local-exposure controls (stealth, notifications, clipboard, recents, wipe) and
+coercion controls (decoy, duress). They reduce local observability and some physical-access
+risks; they do **not** provide network anonymity, transaction unlinkability, or plausible
+deniability. Network anonymity belongs to `tor-networking` and `monero-lws`.
 
 ## When to use
 
@@ -28,6 +36,17 @@ description: "Use when implementing or reviewing Stealth Mode, Decoy Wallet, Dur
 - `app/src/main/java/io/anonero/services/AnonNeroService.kt`
 - `app/src/main/java/io/anonero/ui/MainActivity.kt`
 - `app/src/main/java/io/anonero/ui/viewmodels/AppViewModel.kt`
+
+## Anonymity contribution
+
+| Control | Primary property | Not provided |
+| --- | --- | --- |
+| Stealth mode | Local observability reduction | Network anonymity, transaction privacy |
+| Hidden amounts | Shoulder-surfing resistance | On-chain confidentiality (Monero supplies that) |
+| Auto-lock/background sync | Reduced unlocked-window exposure | Protection from root/forensics |
+| Decoy wallet | Separation of wallet files and identities on device | Plausible deniability, network anonymity |
+| Duress PIN | Coercion path to a decoy profile | Proof of coercion resistance |
+| Secure wipe | Reduced residual local data | Erasure of backups, remote copies, or forensic traces |
 
 ## Threat model
 
@@ -140,5 +159,25 @@ a decoy key read from the main path.
 - [ ] Wipe removes only the active profile and shared non-credential state.
 - [ ] Stealth notifications and logs contain no sensitive values.
 - [ ] `FLAG_SECURE` and the lock overlay are intact.
+- [ ] Controls are documented as local-exposure/coercion mitigations, not network
+      anonymity or plausible deniability.
 - [ ] Threat-model limitations are documented.
 - [ ] Runtime behavior marked unverified until CI/device testing.
+
+
+Diagnostic persistence now accepts warning/error events through `DiagnosticPolicy` exact
+constants, with fixed fallback/tag and minute timestamps in every build. Do not reintroduce
+an independent DebugTree, raw throwable forwarding to Android crash logging, hardware
+fingerprints in exports or routine lifecycle logs. Startup removes old diagnostic store/
+exports before consumers; clear invalidates queued writes and mutation rechecks stealth.
+Fixed native errors remain outside Kotlin stealth suppression. Notification visibility is
+SECRET in both builders. MAIN/DECOY have independent LWS settings/consent; profile removal
+must clear only that profile's LWS keys. Shared RPC/transport can still correlate profiles.
+
+
+Auxiliary close failures retain ownership and recovery files; retry closure before deleting
+backing files/credentials or publishing decoy success. Profile deletion runs inside the
+registry's closed-path guard. This does not serialize the earlier Keystore provisioning
+phase globally or establish forensic/coercion resistance. Restore cleanup preserves the
+transport cache; explicit wipe retains full cache cleanup. Hidden amounts also covers the
+Pay to Many total. Java/native strings are not erased by hiding fields or redacting logs.

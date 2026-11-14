@@ -1,9 +1,17 @@
 ---
 name: monero-lws
-description: "Use when changing the optional Monero Light Wallet Server integration: LWS configuration and validation, login, trust policy, sync behavior, or the LWS settings UI. Distinguishes privacy requirements from connectivity requirements."
+description: "Use when changing the optional Monero Light Wallet Server integration: LWS configuration and validation, login, trust policy, sync behavior, or the LWS settings UI. Distinguishes anonymity and privacy requirements from connectivity requirements."
 ---
 
 # Monero Light Wallet Server integration
+
+## Anonymity and privacy boundary
+
+LWS is an external index, not an anonymity service. Even when reached through Tor or I2P,
+the operator sees the wallet's public address, private view key, incoming amounts, and
+approximate timing. The transport hides the network path only as far as its model allows.
+Do not describe LWS as anonymous, private by default, or trustless. Prefer a self-operated
+server and explicit user consent; never switch operators silently.
 
 ## When to use
 
@@ -30,11 +38,11 @@ Use `tor-networking` for the shared transport, proxy, VPN, and fail-closed mecha
 - `app/src/main/java/io/anonero/ui/home/settings/ProxySettings.kt`
 - `app/src/test/java/io/anonero/util/LwsConfigTest.kt`
 
-## Privacy vs connectivity
+## Anonymity, privacy, and connectivity
 
 Keep these separate in design and review:
 
-**Privacy requirements**
+**Anonymity and privacy requirements**
 
 - LWS sees the wallet’s public address and private view key. It can see incoming
   transactions, amounts, and approximate timing, and can lie about chain state.
@@ -135,6 +143,15 @@ python3 scripts/check-i18n.py
 - [ ] Host/port/scheme validation remains strict.
 - [ ] No full-node or different-operator fallback on LWS failure.
 - [ ] User consent precedes first view-key disclosure to a new server.
+- [ ] LWS is documented as an untrusted index, not as anonymity or a trustless service.
 - [ ] Light-wallet sync semantics preserved.
 - [ ] UI discloses server trust, transport network, and TLS requirement in all locales.
 - [ ] Runtime behavior marked unverified until CI/device testing.
+
+
+Use profile-aware `LwsConfig.load/save`; MAIN preserves `lws*`, DECOY uses `decoyLws*`,
+disabled by default. Never inherit operator consent between profiles. All consumers,
+including service notifications/startup/node settings, must use this boundary. The TLS
+loopback exemption uses strict DNS-free literal validation, never `startsWith("127.")`.
+Profile-specific settings do not establish transport/circuit isolation or prevent linking
+when the same operator is explicitly chosen for both profiles.
