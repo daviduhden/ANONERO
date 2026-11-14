@@ -295,15 +295,18 @@ class AnonWalletHandler(
 
         val lws = LwsConfig.load(prefs)
         val lwsActive = lws.enabled
-        val host = if (lwsActive) lws.host else prefs.getString(NodeFields.RPC_HOST.value, "")
+        val host =
+            (if (lwsActive) lws.host else prefs.getString(NodeFields.RPC_HOST.value, "")).orEmpty()
         val rpcPort = if (lwsActive) lws.port else prefs.getInt(NodeFields.RPC_PORT.value, Node.defaultRpcPort)
-        val rpcUsername = if (lwsActive) "" else prefs.getString(NodeFields.RPC_USERNAME.value, "")
-        val rpcPassphrase = if (lwsActive) "" else prefs.getString(NodeFields.RPC_PASSWORD.value, "")
-        val offline = host.isNullOrEmpty()
+        val rpcUsername =
+            (if (lwsActive) "" else prefs.getString(NodeFields.RPC_USERNAME.value, "")).orEmpty()
+        val rpcPassphrase =
+            (if (lwsActive) "" else prefs.getString(NodeFields.RPC_PASSWORD.value, "")).orEmpty()
+        val offline = host.isEmpty()
         walletState.setOffline(offline)
         wallet.setOffline(offline)
         // nothing to load without a node/LWS
-        if (!host.isNullOrEmpty()) walletState.setLoading(true)
+        if (host.isNotEmpty()) walletState.setLoading(true)
         walletState.update()
         try {
             if (lwsActive) {
@@ -318,10 +321,10 @@ class AnonWalletHandler(
                 if (validation != null) throw Exception(validation.technicalMessage)
             }
             // no node (offline signer): nothing to route, leave the transport off
-            if (host?.isNotEmpty() == true) applyProxy()
+            if (host.isNotEmpty()) applyProxy()
             // A profile switch or close can replace this session while Tor is starting.
             if (WalletManager.instance !== manager || manager.wallet !== wallet) return
-            if (host?.isNotEmpty() == true) {
+            if (host.isNotEmpty()) {
                 var node =
                     nodeFromPrefs(
                         host,
@@ -625,10 +628,10 @@ class AnonWalletHandler(
     }
 
     fun getProxy(): Pair<String, Int>? {
-        val proxyHost = prefs.getString(WALLET_PROXY, "")
+        val proxyHost = prefs.getString(WALLET_PROXY, "").orEmpty()
         val proxyPort = prefs.getInt(WALLET_PROXY_PORT, -1)
 
-        if (proxyHost?.isNotEmpty() == true && proxyPort != -1) {
+        if (proxyHost.isNotEmpty() && proxyPort != -1) {
             return Pair(proxyHost, proxyPort)
         }
         return null

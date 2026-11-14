@@ -84,6 +84,7 @@ fun SignVerifyScreen(
     var message by remember { mutableStateOf("") }
     var signature by remember { mutableStateOf("") }
     var verifyAddress by remember { mutableStateOf("") }
+    var primaryAddress by remember { mutableStateOf("") }
     var verifyMessage by remember { mutableStateOf("") }
     var verifySignature by remember { mutableStateOf("") }
     var verifyResult by remember { mutableStateOf<Boolean?>(null) }
@@ -100,6 +101,7 @@ fun SignVerifyScreen(
             withContext(Dispatchers.IO) {
                 WalletManager.instance?.wallet?.address ?: ""
             }
+        primaryAddress = address
         if (verifyAddress.isEmpty()) verifyAddress = address
     }
 
@@ -211,7 +213,7 @@ fun SignVerifyScreen(
                     stringResource(
                         R.string.label_value,
                         stringResource(R.string.primary_address),
-                        wallet?.address ?: "-",
+                        primaryAddress.ifEmpty { "-" },
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
