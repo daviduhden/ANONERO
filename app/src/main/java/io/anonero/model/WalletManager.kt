@@ -22,8 +22,11 @@ private const val TAG = "WalletManager"
  */
 class WalletManager {
     var networkType = NetworkType.NetworkType_Mainnet
+
+    @Volatile
     var wallet: Wallet? = null
         private set
+    private val unmanagedWallets = RetainedWallets<Wallet> { closeJ(it) }
     private var daemonAddress: String? = null
     var daemonUsername = ""
         private set
@@ -94,18 +97,19 @@ class WalletManager {
         passphrase: String,
         language: String,
         height: Long,
-    ): Wallet {
-        val handle =
-            createWalletJ(
-                aFile.absolutePath,
-                password,
-                passphrase,
-                language,
-                networkType.value,
-            )
-        if (handle == 0L) throw IllegalStateException("Wallet creation failed")
-        return Wallet(handle)
-    }
+    ): Wallet =
+        unmanagedWallets.open(aFile.path) {
+            val handle =
+                createWalletJ(
+                    aFile.absolutePath,
+                    password,
+                    passphrase,
+                    language,
+                    networkType.value,
+                )
+            if (handle == 0L) throw IllegalStateException("Wallet creation failed")
+            Wallet(handle)
+        }
 
     private external fun createWalletJ(
         path: String,
@@ -133,13 +137,25 @@ class WalletManager {
     fun openWalletUnmanaged(
         path: String,
         password: String,
-    ): Wallet {
-        val handle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
-        if (handle == 0L) throw IllegalStateException("Wallet open failed")
-        return Wallet(handle)
-    }
+    ): Wallet =
+        unmanagedWallets.open(path) {
+            val handle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
+            if (handle == 0L) throw IllegalStateException("Wallet open failed")
+            Wallet(handle)
+        }
 
-    fun closeUnmanaged(wallet: Wallet): Boolean = closeJ(wallet)
+    fun closeUnmanaged(wallet: Wallet): Boolean = unmanagedWallets.close(wallet)
+
+    fun retryUnmanagedClose(path: String): Boolean = unmanagedWallets.closeAt(path)
+
+    fun hasUnmanagedWalletAt(path: String): Boolean = unmanagedWallets.contains(path)
+
+    fun withUnmanagedPathClosed(
+        path: String,
+        action: () -> Boolean,
+    ): Boolean = unmanagedWallets.withPathClosed(path, action)
+
+    fun hasUnmanagedWalletIn(directory: File): Boolean = unmanagedWallets.containsIn(directory)
 
     private external fun openWalletJ(
         path: String,
@@ -424,6 +440,9 @@ class WalletManager {
             }
 
         fun resetInstance() {
+            check(instance?.wallet == null && instance?.unmanagedWallets?.isEmpty() != false) {
+                "Wallets must be closed before resetting their owner"
+            }
             instance = null
         }
 

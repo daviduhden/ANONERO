@@ -139,8 +139,20 @@ object WalletProfileStore {
         prefs: SharedPreferences,
         profile: WalletProfile,
     ): Boolean {
+        val manager = io.anonero.model.WalletManager.instance ?: return false
+        return manager.withUnmanagedPathClosed(walletFile(context, profile).path) {
+            removeClosedProfile(context, prefs, profile)
+        }
+    }
+
+    private fun removeClosedProfile(
+        context: Context,
+        prefs: SharedPreferences,
+        profile: WalletProfile,
+    ): Boolean {
+        val target = walletFile(context, profile)
         var ok = true
-        val keyName = walletFile(context, profile).name
+        val keyName = target.name
         walletFiles(context, profile).forEach { file ->
             if (!file.delete() && file.exists()) {
                 Timber.tag(TAG).w("could not delete %s", file.name)

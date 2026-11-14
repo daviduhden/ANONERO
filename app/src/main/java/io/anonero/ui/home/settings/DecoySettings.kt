@@ -73,6 +73,7 @@ import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -266,9 +267,26 @@ fun DecoySettingsScreen(
                 TextButton(onClick = {
                     showRemoveConfirm = false
                     val ctx = context ?: return@TextButton
-                    WalletProfileStore.removeProfile(ctx, prefs, WalletProfile.DECOY)
-                    configured = false
-                    error = null
+                    scope.launch(Dispatchers.IO) {
+                        val removed =
+                            try {
+                                val manager = checkNotNull(WalletManager.instance)
+                                manager.retryUnmanagedClose(WalletProfileStore.walletFile(ctx, WalletProfile.DECOY).path) &&
+                                    WalletProfileStore.removeProfile(ctx, prefs, WalletProfile.DECOY)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                false
+                            }
+                        withContext(Dispatchers.Main) {
+                            if (removed) {
+                                configured = false
+                                error = null
+                            } else {
+                                error = DecoyError.WRITE_FAILED
+                            }
+                        }
+                    }
                 }) { Text(stringResource(R.string.remove)) }
             },
             dismissButton = {
@@ -386,6 +404,18 @@ fun DecoySettingsScreen(
                     ) { Text(stringResource(R.string.continue_action)) }
                 }
             }
+            if (!configured && context != null &&
+                (
+                    WalletProfileStore.walletFile(context, WalletProfile.DECOY).exists() ||
+                        WalletKey.exists(context, WalletProfile.DECOY.walletName)
+                )
+            ) {
+                item {
+                    AnonOutlineButton(onClick = { showRemoveConfirm = true }) {
+                        Text(stringResource(R.string.remove_decoy_wallet))
+                    }
+                }
+            }
             if (configured) {
                 item {
                     Text(
@@ -441,18 +471,36 @@ private fun createDecoy(
             onDone(null, DecoyError.EXISTS)
             return@launch
         }
+        val manager = WalletManager.instance ?: return@launch
         val walletKey = WalletKey.newSecret()
         var created: io.anonero.model.Wallet? = null
+        var creationComplete = false
+
+        fun rollback(): Boolean {
+            val auxiliary = created
+            if (auxiliary != null) {
+                try {
+                    if (!manager.closeUnmanaged(auxiliary)) return false
+                    created = null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    Timber.tag(TAG).e("Decoy wallet close failed; recovery data retained")
+                    return false
+                }
+            }
+            return WalletProfileStore.removeProfile(context, prefs, WalletProfile.DECOY)
+        }
         try {
             WalletKey.store(context, file.name, walletKey)
             val wallet =
-                WalletManager.instance?.createWalletUnmanaged(
+                manager.createWalletUnmanaged(
                     aFile = file,
                     password = walletKey,
                     passphrase = passphrase,
                     language = "English",
                     height = 1,
-                ) ?: throw DecoyException(DecoyError.CREATION_FAILED)
+                )
             created = wallet
             if (wallet.status.isOk != true) {
                 Timber.tag(TAG).e("decoy creation status is not OK")
@@ -471,6 +519,9 @@ private fun createDecoy(
             val words = wallet.getSeed(passphrase)?.split(" ").orEmpty()
             if (words.isEmpty()) throw DecoyException(DecoyError.SEED_FAILED)
             val restoreHeight = wallet.getRestoreHeight()
+            // Do not publish credentials or seed-display success before native closure.
+            if (!manager.closeUnmanaged(wallet)) throw DecoyException(DecoyError.WRITE_FAILED)
+            created = null
             prefs.edit(commit = true) {
                 putString(PREFS_DURESS_PIN_HASH, PinHash.hash(duressPin))
                 putString(
@@ -483,16 +534,24 @@ private fun createDecoy(
             if (!WalletProfileStore.isDecoyConfigured(context, prefs)) {
                 throw DecoyException(DecoyError.CREDENTIALS_FAILED)
             }
+            creationComplete = true
             withContext(Dispatchers.Main) { onDone(words, null) }
+        } catch (cancelled: CancellationException) {
+            if (!creationComplete) {
+                try {
+                    rollback()
+                } catch (cleanup: Exception) {
+                    cancelled.addSuppressed(cleanup)
+                }
+            }
+            throw cancelled
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "decoy creation failed; rolling back")
-            runCatching { created?.let { WalletManager.instance?.closeUnmanaged(it) } }
-            created = null
-            WalletProfileStore.removeProfile(context, prefs, WalletProfile.DECOY)
+            Timber.tag(TAG).e("Decoy creation failed")
+            if (!creationComplete && !rollback()) {
+                Timber.tag(TAG).e("Decoy recovery data retained after cleanup failure")
+            }
             val mapped = (e as? DecoyException)?.error ?: DecoyError.CREATION_FAILED
             withContext(Dispatchers.Main) { onDone(null, mapped) }
-        } finally {
-            runCatching { created?.let { WalletManager.instance?.closeUnmanaged(it) } }
         }
     }
 }

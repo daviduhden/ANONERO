@@ -122,7 +122,10 @@ fun RestorePreview(
     // The extracted backup (anon.json holds the plaintext seed) must not outlive this
     // screen, whether the user backs out or the restore fails.
     DisposableEffect(Unit) {
-        onDispose { BackupHelper.cleanCacheDir() }
+        onDispose {
+            runCatching { BackupHelper.cleanCacheDir(preserveTransport = true) }
+                .onFailure { Timber.tag(TAG).w("Restore cache cleanup deferred") }
+        }
     }
 
     fun restoreFromBackup() {
@@ -620,7 +623,7 @@ fun RestorePreview(
                         loadingMessage = R.string.restoring_wallet
                         val success = BackupHelper.restoreBackUp(backupPayload!!, passPhrase, pin)
                         if (success) {
-                            BackupHelper.cleanCacheDir()
+                            BackupHelper.cleanCacheDir(preserveTransport = true)
                             delay(1000)
                             withContext(Dispatchers.Main) { oNextPressed() }
                         } else {

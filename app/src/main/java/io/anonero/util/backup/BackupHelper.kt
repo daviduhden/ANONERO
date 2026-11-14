@@ -49,6 +49,8 @@ import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.core.qualifier.named
@@ -77,6 +79,8 @@ class NetworkMismatchException : Exception()
  * exporting the decoy would either overwrite the legitimate wallet or leak decoy history.
  */
 object BackupHelper {
+    private val exportMutex = Mutex()
+
     // 3: wallet files inside the zip are keyed to the seed passphrase (portable).
     // 2 and below: keyed to the PIN of the phone that made the backup -- which is also
     // what a wallet that has not migrated to the Keystore still exports.
@@ -101,15 +105,23 @@ object BackupHelper {
     suspend fun createBackUp(
         seedPassphrase: String,
         context: Context,
+    ): String = exportMutex.withLock { createBackupLocked(seedPassphrase, context) }
+
+    private suspend fun createBackupLocked(
+        seedPassphrase: String,
+        context: Context,
     ): String {
-        if (AnonConfig.viewOnly) {
-            require(seedPassphrase.length >= 8) { "Backup passphrase is too short" }
-        }
+        check(!AnonConfig.viewOnly) { "Encrypted backup export is unavailable in the view-only build" }
         if (WalletSession.isDecoy) {
             // A backup restores into the MAIN wallet path; exporting the decoy here
             // would produce a file that either replaces the legitimate wallet or leaks
             // decoy history into it. The decoy is recovered from its seed instead.
             throw Exception("Encrypted backup is not available for the decoy wallet; use its seed")
+        }
+        val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
+        val scratch = File(context.cacheDir, "tmp_backup")
+        check(manager.retryUnmanagedClose(File(scratch, WalletProfile.MAIN.walletName).path)) {
+            "Previous backup wallet could not be closed"
         }
         val wallet = WalletManager.instance?.wallet ?: throw Exception("Wallet not found")
         val prefs = provideWalletSharedPrefs(context)
@@ -214,8 +226,8 @@ object BackupHelper {
                 // touched: nothing here can leave it in a state the Keystore cannot open. A legacy
                 // wallet that never migrated has no W and is still PIN-keyed; it is left as is.
                 if (w != null) {
-                    val manager = WalletManager.instance ?: throw Exception("Wallet manager not found")
                     val copy = manager.openWalletUnmanaged(File(tmpBackupDir, walletName).path, w)
+                    var copyFailure: Throwable? = null
                     try {
                         if (!copy.status.isOk) {
                             throw Exception("backup copy did not open: ${copy.status.errorString}")
@@ -226,8 +238,17 @@ object BackupHelper {
                         if (!copy.store()) {
                             throw Exception("backup copy could not be stored: ${copy.status.errorString}")
                         }
+                    } catch (failure: Throwable) {
+                        copyFailure = failure
+                        throw failure
                     } finally {
-                        manager.closeUnmanaged(copy)
+                        try {
+                            check(manager.closeUnmanaged(copy)) { "Backup wallet could not be closed" }
+                        } catch (cleanup: Exception) {
+                            val failure = copyFailure
+                            if (failure == null) throw cleanup
+                            failure.addSuppressed(cleanup)
+                        }
                     }
                 }
             } finally {
@@ -250,9 +271,14 @@ object BackupHelper {
             EncryptUtil.encryptFile(seedPassphrase, backupFile, backupFileEncrypted)
             return backupFileEncrypted.absolutePath
         } finally {
-            // delete the unencrypted copies
-            tmpBackupDir.deleteRecursively()
+            // wallet2 may still write this copy after a failed close. Preserve its
+            // files inside tmp_backup until an explicit close retry or process restart.
+            // The seed-bearing manifest/archive are not native backing files.
+            File(tmpBackupDir, "anon.json").delete()
             backupFile.delete()
+            if (!manager.hasUnmanagedWalletIn(tmpBackupDir)) {
+                tmpBackupDir.deleteRecursively()
+            }
         }
     }
 
@@ -537,7 +563,25 @@ object BackupHelper {
         }
     }
 
-    fun cleanCacheDir() {
-        AnonConfig.context?.cacheDir?.deleteRecursively()
+    fun cleanCacheDir(preserveTransport: Boolean = false) {
+        check(exportMutex.tryLock()) { "Backup export is active" }
+        try {
+            val cache = checkNotNull(AnonConfig.context) { "Application context unavailable" }.cacheDir
+            check(WalletManager.instance?.hasUnmanagedWalletIn(cache) != true) {
+                "Auxiliary wallet must be closed before clearing cache"
+            }
+            val targets =
+                if (preserveTransport) {
+                    cache.listFiles()?.filter { it.name != "tor" }
+                        ?: throw java.io.IOException("Could not list cache files")
+                } else {
+                    listOf(cache)
+                }
+            var removed = true
+            targets.forEach { if (!it.deleteRecursively()) removed = false }
+            check(removed) { "Could not clear temporary files" }
+        } finally {
+            exportMutex.unlock()
+        }
     }
 }
