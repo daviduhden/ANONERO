@@ -50,9 +50,12 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -76,8 +79,10 @@ import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
 import io.anonero.ui.home.graph.routes.SendScreenRoute
 import io.anonero.util.Formats
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.java.KoinJavaComponent.inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +104,13 @@ fun CoinsScreen(
     )
     val loading by walletState.isLoading.asLiveData().observeAsState(false)
     val hideAmounts by walletState.hideAmountsFlow.collectAsState(false)
+    val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
+    val snackbar = remember { SnackbarHostState() }
+    val failureMessage = stringResource(R.string.wallet_operation_failed)
+    var mutating by remember { mutableStateOf(false) }
+    LaunchedEffect(coins) {
+        selectedCoins = selectedCoins.intersect(coins.filter { !it.frozen && !it.spent }.map { it.pub_key }.toSet())
+    }
     val nodeConnected = connectionStatus == Wallet.ConnectionStatus.ConnectionStatus_Connected
 
     var message: String? = null
@@ -111,7 +123,7 @@ fun CoinsScreen(
     }
 
     fun selectCoin(coin: CoinsInfo) {
-        if (coin.frozen || coin.spent) return
+        if (locked || mutating || coin.frozen || coin.spent) return
         selectedCoins =
             if (selectedCoins.contains(coin.pub_key)) {
                 selectedCoins - coin.pub_key
@@ -122,6 +134,7 @@ fun CoinsScreen(
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButtonPosition = FabPosition.Center,
         floatingActionButton = {
             AnimatedVisibility(
@@ -144,6 +157,7 @@ fun CoinsScreen(
                     ),
             ) {
                 OutlinedButton(
+                    enabled = !locked && !mutating && selectedCoins.isNotEmpty(),
                     colors =
                         ButtonDefaults.outlinedButtonColors(
                             containerColor = MaterialTheme.colorScheme.background,
@@ -179,7 +193,7 @@ fun CoinsScreen(
                     IconButton(
                         onClick = onBackPress,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
             )
@@ -252,6 +266,7 @@ fun CoinsScreen(
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
+                                enabled = !locked && !mutating,
                                 colors =
                                     IconButtonDefaults.iconButtonColors(
                                         contentColor =
@@ -262,8 +277,22 @@ fun CoinsScreen(
                                             },
                                     ),
                                 onClick = {
-                                    scope.launch(Dispatchers.IO) {
-                                        walletState.setOutputFrozen(coin.pub_key, !coin.frozen)
+                                    if (mutating || locked) return@IconButton
+                                    mutating = true
+                                    scope.launch {
+                                        try {
+                                            val applied =
+                                                withContext(Dispatchers.IO) {
+                                                    walletState.setOutputFrozen(coin.pub_key, !coin.frozen)
+                                                }
+                                            if (!applied) snackbar.showSnackbar(failureMessage)
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            snackbar.showSnackbar(failureMessage)
+                                        } finally {
+                                            mutating = false
+                                        }
                                     }
                                 },
                             ) {

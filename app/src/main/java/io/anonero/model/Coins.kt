@@ -29,12 +29,14 @@ class Coins(
     fun freeze(publicKey: String) {
         setFrozenJ(publicKey)
         refresh()
+        check(all.any { it.pub_key == publicKey && it.frozen }) { "Output freeze was not applied" }
     }
 
     // Thaw by output public key, then re-read wallet2's state.
     fun thaw(publicKey: String) {
         thawJ(publicKey)
         refresh()
+        check(all.any { it.pub_key == publicKey && !it.frozen }) { "Output thaw was not applied" }
     }
 
     private external fun setFrozenJ(publicKey: String)

@@ -42,6 +42,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -64,12 +66,11 @@ import io.anonero.R
 import io.anonero.model.AccountInfo
 import io.anonero.services.WalletState
 import io.anonero.util.Formats
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import timber.log.Timber
-
-private const val TAG = "AccountsScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +86,25 @@ fun AccountsScreen(
     var showAdd by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<AccountInfo?>(null) }
     val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
+    val snackbar = remember { SnackbarHostState() }
+    var busy by remember { mutableStateOf(false) }
+    val failureMessage = stringResource(R.string.wallet_operation_failed)
+
+    fun mutate(operation: () -> Boolean) {
+        if (busy || locked) return
+        busy = true
+        scope.launch {
+            try {
+                if (!withContext(Dispatchers.IO) { operation() }) snackbar.showSnackbar(failureMessage)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                snackbar.showSnackbar(failureMessage)
+            } finally {
+                busy = false
+            }
+        }
+    }
 
     BackHandler { onBackPress() }
 
@@ -102,11 +122,7 @@ fun AccountsScreen(
             onDismiss = { showAdd = false },
             onConfirm = { label ->
                 showAdd = false
-                scope.launch(Dispatchers.IO) {
-                    if (!walletState.addAccount(label)) {
-                        Timber.tag(TAG).e("could not create account")
-                    }
-                }
+                mutate { walletState.addAccount(label) }
             },
         )
     }
@@ -117,27 +133,26 @@ fun AccountsScreen(
             onDismiss = { renameTarget = null },
             onConfirm = { label ->
                 renameTarget = null
-                scope.launch(Dispatchers.IO) {
-                    walletState.updateAccountLabel(target.index, label)
-                }
+                mutate { walletState.updateAccountLabel(target.index, label) }
             },
         )
     }
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.accounts)) },
                 navigationIcon = {
                     IconButton(onClick = onBackPress) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }) {
+            FloatingActionButton(onClick = { if (!busy && !locked) showAdd = true }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_account))
             }
         },
@@ -170,10 +185,8 @@ fun AccountsScreen(
                     modifier =
                         Modifier
                             .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .clickable {
-                                scope.launch(Dispatchers.IO) {
-                                    walletState.selectAccount(account.index)
-                                }
+                            .clickable(enabled = !busy && !locked) {
+                                mutate { walletState.selectAccount(account.index) }
                             },
                     leadingContent = {
                         if (account.index == active) {
@@ -217,7 +230,7 @@ fun AccountsScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            IconButton(onClick = { renameTarget = account }) {
+                            IconButton(enabled = !busy && !locked, onClick = { renameTarget = account }) {
                                 Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_account))
                             }
                         }

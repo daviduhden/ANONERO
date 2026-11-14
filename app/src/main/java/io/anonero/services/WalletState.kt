@@ -36,6 +36,7 @@ import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -281,24 +282,44 @@ class WalletState {
      */
     @Synchronized
     fun selectAccount(index: Int): Boolean {
+        if (backgroundSync || backgroundSyncRunning) return false
         val wallet = getWallet ?: return false
         if (index < 0 || index >= wallet.getNumAccounts()) return false
-        wallet.setAccountIndex(index)
-        wallet.refreshHistory()
-        runCatching { wallet.coins?.refresh() }
-        _activeAccount.value = index
-        update()
-        return true
+        // Selection can change the local wallet index before native snapshot refresh
+        // fails. Never leave old-account amounts/outputs beneath the current index.
+        _transactions.value = emptyList()
+        _subAddresses.value = emptyList()
+        _coins.value = emptyList()
+        _nextAddress.value = null
+        _balanceInfo.value = null
+        _unLockedBalance.value = null
+        return try {
+            wallet.setAccountIndex(index)
+            wallet.refreshHistory()
+            wallet.coins?.refresh()
+            update()
+            true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Account selection failed")
+            false
+        } finally {
+            _activeAccount.value = wallet.getAccountIndex()
+        }
     }
 
     @Synchronized
     fun addAccount(label: String): Boolean {
+        if (backgroundSync || backgroundSyncRunning) return false
         val wallet = getWallet ?: return false
         return try {
             wallet.addAccount(label.ifBlank { "Account ${wallet.getNumAccounts()}" })
             if (!wallet.store()) return false
             update()
             true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "addAccount failed")
             false
@@ -310,12 +331,16 @@ class WalletState {
         accountIndex: Int,
         label: String,
     ): Boolean {
+        if (backgroundSync || backgroundSyncRunning) return false
         val wallet = getWallet ?: return false
         return try {
+            if (accountIndex !in 0 until wallet.getNumAccounts()) return false
             wallet.setAccountLabelFor(accountIndex, label)
             if (!wallet.store()) return false
             update()
             true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "updateAccountLabel failed")
             false
@@ -328,17 +353,20 @@ class WalletState {
         publicKey: String,
         frozen: Boolean,
     ): Boolean {
+        if (backgroundSync || backgroundSyncRunning) return false
         val wallet = getWallet ?: return false
         return try {
             val coins = wallet.coins ?: return false
+            if (coins.all.none { it.pub_key == publicKey && !it.spent && it.subaddrAccount == wallet.getAccountIndex() }) return false
             if (frozen) coins.freeze(publicKey) else coins.thaw(publicKey)
-            if (!wallet.store()) return false
             _coins.update {
                 (wallet.coins?.all ?: listOf()).fastFilter {
                     !it.spent && it.subaddrAccount == wallet.getAccountIndex()
                 }
             }
-            true
+            wallet.store()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "setOutputFrozen failed")
             false
