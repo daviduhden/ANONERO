@@ -91,6 +91,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
 import java.io.IOException
@@ -115,6 +117,7 @@ class NetworkSettingsViewModel(
     private val walletState: WalletState,
     private val walletHandler: AnonWalletHandler,
 ) : ViewModel() {
+    private val mutation = Mutex()
     private val _nodes = MutableStateFlow<List<Node>>(emptyList())
     val nodes: StateFlow<List<Node>> = _nodes
 
@@ -150,123 +153,143 @@ class NetworkSettingsViewModel(
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
-            _busy.postValue(true)
-            _error.postValue(null)
-            val manager = WalletManager.instance
-            val wallet = manager?.wallet
-            try {
-                wallet?.pauseRefresh()
-                wallet?.setOffline(true)
-                transportController.saveConfig(config).getOrThrow()
-                val lws = LwsConfig.load(prefs)
-                val lwsActive = lws.enabled && wallet?.isLightWallet == true
-                val lwsPendingDisable = !lws.enabled && wallet?.isLightWallet == true
-                // The transport is now saved. If the active LWS endpoint belongs to a
-                // different network, keep the wallet offline instead of reusing the old
-                // transport or connecting directly.
-                if (lwsActive && LwsConfig.validateTransport(lws, config) != null) {
+            mutation.withLock {
+                _busy.postValue(true)
+                _error.postValue(null)
+                val manager = WalletManager.instance
+                val wallet = manager?.wallet
+                try {
                     wallet?.pauseRefresh()
                     wallet?.setOffline(true)
-                    walletState.setOffline(true)
-                    walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
-                    walletState.setLoading(false)
-                    _error.postValue(NetworkSettingsError.LWS_INCOMPATIBLE)
-                    return@launch
-                }
-                // Do not switch an active light wallet back to RPC implicitly. The LWS
-                // toggle takes effect on the next wallet start.
-                if (lwsPendingDisable) {
-                    wallet?.pauseRefresh()
-                    wallet?.setOffline(true)
-                    walletState.setOffline(true)
-                    walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
-                    walletState.setLoading(false)
-                    _error.postValue(NetworkSettingsError.LWS_RESTART_REQUIRED)
-                    return@launch
-                }
-                if (wallet != null) {
-                    if (lwsActive) {
-                        walletHandler.reapplyLightWallet()
-                    } else {
-                        walletHandler.applyProxy()
-                        val selected =
-                            NodeSelectionPolicy.select(
-                                _nodes.value,
-                                config,
-                                io.anonero.AnonConfig.getNetworkType(),
-                                activeNode.value,
-                            )
-                        if (selected == null) {
-                            throw IllegalStateException("No compatible node")
-                        }
-                        walletHandler.updateDaemon(selected, lightWallet = false)
-                        wallet.setOffline(false)
-                        if (wallet.isInitialized) wallet.startRefresh()
+                    transportController.saveConfig(config).getOrThrow()
+                    val lws = LwsConfig.load(prefs)
+                    val lwsActive = lws.enabled && wallet?.isLightWallet == true
+                    val lwsPendingDisable = !lws.enabled && wallet?.isLightWallet == true
+                    // The transport is now saved. If the active LWS endpoint belongs to a
+                    // different network, keep the wallet offline instead of reusing the old
+                    // transport or connecting directly.
+                    if (lwsActive && LwsConfig.validateTransport(lws, config) != null) {
+                        wallet?.pauseRefresh()
+                        wallet?.setOffline(true)
+                        walletState.setOffline(true)
+                        walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+                        walletState.setLoading(false)
+                        _error.postValue(NetworkSettingsError.LWS_INCOMPATIBLE)
+                        return@launch
                     }
+                    // Do not switch an active light wallet back to RPC implicitly. The LWS
+                    // toggle takes effect on the next wallet start.
+                    if (lwsPendingDisable) {
+                        wallet?.pauseRefresh()
+                        wallet?.setOffline(true)
+                        walletState.setOffline(true)
+                        walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+                        walletState.setLoading(false)
+                        _error.postValue(NetworkSettingsError.LWS_RESTART_REQUIRED)
+                        return@launch
+                    }
+                    if (wallet != null) {
+                        if (lwsActive) {
+                            walletHandler.reapplyLightWallet()
+                        } else {
+                            walletHandler.applyProxy()
+                            check(WalletManager.instance === manager && manager?.wallet === wallet) {
+                                "Wallet session changed"
+                            }
+                            val selected =
+                                NodeSelectionPolicy.select(
+                                    _nodes.value,
+                                    config,
+                                    io.anonero.AnonConfig.getNetworkType(),
+                                    activeNode.value,
+                                )
+                            if (selected == null) {
+                                throw IllegalStateException("No compatible node")
+                            }
+                            walletHandler.updateDaemon(selected, lightWallet = false)
+                            wallet.setOffline(false)
+                            if (wallet.isInitialized) wallet.startRefresh()
+                        }
+                    }
+                    walletState.setLoading(false)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (WalletManager.instance !== manager || manager?.wallet !== wallet) return@withLock
+                    wallet?.pauseRefresh()
+                    wallet?.setOffline(true)
+                    walletState.setOffline(true)
+                    walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+                    walletState.setLoading(false)
+                    Timber.tag("NetworkSettings").w("Transport change failed")
+                    _error.postValue(errorFor(e))
+                } finally {
+                    _busy.postValue(false)
                 }
-                walletState.setLoading(false)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                wallet?.pauseRefresh()
-                wallet?.setOffline(true)
-                walletState.setOffline(true)
-                walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
-                walletState.setLoading(false)
-                Timber.tag("NetworkSettings").w(e, "Transport change failed")
-                _error.postValue(errorFor(e))
-            } finally {
-                _busy.postValue(false)
             }
         }
     }
 
     fun selectNode(node: Node) {
-        // An active light wallet must not be pointed at a full node. The LWS toggle takes
-        // effect on restart, so refuse instead of changing trust or the backend.
-        if (LwsConfig.load(prefs).enabled && WalletManager.instance?.wallet?.isLightWallet == true) {
-            _error.postValue(NetworkSettingsError.LWS_ACTIVE)
-            return
-        }
-        if (!NodeSelectionPolicy.accepts(config.value, node)) {
-            _error.postValue(NetworkSettingsError.NO_COMPATIBLE_NODE)
-            return
-        }
         viewModelScope.launch(Dispatchers.IO) {
-            _busy.postValue(true)
-            try {
-                walletHandler.updateDaemon(node, lightWallet = false)
-                prefs.edit(commit = true) {
-                    putString(NodeFields.RPC_HOST.value, node.host)
-                    putBoolean(NodeFields.NODE_TLS.value, node.useTls)
-                    putInt(NodeFields.RPC_PORT.value, node.rpcPort)
-                    putString(NodeFields.RPC_USERNAME.value, node.username)
-                    putString(NodeFields.RPC_PASSWORD.value, node.password)
-                    putString(
-                        NodeFields.RPC_NETWORK.value,
-                        io.anonero.AnonConfig
-                            .getNetworkType()
-                            .toString(),
-                    )
-                    putString(NodeFields.NODE_NAME.value, node.name)
+            mutation.withLock {
+                _busy.postValue(true)
+                try {
+                    // An active light wallet must not be pointed at a full node. The LWS toggle takes
+                    // effect on restart, so refuse instead of changing trust or the backend.
+                    if (LwsConfig.load(prefs).enabled && WalletManager.instance?.wallet?.isLightWallet == true) {
+                        _error.postValue(NetworkSettingsError.LWS_ACTIVE)
+                        return@withLock
+                    }
+                    if (!NodeSelectionPolicy.accepts(config.value, node)) {
+                        _error.postValue(NetworkSettingsError.NO_COMPATIBLE_NODE)
+                        return@withLock
+                    }
+
+                    walletHandler.updateDaemon(node, lightWallet = false)
+                    prefs.edit(commit = true) {
+                        putString(NodeFields.RPC_HOST.value, node.host)
+                        putBoolean(NodeFields.NODE_TLS.value, node.useTls)
+                        putInt(NodeFields.RPC_PORT.value, node.rpcPort)
+                        putString(NodeFields.RPC_USERNAME.value, node.username)
+                        putString(NodeFields.RPC_PASSWORD.value, node.password)
+                        putString(
+                            NodeFields.RPC_NETWORK.value,
+                            io.anonero.AnonConfig
+                                .getNetworkType()
+                                .toString(),
+                        )
+                        putString(NodeFields.NODE_NAME.value, node.name)
+                    }
+                    WalletManager.instance?.wallet?.startRefresh()
+                    _error.postValue(null)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.tag("NetworkSettings").w("Node selection failed")
+                    _error.postValue(NetworkSettingsError.APPLY_FAILED)
+                } finally {
+                    _busy.postValue(false)
                 }
-                WalletManager.instance?.wallet?.startRefresh()
-                _error.postValue(null)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.tag("NetworkSettings").w(e, "Node selection failed")
-                _error.postValue(NetworkSettingsError.APPLY_FAILED)
-            } finally {
-                _busy.postValue(false)
             }
         }
     }
 
-    fun savePreferences(config: TransportConfig) {
-        // Preference writes use commit=true; keep them off the main thread.
+    fun savePreferences(
+        autoSelectNode: Boolean? = null,
+        preferTrustedNode: Boolean? = null,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            transportController.saveConfig(config)
+            mutation.withLock {
+                val current = transportController.config.value
+                transportController
+                    .saveConfig(
+                        current.copy(
+                            autoSelectNode = autoSelectNode ?: current.autoSelectNode,
+                            preferTrustedNode = preferTrustedNode ?: current.preferTrustedNode,
+                        ),
+                    ).onFailure { _error.postValue(NetworkSettingsError.INVALID_CONFIG) }
+            }
         }
     }
 
@@ -340,6 +363,8 @@ fun NetworkSettings(
     onManageNodes: () -> Unit,
     onManageLws: () -> Unit,
     modifier: Modifier = Modifier,
+    transportOnly: Boolean = false,
+    onShowTorLogs: (() -> Unit)? = null,
 ) {
     val viewModel = koinViewModel<NetworkSettingsViewModel>()
     val context = LocalContext.current
@@ -367,6 +392,13 @@ fun NetworkSettings(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_network_nodes)) },
+                actions = {
+                    onShowTorLogs?.let { showLogs ->
+                        TextButton(onClick = showLogs) {
+                            Text(stringResource(R.string.tor_logs))
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackPress) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -554,7 +586,7 @@ fun NetworkSettings(
                     checked = autoSelect,
                     onCheckedChange = {
                         autoSelect = it
-                        viewModel.savePreferences(config.copy(autoSelectNode = it))
+                        viewModel.savePreferences(autoSelectNode = it)
                     },
                 )
             }
@@ -564,84 +596,86 @@ fun NetworkSettings(
                     checked = preferTrusted,
                     onCheckedChange = {
                         preferTrusted = it
-                        viewModel.savePreferences(config.copy(preferTrustedNode = it))
+                        viewModel.savePreferences(preferTrustedNode = it)
                     },
                 )
             }
-            item { SettingsSectionHeader(stringResource(R.string.network_lws)) }
-            item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(
-                        text =
-                            stringResource(
-                                if (lws.enabled) R.string.network_lws_enabled else R.string.network_lws_disabled,
-                            ),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    if (lws.enabled) {
-                        Text(lws.address, style = MaterialTheme.typography.bodySmall)
+            if (!transportOnly) {
+                item { SettingsSectionHeader(stringResource(R.string.network_lws)) }
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Text(
-                            text = stringResource(R.string.network_node_network, stringResource(lws.network.labelRes())),
+                            text =
+                                stringResource(
+                                    if (lws.enabled) R.string.network_lws_enabled else R.string.network_lws_disabled,
+                                ),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        if (lws.enabled) {
+                            Text(lws.address, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text = stringResource(R.string.network_node_network, stringResource(lws.network.labelRes())),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (lwsCompatibility != null) {
+                                Text(
+                                    text = stringResource(lwsCompatibility.messageResForUi()),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            syncProgress?.let {
+                                Text(
+                                    text = stringResource(R.string.syncing_blocks_left, it.left.toString()),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        Text(
+                            text = stringResource(R.string.lws_privacy_warning),
                             style = MaterialTheme.typography.bodySmall,
                         )
-                        if (lwsCompatibility != null) {
-                            Text(
-                                text = stringResource(lwsCompatibility.messageResForUi()),
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                        TextButton(onClick = onManageLws) {
+                            Text(stringResource(R.string.network_lws_configure))
                         }
-                        syncProgress?.let {
-                            Text(
-                                text = stringResource(R.string.syncing_blocks_left, it.left.toString()),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    Text(
-                        text = stringResource(R.string.lws_privacy_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextButton(onClick = onManageLws) {
-                        Text(stringResource(R.string.network_lws_configure))
                     }
                 }
-            }
-            item { SettingsSectionHeader(stringResource(R.string.network_nodes)) }
-            val visibleNodes = nodes.filter { it.network == config.nodeNetwork }
-            if (visibleNodes.isEmpty()) {
+                item { SettingsSectionHeader(stringResource(R.string.network_nodes)) }
+                val visibleNodes = nodes.filter { it.network == config.nodeNetwork }
+                if (visibleNodes.isEmpty()) {
+                    item {
+                        Text(
+                            text = stringResource(R.string.network_no_nodes),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                items(visibleNodes) { node ->
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !busy) { viewModel.selectNode(node) }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = node.name ?: node.hostPort,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "${node.hostPort} · ${stringResource(node.network.labelRes())}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (node.trusted) {
+                            Text(stringResource(R.string.network_trusted), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
                 item {
-                    Text(
-                        text = stringResource(R.string.network_no_nodes),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            }
-            items(visibleNodes) { node ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = !busy) { viewModel.selectNode(node) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = node.name ?: node.hostPort,
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${node.hostPort} · ${stringResource(node.network.labelRes())}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    if (node.trusted) {
-                        Text(stringResource(R.string.network_trusted), style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = onManageNodes) {
+                        Text(stringResource(R.string.network_manage_nodes))
                     }
-                }
-            }
-            item {
-                TextButton(onClick = onManageNodes) {
-                    Text(stringResource(R.string.network_manage_nodes))
                 }
             }
         }

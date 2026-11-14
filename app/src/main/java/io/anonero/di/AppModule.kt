@@ -78,7 +78,7 @@ val appModule =
         viewModel { SendViewModel() }
         viewModel { SecureWipeViewModel(get(), get(named(WALLET_PREFERENCES)), get(), get()) }
         viewModel { NodeSettingsViewModel(get(named(WALLET_PREFERENCES)), get<NodesRepository>(), get()) }
-        viewModel { ProxySettingsViewModel(get(), get(), get(named(WALLET_PREFERENCES))) }
+        viewModel { ProxySettingsViewModel(get()) }
         viewModel {
             NetworkSettingsViewModel(
                 get(named(WALLET_PREFERENCES)),

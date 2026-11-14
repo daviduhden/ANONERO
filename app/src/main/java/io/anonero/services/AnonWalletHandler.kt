@@ -35,8 +35,6 @@ import io.anonero.store.NodesRepository
 import io.anonero.util.LwsConfig
 import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
-import io.anonero.util.WALLET_PROXY
-import io.anonero.util.WALLET_PROXY_PORT
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
@@ -573,66 +571,6 @@ class AnonWalletHandler(
             walletState.setLoading(false)
             throw e
         }
-    }
-
-    private fun proxyAddress(
-        host: String,
-        port: Int,
-    ): String {
-        require(host.isNotBlank() && port in 1..65535) { "Invalid proxy endpoint" }
-        val formattedHost = if (':' in host && !host.startsWith("[")) "[$host]" else host
-        return "socks5://$formattedHost:$port"
-    }
-
-    fun setProxy(
-        proxy: String?,
-        port: Int?,
-        persist: Boolean = true,
-    ) {
-        Timber.tag(TAG).d("setProxy: updating endpoint")
-        // LWS traffic must follow the selected transport. The legacy proxy screen must not
-        // be able to install or clear a second proxy that bypasses TransportController.
-        val lwsActive = LwsConfig.load(prefs).enabled || WalletManager.instance?.wallet?.isLightWallet == true
-        check(!lwsActive) { "LWS proxy is managed by Network & Nodes" }
-        // Disable the proxy in both native clients, not only in preferences.
-        if (proxy == null && port == null) {
-            val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-            check(manager.clearProxy()) { "Clearing the proxy was rejected" }
-            manager.wallet?.clearProxy()
-            if (persist) {
-                prefs.edit(commit = true) {
-                    remove(WALLET_PROXY)
-                    remove(WALLET_PROXY_PORT)
-                }
-            }
-        } else {
-            val proxyHost = requireNotNull(proxy) { "Proxy host required" }
-            val proxyPort = requireNotNull(port) { "Proxy port required" }
-            val proxyStr = proxyAddress(proxyHost, proxyPort)
-            val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-            check(manager.setProxy(proxyStr)) { "Proxy was rejected" }
-            val wallet = manager.wallet
-            if (wallet != null && !wallet.setProxy(proxyStr)) {
-                wallet.pauseRefresh()
-                throw IllegalStateException("Wallet proxy was rejected")
-            }
-            prefs.edit(commit = true) {
-                if (persist) {
-                    putString(WALLET_PROXY, proxyHost)
-                    putInt(WALLET_PROXY_PORT, proxyPort)
-                }
-            }
-        }
-    }
-
-    fun getProxy(): Pair<String, Int>? {
-        val proxyHost = prefs.getString(WALLET_PROXY, "").orEmpty()
-        val proxyPort = prefs.getInt(WALLET_PROXY_PORT, -1)
-
-        if (proxyHost.isNotEmpty() && proxyPort != -1) {
-            return Pair(proxyHost, proxyPort)
-        }
-        return null
     }
 
     fun wipe(passPhrase: String): Boolean {
