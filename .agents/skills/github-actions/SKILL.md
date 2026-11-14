@@ -26,9 +26,9 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 
 ## Invariants
 
-- Workflows are manual-only. `test.yml` keeps `workflow_call` only for the manual release
-  workflow; there is no `push`, `pull_request`, `pull_request_target`, `schedule`, tag,
-  `release`, `workflow_run`, or `repository_dispatch` trigger.
+- Both workflows use only `workflow_dispatch`; callable and automatic triggers are
+  forbidden. Release embeds the required Tests jobs with explicit tag checkouts and
+  disabled Gradle caches, then aggregates all results and its same-run native artifact.
 - Every job depends on the `authorize` job, which requires
   `github.actor == github.repository_owner` and
   `github.triggering_actor == github.repository_owner`. A non-owner dispatch must have no
@@ -64,8 +64,7 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
    and downstream needs.
 2. **Classify the trust boundary.** PR code, third-party action, downloaded artifact,
    cache, secret, or published asset.
-3. **Check permissions, triggers, and the owner gate.** Only `workflow_dispatch` and the
-   guarded `workflow_call` may remain. Every job must need `authorize`; keep
+3. **Check permissions, triggers, and the owner gate.** Only `workflow_dispatch` may remain; no callable entry point is allowed. Every job must need `authorize`; keep
    `contents: read` as the default. Never expose `release` to an untrusted run.
 4. **Pin actions.** Use a full SHA and update the comment to the release version.
 5. **Preserve fail-closed checks.** New steps should `exit 1` on a failed invariant,
@@ -140,7 +139,7 @@ device farm), not as a reason to relax the test gate.
 ## Completion criteria
 
 - [ ] Least privilege, pinned actions, no PR secret exposure.
-- [ ] No automatic triggers; `workflow_dispatch` only, with guarded `workflow_call`.
+- [ ] `workflow_dispatch` only; no callable or automatic triggers.
 - [ ] Every job depends on the owner `authorize` gate.
 - [ ] No cache in publishing.
 - [ ] All required gates intact.
@@ -148,3 +147,15 @@ device farm), not as a reason to relax the test gate.
 - [ ] No debug signing, no asset overwrite.
 - [ ] Documentation updated with manual run commands.
 - [ ] Success is not claimed without a manual owner run.
+
+The `jni-contract` job also runs `scripts/check-native-diagnostics.py` to reject
+project-owned native diagnostic payloads and unsafe exception disclosure. Keep this
+static gate fail-closed; it does not establish native runtime logging behavior.
+
+The same job runs `scripts/check-anonymity-boundaries.py` for selected Android logging,
+LWS consumer, manifest and notification policies. This textual guard supplements tests.
+
+Shared test jobs are owned by test.yml. After changing them, run the allowed static
+`python3 scripts/sync-release-test-jobs.py --write`, then `--check` and actionlint.
+Never hand-edit the generated release block independently. The generator and static
+checker regression tests run in the JNI job; execute tests only in authorized CI.

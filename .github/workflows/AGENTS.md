@@ -1,16 +1,17 @@
 # GitHub Actions — Agent Instructions
 
 These instructions apply to `.github/workflows/`. The root `AGENTS.md` remains
-authoritative for security, language, build, and Git policy.
+authoritative for anonymity, privacy, security, language, build, and Git policy.
 
 ## 1. Workflows
 
-- `test.yml` — reusable test suite called by `release.yml` and manual dispatch only.
+- `test.yml` — manually dispatched test suite; source of the generated release test jobs.
   There is no `push` or `pull_request` trigger. Jobs:
   - `authorize`: owner gate; every other job needs it.
   - `unit`: JVM unit tests for `anon` and `nero`.
   - `lint`: Android Lint for both flavors; uploads HTML/XML reports.
-  - `jni-contract`: `scripts/check-jni-contract.py`.
+  - `jni-contract`: `scripts/check-jni-contract.py` with `scripts/check-native-diagnostics.py` and
+    `scripts/check-anonymity-boundaries.py`.
   - `i18n`: `scripts/check-i18n.py`.
   - `native-language-policy`: rejects project-owned Java sources.
   - `native`: builds the pinned Monero/JNI archives after verifying the submodule and
@@ -24,7 +25,8 @@ authoritative for security, language, build, and Git policy.
   - `run_instrumented`: pass through to `test.yml`; default `true`.
   Jobs:
   - `authorize`: owner gate; every other job needs it.
-  - `test`: calls `test.yml` with the requested ref and instrumented-test flag.
+  - required suite: embeds the eight Tests jobs using the explicit release tag ref;
+    `test` aggregates all results and the same-run native artifact before build.
   - `build`: verifies version/tag, enforces the Kotlin/C++ policy, installs native
     archives, builds unsigned release APKs, verifies package ID, version, minSdk,
     ABI splits, debuggability, and artifact count.
@@ -37,8 +39,11 @@ authoritative for security, language, build, and Git policy.
 
 - No workflow may have `push`, `pull_request`, `pull_request_target`, `schedule`,
   `release`, `workflow_run`, `repository_dispatch`, or any other automatic trigger.
-- `test.yml` keeps `workflow_call` only so `release.yml` can reuse it. The callee has its
-  own owner gate, so an indirect call by a non-owner does not execute jobs.
+- Both workflows accept only `workflow_dispatch`; no callable entry point is allowed.
+  Release embeds synchronized test jobs and runs the full suite in its own manual run.
+  `scripts/sync-release-test-jobs.py --check` rejects drift; `--write` regenerates only
+  the marked release job block. Every shared job retains its owner dependency; the
+  aggregate rejects missing/failed/cancelled required checks and unapproved skips.
 - `workflow_dispatch` is not owner-only by itself: collaborators with write access can
   dispatch workflows. Every workflow therefore has an `authorize` job:
   `github.actor == github.repository_owner && github.triggering_actor == github.repository_owner`.
@@ -75,6 +80,10 @@ authoritative for security, language, build, and Git policy.
 - Publishing requires `publish == true`, a valid `tag` input, and a successful build/sign.
   A disabled `publish` input must still leave the signed artifacts available for review.
 - Do not overwrite an existing release's assets. The current workflow refuses this.
+- Do not add a step that uploads source, artifacts, logs, environment data, or build
+  metadata to an external service. CI must not introduce telemetry or a new identifier.
+- Do not publish artifacts containing wallet data, node addresses, user identifiers, or
+  secrets. Review new artifact paths and log output for linkability.
 - Keep timeouts and concurrency groups. A release must not be cancelled mid-upload.
 - Keep `fetch-depth: 0` where tag/commit verification depends on it.
 - Keep `persist-credentials: false` on checkouts unless a job genuinely needs Git
@@ -132,10 +141,9 @@ git diff --check
 If PyYAML is unavailable, parse structurally by reading and use a minimal YAML
 sanity check; do not install packages.
 
-`zizmor` currently reports one low self-repository style finding for the `./` reusable
-workflow reference. The `$/` alternative is recommended by GitHub but is rejected by the
-installed `actionlint`; `./` resolves to the same commit and remains valid. Revisit this
-when the validator supports the new syntax.
+The generated release suite disables Gradle caches, binds every checkout to
+`refs/tags/${{ inputs.tag }}` and preserves the same-run native artifact contract.
+`zizmor --offline` reported no findings in this iteration; that is a static result only.
 
 Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
 
@@ -144,8 +152,8 @@ Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
 - [ ] Least-privilege permissions preserved.
 - [ ] All actions pinned by SHA.
 - [ ] No automatic triggers (`push`, `pull_request`, `schedule`, tags, etc.).
-- [ ] `workflow_dispatch` is the only entry point; `workflow_call` is guarded and used only
-      by the manual release workflow.
+- [ ] `workflow_dispatch` is the only entry point in both workflows; shared jobs and
+      aggregate remain synchronized and fail closed.
 - [ ] Every job needs the `authorize` owner gate.
 - [ ] No secret reachable from untrusted PR code.
 - [ ] No cache in publishing.
@@ -155,3 +163,8 @@ Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
 - [ ] Kotlin/C++ policy intact.
 - [ ] Artifacts do not contain secrets or unintended wallet data.
 - [ ] Documentation updated; success is not claimed without a manual run by the owner.
+
+The JNI job additionally checks Kotlin cancellation imports and shared-job synchronization,
+then runs Python static-checker regression tests in CI only. Do not run those tests locally.
+Optional emulator animation settings are disabled after run 43633496677 failed before the
+repository test script; readiness, instrumentation, report and nonzero-test gates remain.

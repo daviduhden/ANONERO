@@ -72,16 +72,724 @@ jobs:
         run: |
           echo "Owner authorization passed"
 
-  test:
-    name: Required test suite
+  # BEGIN GENERATED TEST JOBS
+  unit:
+    name: JVM unit tests
     needs: authorize
-    # actionlint 1.x does not accept $/ yet; keep ./ for compatibility.
-    uses: ./.github/workflows/test.yml # zizmor: ignore[self-repository]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
-    with:
-      run_instrumented: ${{ inputs.run_instrumented }}
-      ref: ${{ inputs.tag }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android platform and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-disabled: true
+          validate-wrappers: true
+
+      - name: Run Kotlin/JVM unit tests for both flavors
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --continue --stacktrace \
+            :app:testAnonDebugUnitTest \
+            :app:testNeroDebugUnitTest
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            app/build/test-results/testAnonDebugUnitTest/**
+            app/build/test-results/testNeroDebugUnitTest/**
+            app/build/reports/tests/testAnonDebugUnitTest/**
+            app/build/reports/tests/testNeroDebugUnitTest/**
+            app/build/reports/problems/problems-report.html
+            build/reports/problems/problems-report.html
+          if-no-files-found: warn
+          retention-days: 14
+
+  lint:
+    name: Android Lint
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android platform and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-disabled: true
+          validate-wrappers: true
+
+      - name: Run Android Lint for both flavors
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --continue --stacktrace :app:lintAnonDebug :app:lintNeroDebug
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lint-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.xml
+            app/build/reports/lint-results-*.txt
+            app/build/reports/problems/problems-report.html
+            build/reports/problems/problems-report.html
+          if-no-files-found: warn
+          retention-days: 14
+
+  jni-contract:
+    name: JNI symbol contract
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Compare Kotlin external declarations and JNI exports
+        shell: bash
+        run: python3 scripts/check-jni-contract.py
+
+      - name: Reject unsafe native diagnostics
+        shell: bash
+        run: python3 scripts/check-native-diagnostics.py
+
+      - name: Check Android anonymity source boundaries
+        shell: bash
+        run: python3 scripts/check-anonymity-boundaries.py
+
+      - name: Check Kotlin cancellation catch imports
+        shell: bash
+        run: python3 scripts/check-kotlin-cancellation.py
+
+      - name: Verify shared manual workflow jobs
+        shell: bash
+        run: python3 scripts/sync-release-test-jobs.py --check
+
+      - name: Run static checker regression tests
+        shell: bash
+        run: python3 -m unittest discover -s scripts/tests
+
+  i18n:
+    name: Localization resources
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Check resource parity and hardcoded UI text
+        shell: bash
+        run: python3 scripts/check-i18n.py
+
+  native-language-policy:
+    name: Kotlin and C++ architecture policy
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Reject project-owned Java sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find . -name '*.java' -not -path './.git/*' -not -path './external-libs/*' -print -quit | grep -q .; then
+            echo "::error::Project-owned Java conflicts with the Kotlin/C++ architecture policy."
+            exit 1
+          fi
+
+  native:
+    name: Build native Monero/JNI archives
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    outputs:
+      artifact: ${{ steps.meta.outputs.artifact }}
+    steps:
+      - name: Set native artifact name
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "artifact=anonero-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Free runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            /usr/share/swift \
+            /usr/local/.ghcup
+          docker system prune -af
+          df -h /
+
+      - name: Check out source and pinned Monero submodule
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Verify pinned native inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -f external-libs/monero/Makefile ]] || {
+            echo "::error::Monero submodule is not initialized; run checkout with submodules."
+            exit 1
+          }
+          shopt -s nullglob
+          patches=(external-libs/patches/*.patch)
+          (( ${#patches[@]} > 0 )) || {
+            echo "::error::Pinned ANONERO Monero patch series is missing from external-libs/patches/."
+            exit 1
+          }
+
+      - name: Build native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C external-libs android NPROC=4 2>&1 | tee native-build.log
+          for f in \
+            external-libs/arm64-v8a/monero/libwallet_api.a \
+            external-libs/armeabi-v7a/monero/libwallet_api.a \
+            external-libs/include/wallet2_api.h; do
+            [[ -s "$f" ]] || { echo "::error::missing native artifact: $f"; exit 1; }
+          done
+
+      - name: Stage native archives and build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf native-out
+          mkdir -p native-out
+          cp -a external-libs/arm64-v8a native-out/
+          cp -a external-libs/armeabi-v7a native-out/
+          cp -a external-libs/include native-out/
+          cp -a external-libs/VERSION native-out/
+          cp native-build.log native-out/
+          {
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "monero_sha=$(git -C external-libs/monero rev-parse HEAD)"
+            echo "monero_describe=$(git -C external-libs/monero describe --tags --always)"
+            sha256sum external-libs/patches/*.patch
+            find native-out -type f -print0 | sort -z | xargs -0 sha256sum
+          } > native-out/NATIVE-MANIFEST.txt
+          du -sh native-out
+
+      - name: Upload native archives
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.meta.outputs.artifact }}
+          path: native-out
+          if-no-files-found: error
+          retention-days: 7
+
+  assemble:
+    name: Assemble debug APKs and link JNI
+    needs: [authorize, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK}" \
+            "cmake;${ANDROID_CMAKE}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -d "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK}"
+
+      - name: Download native archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.native.outputs.artifact }}
+          path: native-artifact
+
+      - name: Install native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d native-artifact/native-out ]; then
+            cp -a native-artifact/native-out/. external-libs/
+          else
+            cp -a native-artifact/. external-libs/
+          fi
+          for f in \
+            external-libs/arm64-v8a/monero/libwallet_api.a \
+            external-libs/armeabi-v7a/monero/libwallet_api.a \
+            external-libs/include/wallet2_api.h; do
+            [[ -s "$f" ]] || { echo "::error::missing native artifact: $f"; exit 1; }
+          done
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-disabled: true
+          validate-wrappers: true
+
+      - name: Assemble debug APKs and verify the API 29 floor
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT2="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -x "$AAPT2"
+          ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
+            :app:assembleAnonDebug \
+            :app:assembleNeroDebug
+          echo "=== debug APK outputs ==="
+          find app/build/outputs -maxdepth 4 -type f -printf '%p %s\n' | sort || true
+          for flavor in anon nero; do
+            apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
+            [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
+            badging="$("$AAPT2" dump badging "$apk")"
+            min_sdk="$(printf '%s\n' "$badging" | sed -n -E "s/^[[:space:]]*(minSdkVersion|sdkVersion):'([^']*)'.*/\2/p" | head -n 1)"
+            if [[ -z "$min_sdk" ]]; then
+              echo "::error::could not read minSdk from $apk"
+              printf '%s\n' "$badging" | sed -n '1,20p'
+              exit 1
+            fi
+            [[ "$min_sdk" == "$ANDROID_MIN_SDK" ]] || {
+              echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
+              exit 1
+            }
+            unzip -l "$apk" | grep -q 'lib/.*/libanonero\.so' || {
+              echo "::error::$apk has no libanonero.so"
+              exit 1
+            }
+          done
+
+      - name: Upload debug APKs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: debug-apks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/outputs/apk/*/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 7
+
+  instrumented:
+    name: Instrumented tests (API ${{ matrix.api-level }})
+    needs: [authorize, native, assemble]
+    if: ${{ inputs.run_instrumented }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # API 35 Google APIs x86_64 includes ARM64 translation, so the
+          # arm64-v8a-only ANONERO APK can run on a hosted x86_64 emulator.
+          # API 29 has no equivalent ARM translation on these images; API 29
+          # compile/manifest coverage is in the assemble step below.
+          - api-level: 35
+            target: google_apis
+            arch: x86_64
+            profile: pixel_5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gradle/wrapper/gradle-wrapper.jar || {
+            echo "::error::gradle/wrapper/gradle-wrapper.jar is missing; commit the pinned wrapper."
+            exit 1
+          }
+
+      - name: Set up Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Free runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep /usr/local/lib/android: this job needs the SDK, emulator and NDK.
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            /usr/share/swift \
+            /usr/local/.ghcup
+          docker system prune -af || true
+          df -h /
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Install Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses >/dev/null 2>&1
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}.${ANDROID_COMPILE_SDK_MINOR}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK}" \
+            "cmake;${ANDROID_CMAKE}"
+          test -x "${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -d "${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK}"
+
+      - name: Download native archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.native.outputs.artifact }}
+          path: native-artifact
+
+      - name: Install native archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d native-artifact/native-out ]; then
+            cp -a native-artifact/native-out/. external-libs/
+          else
+            cp -a native-artifact/. external-libs/
+          fi
+          for f in \
+            external-libs/arm64-v8a/monero/libwallet_api.a \
+            external-libs/armeabi-v7a/monero/libwallet_api.a \
+            external-libs/include/wallet2_api.h; do
+            [[ -s "$f" ]] || { echo "::error::missing native artifact: $f"; exit 1; }
+          done
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-disabled: true
+          validate-wrappers: true
+
+      - name: Assemble app and test APKs and verify the API 29 floor
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT2="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+          test -x "$AAPT2"
+          # Build the test APKs before the emulator starts. Compiling and dexing them
+          # while the software-emulated guest runs starves system_server and can kill it.
+          ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
+            :app:assembleAnonDebug \
+            :app:assembleNeroDebug \
+            :app:assembleAnonDebugAndroidTest \
+            :app:assembleNeroDebugAndroidTest
+          for flavor in anon nero; do
+            apk="app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk"
+            [[ -s "$apk" ]] || { echo "::error::missing $apk"; exit 1; }
+            badging="$("$AAPT2" dump badging "$apk")"
+            min_sdk="$(printf '%s\n' "$badging" | sed -n -E "s/^[[:space:]]*(minSdkVersion|sdkVersion):'([^']*)'.*/\2/p" | head -n 1)"
+            if [[ -z "$min_sdk" ]]; then
+              echo "::error::could not read minSdk from $apk"
+              printf '%s\n' "$badging" | sed -n '1,20p'
+              exit 1
+            fi
+            [[ "$min_sdk" == "$ANDROID_MIN_SDK" ]] || {
+              echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
+              exit 1
+            }
+            unzip -l "$apk" | grep -q 'lib/.*/libanonero\.so' || {
+              echo "::error::$apk has no libanonero.so"
+              exit 1
+            }
+            test_apk="$(find app/build/outputs/apk -type f \
+              -path "*${flavor}*" -name "*androidTest*.apk" | head -n 1)"
+            [[ -s "$test_apk" ]] || {
+              echo "::error::missing AndroidTest APK for $flavor"
+              exit 1
+            }
+          done
+
+      - name: Run instrumented tests on API ${{ matrix.api-level }}
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          profile: ${{ matrix.profile }}
+          cores: 2
+          ram-size: 2048M
+          # Optional settings writes failed before our readiness/test script in
+          # 43633496677. Keep the guest's defaults; all test/result gates stay required.
+          disable-animations: false
+          emulator-boot-timeout: 1200
+          emulator-options: >-
+            -no-window -gpu swiftshader_indirect -no-snapshot
+            -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: |
+            bash .github/scripts/run-instrumented.sh
+
+      - name: Verify instrumented results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          files = sorted(glob.glob(
+              "app/build/outputs/androidTest-results/**/TEST-*.xml",
+              recursive=True,
+          ))
+          if not files:
+              print("::error::no instrumented test reports were produced")
+              sys.exit(1)
+
+          flavors = set()
+          failed = []
+          for path in files:
+              root = ET.parse(path).getroot()
+              tests = int(root.get("tests", "0"))
+              failures = int(root.get("failures", "0"))
+              errors = int(root.get("errors", "0"))
+              skipped = int(root.get("skipped", "0"))
+              print(
+                  f"{path}: tests={tests} failures={failures} errors={errors} "
+                  f"skipped={skipped}"
+              )
+              if "flavors/" in path:
+                  flavors.add(path.split("flavors/", 1)[1].split("/", 1)[0])
+              if failures or errors or skipped or tests == 0:
+                  failed.append(path)
+              for testcase in root.iter("testcase"):
+                  for failure in testcase.findall("failure"):
+                      text = (failure.text or "").lower()
+                      if any(
+                          marker in text
+                          for marker in (
+                              "failed to attach",
+                              "failed to install",
+                              "test run failed",
+                              "testrunfailed",
+                              "process crashed",
+                              "broken pipe",
+                              "can't find service",
+                              "failure calling service package",
+                          )
+                      ):
+                          failed.append(path)
+
+          for flavor in ("anon", "nero"):
+              codes = glob.glob(
+                  f"app/build/outputs/androidTest-results/**/flavors/{flavor}/"
+                  "**/test-result-exit-code.txt",
+                  recursive=True,
+              )
+              if not codes:
+                  print(f"::error::missing test-result-exit-code.txt for {flavor}")
+                  failed.append(flavor)
+                  continue
+              for code_path in codes:
+                  with open(code_path, encoding="utf-8") as code_file:
+                      code = code_file.read().strip()
+                  print(f"{code_path}: exit={code}")
+                  if code != "0":
+                      failed.append(code_path)
+
+          if flavors != {"anon", "nero"}:
+              print(f"::error::expected anon and nero reports, got {sorted(flavors)}")
+              sys.exit(1)
+          if failed:
+              print("::error::instrumented test failures: " + ", ".join(failed))
+              sys.exit(1)
+          PY
+
+      - name: Upload instrumented reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: instrumented-api${{ matrix.api-level }}-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            app/build/outputs/androidTest-results/**
+            app/build/reports/androidTests/**
+            ci-diagnostics/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  test:
+    name: Required test suite
+    needs: [authorize, unit, lint, jni-contract, i18n, native-language-policy, native, assemble, instrumented]
+    # Run the aggregate even if a required job failed or was skipped; reject it below.
+    if: ${{ always() && needs.authorize.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      native_artifact: ${{ needs.native.outputs.artifact }}
+    steps:
+      - name: Require all tests and the native artifact from this run
+        shell: bash
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+          RUN_INSTRUMENTED: ${{ inputs.run_instrumented }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          jobs = json.loads(os.environ["JOB_RESULTS"])
+          required = ['authorize', 'unit', 'lint', 'jni-contract', 'i18n', 'native-language-policy', 'native', 'assemble', 'instrumented']
+          run_instrumented = os.environ["RUN_INSTRUMENTED"] == "true"
+          for name in required:
+              expected = "success"
+              if name == "instrumented" and not run_instrumented:
+                  expected = "skipped"
+              actual = jobs.get(name, {}).get("result")
+              if actual != expected:
+                  raise SystemExit(f"Required job {name}: expected {expected}, got {actual}")
+          artifact = jobs.get("native", {}).get("outputs", {}).get("artifact", "")
+          if not artifact:
+              raise SystemExit("Required native artifact output is missing")
+          print("Required test suite passed in this workflow execution")
+          PY
+  # END GENERATED TEST JOBS
 
   build:
     name: Build and verify unsigned APKs

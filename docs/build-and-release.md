@@ -78,8 +78,8 @@ test passed on `42874760135` but is not stable on the KVM-less hosted runner.
 
 ## 4. GitHub Actions: test pipeline
 
-`.github/workflows/test.yml` is manual-dispatch only and reusable by the manual release
-workflow. There are no `push`, `pull_request`, or tag triggers. Every other job depends on
+Both workflows accept only `workflow_dispatch`. The release workflow embeds the same
+required test jobs in its own execution; it does not call or dispatch another workflow. There are no `push`, `pull_request`, or tag triggers. Every other job depends on
 an `authorize` job that requires the repository owner as both `github.actor` and
 `github.triggering_actor`.
 
@@ -220,3 +220,12 @@ Agent work must not execute these commands; use CI.
 Run `43521054641` validated the AGP/Gradle/NDK/CMake build, unit tests, lint 0/0, JNI
 parity, native archives, assemble/link, and `-Werror`. Instrumented execution, signing, and
 release publication remain unverified; treat those claims as pending CI.
+
+### Maintaining the embedded release suite
+
+After editing shared Tests jobs, regenerate only the marked block with
+`python3 scripts/sync-release-test-jobs.py --write` and verify with `--check` plus actionlint.
+Release test checkouts use the explicit release tag namespace and caches are disabled.
+Its aggregate requires all mandatory checks and the native artifact from that run; the
+existing publication condition still requires instrumentation. No workflow run is
+implicitly authorized by preparing these files.
