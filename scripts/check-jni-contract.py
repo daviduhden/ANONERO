@@ -112,9 +112,7 @@ def kotlin_external_symbols() -> tuple[dict[str, str], list[str]]:
     for path in KOTLIN_ROOT.rglob("*.kt"):
         text = path.read_text(encoding="utf-8")
         code = strip_non_code(text)
-        externals = list(
-            re.finditer(r"\bexternal\s+(?:fun\s+([A-Za-z_]\w*)|get\b)", code)
-        )
+        externals = list(re.finditer(r"\bexternal\s+(?:fun\s+([A-Za-z_]\w*)|get\b)", code))
         if not externals:
             continue
 
@@ -122,14 +120,10 @@ def kotlin_external_symbols() -> tuple[dict[str, str], list[str]]:
         if package is None:
             errors.append(f"{path.relative_to(ROOT)}: external declaration without package")
             continue
-        package_path = "_".join(
-            escape_jni(part) for part in package.group(1).split(".")
-        )
+        package_path = "_".join(escape_jni(part) for part in package.group(1).split("."))
 
         events: list[tuple[int, str, re.Match[str]]] = []
-        for declaration in re.finditer(
-            r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)", code
-        ):
+        for declaration in re.finditer(r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)", code):
             events.append((declaration.start(), "class", declaration))
         for companion in re.finditer(r"\bcompanion\s+object\s*\{", code):
             events.append((companion.start(), "companion", companion))
@@ -161,21 +155,15 @@ def kotlin_external_symbols() -> tuple[dict[str, str], list[str]]:
             while stack and stack[-1][0] >= depth:
                 stack.pop()
             if not stack:
-                errors.append(
-                    f"{path.relative_to(ROOT)}: external declaration outside a class"
-                )
+                errors.append(f"{path.relative_to(ROOT)}: external declaration outside a class")
                 continue
 
             class_path = "_00024".join(escape_jni(part) for part in stack[-1][1])
             prefix = f"Java_{package_path}_{class_path}_"
             if match.group(1) is None:
-                properties = list(
-                    re.finditer(r"\bval\s+([A-Za-z_]\w*)\s*:", text[: match.start()])
-                )
+                properties = list(re.finditer(r"\bval\s+([A-Za-z_]\w*)\s*:", text[: match.start()]))
                 if not properties:
-                    errors.append(
-                        f"{path.relative_to(ROOT)}: external get without a val"
-                    )
+                    errors.append(f"{path.relative_to(ROOT)}: external get without a val")
                     continue
                 prop = properties[-1].group(1)
                 method = "get" + prop[0].upper() + prop[1:]
@@ -194,9 +182,7 @@ def kotlin_external_symbols() -> tuple[dict[str, str], list[str]]:
 
 def native_exports() -> set[str]:
     text = CPP.read_text(encoding="utf-8")
-    return set(
-        re.findall(r"JNICALL\s+(Java_io_anonero_[A-Za-z0-9_]+)", text)
-    )
+    return set(re.findall(r"JNICALL\s+(Java_io_anonero_[A-Za-z0-9_]+)", text))
 
 
 def main() -> int:
