@@ -37,13 +37,10 @@ extern "C" {
 #define LOG_TAG "WalletNDK"
 #ifdef __ANDROID__
 #include <android/log.h>
-#define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #else
-// Desktop has no logcat; same five macros over stderr.
+// Desktop has no logcat; warning/error diagnostics use stderr.
 #include <stdio.h>
 #define ANON_LOG(lvl, ...)                                                                         \
     do {                                                                                           \
@@ -51,9 +48,6 @@ extern "C" {
         fprintf(stderr, __VA_ARGS__);                                                              \
         fputc('\n', stderr);                                                                       \
     } while (0)
-#define LOGV(...) ANON_LOG("V", __VA_ARGS__)
-#define LOGD(...) ANON_LOG("D", __VA_ARGS__)
-#define LOGI(...) ANON_LOG("I", __VA_ARGS__)
 #define LOGW(...) ANON_LOG("W", __VA_ARGS__)
 #define LOGE(...) ANON_LOG("E", __VA_ARGS__)
 #endif
@@ -110,12 +104,17 @@ static jclass cacheGlobalClass(JNIEnv *env, const char *name) {
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
     (void)reserved;
     cachedJVM = jvm;
-    LOGI("JNI_OnLoad");
+    // Native wallet2 logging is independent of Kotlin's logging and stealth policy.
+    // Never rely on an upstream default before the first wallet operation.
+    try {
+        Monero::WalletManagerFactory::setLogLevel(-1);
+    } catch (...) {
+        return JNI_ERR;
+    }
     JNIEnv *jenv;
     if (jvm->GetEnv(reinterpret_cast<void **>(&jenv), JNI_VERSION_1_6) != JNI_OK) {
         return -1;
     }
-    //LOGI("JNI_OnLoad ok");
 
     class_ArrayList = cacheGlobalClass(jenv, "java/util/ArrayList");
     class_TransactionInfo = cacheGlobalClass(jenv, "io/anonero/model/TransactionInfo");
@@ -159,12 +158,11 @@ int attachJVM(JNIEnv **jenv) {
         LOGE("GetEnv: version not supported");
         return JNI_ERR;
     }
-    //LOGI("envStat=%i", envStat);
+
     return envStat;
 }
 
 void detachJVM(JNIEnv *jenv, int envStat) {
-    //LOGI("envStat=%i", envStat);
     if (jenv->ExceptionCheck()) {
         LOGE("Wallet callback JNI operation failed");
         jenv->ExceptionClear();
@@ -222,13 +220,12 @@ struct MyWalletListener : Monero::WalletListener {
     jobject jlistener;
 
     MyWalletListener(JNIEnv *env, jobject aListener) {
-        LOGD("Created Listener");
         jlistener = env->NewGlobalRef(aListener);
         if (jlistener == nullptr && env->ExceptionCheck())
             env->ExceptionClear();
     }
 
-    ~MyWalletListener() { LOGD("Destroyed Listener"); }
+    ~MyWalletListener() = default;
 
     void deleteGlobalJavaRef(JNIEnv *env) {
         std::lock_guard<std::mutex> lock(_listenerMutex);
@@ -596,10 +593,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_createWalletJ(
 
         bool setupStatus = wallet->setupBackgroundSync(Monero::Wallet::BackgroundSync_ReusePassword,
                                                        std::string(passwordChars.get()), {});
-        if (setupStatus == true) {
-            LOGD("createWalletJ(): setupBackgroundSync(): success!");
-        } else {
-            LOGD("createWalletJ(): setupBackgroundSync(): failure!");
+        if (!setupStatus) {
+            LOGE("Background sync setup failed");
         }
         return reinterpret_cast<jlong>(wallet);
     } catch (...) {
@@ -612,7 +607,6 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_createWalletJ(
 // sets it from BuildConfig.
 JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_openWalletJ(
     JNIEnv *env, jobject, jstring path, jstring password, jint networkType, jboolean viewOnly) {
-    LOGD("openWalletJ(): start");
     if (path == nullptr || password == nullptr)
         return 0;
     ScopedUtfChars pathChars(env, path);
@@ -632,10 +626,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_openWalletJ(
         // setup background sync
         bool setupStatus = wallet->setupBackgroundSync(Monero::Wallet::BackgroundSync_ReusePassword,
                                                        std::string(passwordChars.get()), {});
-        if (setupStatus == true) {
-            LOGD("openWalletJ(): setupBackgroundSync(): success!");
-        } else {
-            LOGD("openWalletJ(): setupBackgroundSync(): failure!");
+        if (!setupStatus) {
+            LOGE("Background sync setup failed");
         }
     }
     return reinterpret_cast<jlong>(wallet);
@@ -668,10 +660,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_recoveryWalletJ(
 
     bool setupStatus = wallet->setupBackgroundSync(Monero::Wallet::BackgroundSync_ReusePassword,
                                                    std::string(passwordChars.get()), {});
-    if (setupStatus == true) {
-        LOGD("recoveryWalletJ(): setupBackgroundSync(): success!");
-    } else {
-        LOGD("recoveryWalletJ(): setupBackgroundSync(): failure!");
+    if (!setupStatus) {
+        LOGE("Background sync setup failed");
     }
     return reinterpret_cast<jlong>(wallet);
 }
@@ -702,10 +692,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_recoveryWalletPolyse
 
     bool setupStatus = wallet->setupBackgroundSync(Monero::Wallet::BackgroundSync_ReusePassword,
                                                    std::string(passwordChars.get()), {});
-    if (setupStatus == true) {
-        LOGD("recoveryWalletPolyseedJ(): setupBackgroundSync(): success!");
-    } else {
-        LOGD("recoveryWalletPolyseedJ(): setupBackgroundSync(): failure!");
+    if (!setupStatus) {
+        LOGE("Background sync setup failed");
     }
     return reinterpret_cast<jlong>(wallet);
 }
@@ -742,10 +730,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_createWalletFromKeys
 
     bool setupStatus = wallet->setupBackgroundSync(Monero::Wallet::BackgroundSync_ReusePassword,
                                                    std::string(passwordChars.get()), {});
-    if (setupStatus == true) {
-        LOGD("createWalletFromKeysJ(): setupBackgroundSync(): success!");
-    } else {
-        LOGD("createWalletFromKeysJ(): setupBackgroundSync(): failure!");
+    if (!setupStatus) {
+        LOGE("Background sync setup failed");
     }
     return reinterpret_cast<jlong>(wallet);
 }
@@ -781,10 +767,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_createWalletFromDevi
 
     bool setupStatus = wallet->setupBackgroundSync(Monero::Wallet::BackgroundSync_ReusePassword,
                                                    std::string(passwordChars.get()), {});
-    if (setupStatus == true) {
-        LOGD("createWalletFromDeviceJ(): setupBackgroundSync(): success!");
-    } else {
-        LOGD("createWalletFromDeviceJ(): setupBackgroundSync(): failure!");
+    if (!setupStatus) {
+        LOGE("Background sync setup failed");
     }
     return reinterpret_cast<jlong>(wallet);
 }
@@ -841,10 +825,8 @@ JNIEXPORT void JNICALL Java_io_anonero_model_WalletManager_setDaemonAddressJ(JNI
     ScopedUtfChars addressChars(env, address);
     if (addressChars.get() == nullptr)
         return;
-    LOGD("setDaemonAddressJ(): start");
     Monero::WalletManagerFactory::getWalletManager()->setDaemonAddress(
         std::string(addressChars.get()));
-    LOGD("setDaemonAddressJ(): end");
 }
 
 // returns whether the daemon can be reached, and its version number
@@ -954,7 +936,6 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
             if (env->ExceptionCheck())
                 env->ExceptionClear();
         }
-        LOGD("wallet closed");
     } else {
         LOGE("wallet close failed");
     }
@@ -984,12 +965,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSeed(JNIEnv *env, jobj
     std::string _seed;
     bool _getPolyseed = wallet->getPolyseed(_seed, offset);
 
-    if (_getPolyseed) {
-        LOGD("_getPolyseed: true");
-    } else {
-        LOGD("_getPolyseed: false");
-        LOGE("wallet->getSeed() failed");
-        LOGD("Falling back to normal, boring, seed");
+    if (!_getPolyseed) {
         _seed = wallet->seed(offset);
     }
     return env->NewStringUTF(_seed.c_str());
@@ -1201,11 +1177,9 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_initJ(
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    LOGD("initJ(): start");
     bool status =
         wallet->init(daemonChars.get(), (uint64_t)upper_transaction_size_limit, usernameChars.get(),
                      passwordChars.get(), false, static_cast<bool>(light_wallet), proxyChars.get());
-    LOGD("initJ(): end");
     return static_cast<jboolean>(status);
 }
 
@@ -1456,24 +1430,17 @@ JNIEXPORT void JNICALL Java_io_anonero_model_Wallet_pauseRefresh(JNIEnv *env, jo
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_startBackgroundSync(JNIEnv *env,
                                                                             jobject instance) {
-    LOGD("startBackgroundSync(): start");
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
 
     bool bgsyncStatus = wallet->startBackgroundSync();
-    if (bgsyncStatus == true) {
-        LOGD("startBackgroundSync(): end: success!");
-    } else {
-        LOGD("startBackgroundSync(): end: fail!");
-    }
     return static_cast<jboolean>(bgsyncStatus);
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_stopBackgroundSync(JNIEnv *env,
                                                                            jobject instance,
                                                                            jstring password) {
-    LOGD("stopBackgroundSync(): start");
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr || password == nullptr)
         return JNI_FALSE;
@@ -1481,11 +1448,6 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_stopBackgroundSync(JNIEn
     if (passwordChars.get() == nullptr)
         return JNI_FALSE;
     bool bgsyncStatus = wallet->stopBackgroundSync(std::string(passwordChars.get()));
-    if (bgsyncStatus == true) {
-        LOGD("stopBackgroundSync(): end: success!");
-    } else {
-        LOGD("stopBackgroundSync(): end: fail!");
-    }
     return static_cast<jboolean>(bgsyncStatus);
 }
 
@@ -1699,8 +1661,8 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_exportKeyImages(JNIEnv *
     bool result = false;
     try {
         result = wallet->exportKeyImages(filenameChars.get(), all);
-    } catch (const std::exception &e) {
-        LOGE("exportKeyImages: %s", e.what());
+    } catch (...) {
+        LOGE("exportKeyImages failed");
     }
     return static_cast<jboolean>(result);
 }
@@ -1712,7 +1674,6 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_importKeyImages(JNIEnv *e
     static std::atomic<bool> isImportKeyImagesLocked{false};
     bool expected = false;
     if (!isImportKeyImagesLocked.compare_exchange_strong(expected, true)) {
-        LOGD("monerujo.cpp: importKeyImages: already in progress");
         return env->NewStringUTF("Import request ignored. This is a Bug. Please report it.");
     }
     ScopedAtomicFlagReset resetImportLock(isImportKeyImagesLocked);
@@ -1728,9 +1689,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_importKeyImages(JNIEnv *e
         if (wallet == nullptr)
             return env->NewStringUTF("Wallet is unavailable");
         const bool success = wallet->importKeyImages(inputFile.get());
-        return env->NewStringUTF(success ? "Imported" : wallet->errorString().c_str());
-    } catch (const std::exception &e) {
-        return env->NewStringUTF(e.what());
+        return env->NewStringUTF(success ? "Imported" : "Key image import failed");
     } catch (...) {
         return env->NewStringUTF("Import file is unavailable");
     }
@@ -1750,15 +1709,12 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_submitTransaction(JNIEnv 
         return env->NewStringUTF("Transaction file is unavailable");
     }
     bool success = false;
-    std::string error;
     try {
         success = wallet->submitTransaction(filenameChars.get());
-        if (!success)
-            error = wallet->errorString();
-    } catch (const std::exception &e) {
-        error = e.what();
+    } catch (...) {
+        success = false;
     }
-    return env->NewStringUTF(success ? "Transaction submitted!" : error.c_str());
+    return env->NewStringUTF(success ? "Transaction submitted!" : "Transaction submission failed");
 }
 
 //virtual bool exportOutputs(const std::string &filename, bool all = false) = 0;
@@ -1774,8 +1730,8 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_exportOutputs(JNIEnv *en
     bool result = false;
     try {
         result = wallet->exportOutputs(filenameChars.get(), all);
-    } catch (const std::exception &e) {
-        LOGE("exportOutputs: %s", e.what());
+    } catch (...) {
+        LOGE("exportOutputs failed");
     }
     return static_cast<jboolean>(result);
 }
@@ -1820,15 +1776,12 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_importOutputs(JNIEnv *env
         return env->NewStringUTF("Outputs file is unavailable");
     }
     bool success = false;
-    std::string error;
     try {
         success = wallet->importOutputs(filenameChars.get());
-        if (!success)
-            error = wallet->errorString();
-    } catch (const std::exception &e) {
-        error = e.what();
+    } catch (...) {
+        success = false;
     }
-    return env->NewStringUTF(success ? "Imported" : error.c_str());
+    return env->NewStringUTF(success ? "Imported" : "Outputs import failed");
 }
 
 // Reloads the unsigned file from disk and signs whatever is there now. The reviewed-object
@@ -1849,7 +1802,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_signAndExportJ(JNIEnv *en
         return env->NewStringUTF("Transaction path is unavailable");
     }
     bool success = false;
-    std::string error;
+    const char *error = "Transaction signing failed";
     try {
         std::unique_ptr<Monero::UnsignedTransaction> tx(wallet->loadUnsignedTx(inputChars.get()));
         if (!tx) {
@@ -1857,16 +1810,15 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_signAndExportJ(JNIEnv *en
         } else {
             success = tx->sign(outputChars.get());
             if (!success)
-                error = wallet->errorString();
+                error = "Transaction signing failed";
         }
-    } catch (const std::exception &e) {
-        error = e.what();
+    } catch (...) {
+        error = "Transaction signing failed";
     }
-    return env->NewStringUTF(success ? "Signed" : error.c_str());
+    return env->NewStringUTF(success ? "Signed" : error);
 }
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_loadUnsignedTx(JNIEnv *env, jobject instance,
                                                                     jstring input_file) {
-    LOGD("monerujo.cpp: loadUnsignedTx: start");
     if (input_file == nullptr)
         return 0;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
@@ -1881,7 +1833,6 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_loadUnsignedTx(JNIEnv *env,
     } catch (...) {
         LOGE("loadUnsignedTx: native load failed");
     }
-    LOGD("monerujo.cpp: loadUnsignedTx: end");
     return reinterpret_cast<jlong>(tx);
 }
 
@@ -1988,8 +1939,8 @@ JNIEXPORT void JNICALL Java_io_anonero_model_Coins_setFrozenJ(JNIEnv *env, jobje
         return;
     try {
         coins->setFrozen(std::string(keyChars.get()));
-    } catch (const std::exception &e) {
-        LOGE("Coins.setFrozen: %s", e.what());
+    } catch (...) {
+        LOGE("Coins.setFrozen failed");
     }
 }
 
@@ -2005,8 +1956,8 @@ JNIEXPORT void JNICALL Java_io_anonero_model_Coins_thawJ(JNIEnv *env, jobject in
         return;
     try {
         coins->thaw(std::string(keyChars.get()));
-    } catch (const std::exception &e) {
-        LOGE("Coins.thaw: %s", e.what());
+    } catch (...) {
+        LOGE("Coins.thaw failed");
     }
 }
 
@@ -2026,7 +1977,6 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_setListenerJ(JNIEnv *env, j
         return 0;
     wallet->setListener(nullptr); // clear old listener
     if (javaListener == nullptr) {
-        LOGD("null listener");
         return 0;
     }
     MyWalletListener *listener = new (std::nothrow) MyWalletListener(env, javaListener);
@@ -2199,8 +2149,8 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_signMessageJ(JNIEnv *env,
     std::string signature;
     try {
         signature = wallet->signMessage(java2cpp_bytes(env, message));
-    } catch (const std::exception &e) {
-        LOGE("signMessage: %s", e.what());
+    } catch (...) {
+        LOGE("signMessage failed");
         signature.clear();
     }
     if (signature.empty() && wallet->status() != Monero::Wallet::Status_Ok) {
@@ -2219,8 +2169,8 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_verifySignedMessageJ(
         valid =
             wallet->verifySignedMessage(java2cpp_bytes(env, message), java2cpp_bytes(env, address),
                                         java2cpp_bytes(env, signature));
-    } catch (const std::exception &e) {
-        LOGE("verifySignedMessage: %s", e.what());
+    } catch (...) {
+        LOGE("verifySignedMessage failed");
         valid = false;
     }
     return static_cast<jboolean>(valid);
@@ -2563,7 +2513,12 @@ JNIEXPORT void JNICALL Java_io_anonero_model_WalletManager_initLogger(
     ScopedUtfChars baseChars(env, default_log_base_name);
     if (argv0Chars.get() == nullptr || baseChars.get() == nullptr)
         return;
-    Monero::Wallet::init(argv0Chars.get(), baseChars.get());
+    try {
+        Monero::Wallet::init(argv0Chars.get(), baseChars.get());
+        Monero::WalletManagerFactory::setLogLevel(-1);
+    } catch (...) {
+        LOGE("Native logger initialization failed");
+    }
 }
 
 JNIEXPORT void JNICALL Java_io_anonero_model_WalletManager_logDebug(JNIEnv *env, jclass,
