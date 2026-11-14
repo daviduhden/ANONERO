@@ -131,6 +131,7 @@ class WalletState {
 
     val daemonInfo: Flow<DaemonInfo?> = _connectedDaemon
     val connectionStatus: Flow<Wallet.ConnectionStatus?> = _connectionStatus
+    val connectionStatusValue: Wallet.ConnectionStatus? get() = _connectionStatus.value
     val incomingTx = _incomingTx.asSharedFlow()
 
     @Synchronized
@@ -148,7 +149,9 @@ class WalletState {
                         wallet.unlockedBalance
                     }
                 }
-                _walletStatus.update { wallet.fullStatus }
+                val fullStatus = wallet.fullStatus
+                _walletStatus.update { fullStatus }
+                fullStatus.connectionStatus?.let { status -> _connectionStatus.value = status }
                 if (wallet.status.errorString.isNotEmpty()) {
                     // Do not persist wallet2's raw error text: it can include a node or
                     // file path. The UI still receives the structured status.

@@ -213,17 +213,12 @@ class AnonNeroService : Service() {
                         walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
                         getString(R.string.disconnected)
                     } else {
-                        // Network is available — probe the daemon with a live RPC call
-                        val daemonHeight =
-                            withContext(Dispatchers.IO) {
-                                wallet.getDaemonBlockChainHeight()
-                            }
+                        // Do not send a separate RPC probe on every notification tick:
+                        // the request itself is observable metadata and a timing signal.
+                        // Use the status already published by wallet2 refresh callbacks.
                         val liveStatus =
-                            if (daemonHeight > 0) {
-                                Wallet.ConnectionStatus.ConnectionStatus_Connected
-                            } else {
-                                Wallet.ConnectionStatus.ConnectionStatus_Disconnected
-                            }
+                            walletState.connectionStatusValue
+                                ?: Wallet.ConnectionStatus.ConnectionStatus_Disconnected
                         walletState.setConnectionStatus(liveStatus)
                         when (liveStatus) {
                             Wallet.ConnectionStatus.ConnectionStatus_Disconnected -> {
@@ -305,6 +300,7 @@ class AnonNeroService : Service() {
         return NotificationCompat
             .Builder(this.applicationContext, FOREGROUND_CHANNEL)
             .setSmallIcon(R.drawable.anon_notification)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setAutoCancel(false)
@@ -340,6 +336,7 @@ class AnonNeroService : Service() {
             NotificationCompat
                 .Builder(applicationContext, TX_CHANNEL)
                 .setSmallIcon(R.drawable.anon_notification)
+                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
                 .setContentTitle(StealthMode.incomingTitle(prefs, "[ΛИ0ИΞR0]"))
                 .setContentText(
                     StealthMode.incomingBody(prefs, getString(R.string.transaction_received)),
