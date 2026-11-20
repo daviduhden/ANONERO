@@ -126,3 +126,11 @@ revalidates the full request, and preparation refuses concurrent requests. The a
 refreshed native flag and publishes observed state even if persistence later fails, while
 returning failure. Failed account snapshot refresh must not display prior-account funds
 under the new index. Use the retained auxiliary-wallet registry for backup/decoy files.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

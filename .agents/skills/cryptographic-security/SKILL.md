@@ -108,3 +108,11 @@ files/Keystore wrapping after false/throwing close. Use retained ownership and c
 closure before success; no KDF/backup-format change is implied. Backup export rejects NERO
 and DECOY before inspecting MAIN scratch state. Retained scratch password transitions are
 not independently proven atomic; do not claim stronger at-rest/zeroization guarantees.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

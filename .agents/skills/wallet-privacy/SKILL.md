@@ -181,3 +181,11 @@ registry's closed-path guard. This does not serialize the earlier Keystore provi
 phase globally or establish forensic/coercion resistance. Restore cleanup preserves the
 transport cache; explicit wipe retains full cache cleanup. Hidden amounts also covers the
 Pay to Many total. Java/native strings are not erased by hiding fields or redacting logs.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

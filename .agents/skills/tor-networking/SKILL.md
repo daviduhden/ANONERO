@@ -146,3 +146,11 @@ report Editor.commit failure; controller keeps the prior authoritative config, a
 network-only restoration and drops authorization. VPN loss invalidates generations; VPN
 reappearance alone does not authorize traffic. Preference-only changes preserve the current
 provider. These guards do not prove old native sockets have closed or per-app VPN routing.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

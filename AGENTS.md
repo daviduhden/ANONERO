@@ -476,3 +476,16 @@ Four JNI model constructor contracts are checked statically; full export signatu
 native lifetime still require CI/device review. Legacy proxy onboarding uses the common
 transport editor. See `docs/architecture/anonymity-audit-2026-11.md` and the
 `docs/development-iteration-*.md` records for scope and limitations.
+
+## Continuous Agent & Skills Maintenance
+
+Run `python3 scripts/validate-agent-knowledge.py --scope worktree` before review.
+For committed comparisons use `--scope range --base BASE --head HEAD`; range reads
+the head snapshot, regardless of local edits. Project changes require a substantive
+update to the relevant instructions or skill in the same change. Record reusable
+constraints, failure causes and verification limits, rather than timestamps or status.
+Review AK004 warnings manually: textual change size cannot establish semantic relevance.
+The validator is read-only, executes Git without a shell, and does not run application
+code, builds, tests, workflows or network operations. Its own script and regression
+module are exempt from the synchronization gate to avoid recursive requirements.
+See [the validation contract](docs/agent-knowledge-validation.md) for rules and limits.

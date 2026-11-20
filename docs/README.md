@@ -38,6 +38,12 @@ untrusted index. Secrets are protected at rest by a Keystore-wrapped wallet pass
 PBKDF2 PIN gate. The design goal is to reduce linkability and metadata exposure; it does
 not guarantee anonymity.
 
+## Agent knowledge validation
+
+The read-only [Python validator](agent-knowledge-validation.md) checks instruction
+structure, local links and substantive maintenance alongside project changes.
+Its regression module is CI-only; local invocation is static analysis.
+
 ## Documentation rules
 
 - English is used for technical documentation, comments, and commit messages.

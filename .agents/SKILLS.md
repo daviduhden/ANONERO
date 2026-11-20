@@ -81,3 +81,7 @@ Relevant skills describe profile-scoped LWS consent, diagnostic policy and trans
 
 [Continued-development iteration](../docs/development-iteration-2026-11.md) records retained
 auxiliary ownership, snapshot contracts, UI/payment correctness and dispatch-only CI rules.
+
+Knowledge synchronization is checked by `scripts/validate-agent-knowledge.py`. Every
+skill must retain its Maintenance & Continuous Learning section and current name and
+description frontmatter. The gate checks text structure, not procedural correctness.

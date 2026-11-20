@@ -155,3 +155,11 @@ including service notifications/startup/node settings, must use this boundary. T
 loopback exemption uses strict DNS-free literal validation, never `startsWith("127.")`.
 Profile-specific settings do not establish transport/circuit isolation or prevent linking
 when the same operator is explicitly chosen for both profiles.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

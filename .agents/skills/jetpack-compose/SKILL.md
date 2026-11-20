@@ -99,3 +99,11 @@ content. Indexing an older validation list after adding/removing a row is unsafe
 inputs again at submission, block repeated mutations and clear signature/verification
 results when inputs change. On account/output action failures show localized feedback;
 catch disposal cleanup refusals without crashing the UI. Updated back buttons use a11y_back.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

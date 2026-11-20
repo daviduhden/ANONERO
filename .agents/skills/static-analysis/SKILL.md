@@ -137,3 +137,16 @@ Also run `python3 scripts/check-kotlin-cancellation.py` and
 contracts cover four reviewed model constructors, not all JNI signatures. i18n discovers
 all strings*.xml feature catalogs while keeping strings.xml mandatory. Static-checker
 regressions under scripts/tests execute only in CI, not locally.
+
+For instruction maintenance, use `python3 scripts/validate-agent-knowledge.py --scope worktree`
+and review AK004 warnings against the actual change. Range mode validates the committed
+head snapshot; local instruction edits cannot satisfy a committed-range review.
+The regression module `scripts/tests/test_agent_knowledge.py` runs only in CI.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

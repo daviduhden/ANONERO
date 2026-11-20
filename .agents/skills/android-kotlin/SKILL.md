@@ -105,3 +105,11 @@ and output mutation methods reject locked sessions, preserve cancellation and su
 Use immutable snapshots across IO dispatch, bind asynchronous validation to checked inputs,
 and discard results after wallet/input changes. `scripts/check-kotlin-cancellation.py`
 guards unqualified catch imports; it is not Kotlin compilation.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.

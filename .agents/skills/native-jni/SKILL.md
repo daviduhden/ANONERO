@@ -113,3 +113,11 @@ constructor parameter order plus derived JVM descriptors. It does not prove ever
 signature. Output/history snapshot conversion fails atomically, checks allocations and uses
 ScopedLocalRef; refresh errors preserve JVM failures or raise a fixed Java error. Keep the
 CI-only mutation tests under scripts/tests; never execute them locally under agent policy.
+
+## Maintenance & Continuous Learning
+
+When this subsystem changes, reconcile this procedure with the implementation and
+record reusable constraints, root causes and remaining verification limits. Check the
+closest AGENTS.md and the skills index for stale guidance. Run the read-only
+`python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
+AK004 warnings for relevance and run regression tests only in authorized CI.
