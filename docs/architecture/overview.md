@@ -310,3 +310,9 @@ This is auxiliary ownership, not a global lease over all wallet/native operation
 Legacy proxy onboarding now delegates to NetworkSettings. Native snapshots propagate
 failure atomically, and UI actions bind validation/results to their input context.
 See [iteration](../development-iteration-2026-11.md).
+
+The independent manual `agent-knowledge-validation.yml` workflow checks Python
+validator regressions and instruction structure, with an optional base ref for
+committed knowledge synchronization. It requires the owner gate, read-only repository
+access and full history; it performs no Android builds or artifact publishing.
+Workflow execution remains unverified until an authorized manual CI run.

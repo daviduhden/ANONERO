@@ -222,7 +222,7 @@ threat models, regression requirements and remaining boundaries.
 - **Static analysis is allowed and expected.** Reading files, `git` inspection,
   `grep`/`rg`, Python static checks in `scripts/`, XML/TOML/YAML parsing, `bash -n`,
   and `git diff --check` do not execute the application. Use them.
-- **CI is manual-only.** Both workflows use only `workflow_dispatch`. Release embeds
+- **CI is manual-only.** All workflows use only `workflow_dispatch`. Release embeds
   the required test jobs from Tests; no callable or automatic entry point is allowed.
   Do not trigger, rerun, or cancel a
   workflow without explicit authorization; the agent is not authorized to start Actions.

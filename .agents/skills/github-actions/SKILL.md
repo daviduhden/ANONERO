@@ -7,7 +7,7 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 
 ## When to use
 
-- Editing `.github/workflows/test.yml` or `release.yml`.
+- Editing `.github/workflows/test.yml`, `release.yml` or `agent-knowledge-validation.yml`.
 - Adding/removing a job, cache, artifact, permission, trigger, secret, or action.
 - Auditing build/test/signing/release behavior.
 - Diagnosing a CI gate without running it locally.
@@ -26,7 +26,7 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 
 ## Invariants
 
-- Both workflows use only `workflow_dispatch`; callable and automatic triggers are
+- All workflows use only `workflow_dispatch`; callable and automatic triggers are
   forbidden. Release embeds the required Tests jobs with explicit tag checkouts and
   disabled Gradle caches, then aggregates all results and its same-run native artifact.
 - Every job depends on the `authorize` job, which requires
@@ -167,3 +167,9 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+The manual agent-knowledge workflow runs Python regressions and worktree validation,
+then validates committed changes when its optional `base` input is supplied. Keep
+user inputs in quoted environment variables, full-history checkout at the dispatched
+SHA, and the owner dependency. A clean checkout alone does not enforce AK001 against
+previously committed changes; use `base` for that review.

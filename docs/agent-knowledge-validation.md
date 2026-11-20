@@ -65,7 +65,11 @@ Update this contract and the CI-only regression module when behavior changes.
 
 Regression coverage lives in `scripts/tests/test_agent_knowledge.py` and can be run
 in authorized CI with `python3 -m unittest discover -s scripts/tests -p 'test_agent_knowledge.py'`.
-No workflow has been added or dispatched by this change. Local execution of the
+The manual `.github/workflows/agent-knowledge-validation.yml` runs this regression
+module and worktree validation behind the owner gate. Its optional `base` input
+additionally validates a committed range against the dispatched SHA using full history.
+Without `base`, a clean checkout cannot assess whether committed project changes
+included a knowledge update. No workflow has been dispatched by this change. Local execution of the
 validator is static analysis; regression tests remain CI-only under AGENTS.md §5.
 
 The tool reads repository instructions and local Git objects; it makes no network

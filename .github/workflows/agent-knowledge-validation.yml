@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Agent Knowledge Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Optional base ref for merge-base comparison with the dispatched commit
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anonero-agent-knowledge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authorize:
+    name: Owner authorization
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Confirm repository owner
+        shell: bash
+        run: echo "Owner authorization passed"
+
+  validate-agent-knowledge:
+    name: Agent knowledge and Python regressions
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out dispatched commit and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify Python requirement
+        shell: bash
+        run: python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ required"'
+
+      - name: Run validator regression tests
+        shell: bash
+        run: python3 -m unittest discover -s scripts/tests -p 'test_agent_knowledge.py'
+
+      - name: Validate worktree knowledge
+        shell: bash
+        run: python3 scripts/validate-agent-knowledge.py --scope worktree
+
+      - name: Validate committed changes when a base is supplied
+        if: inputs.base != ''
+        shell: bash
+        env:
+          BASE_REF: ${{ inputs.base }}
+          HEAD_REF: ${{ github.sha }}
+        run: >-
+          python3 scripts/validate-agent-knowledge.py
+          --scope range --base "$BASE_REF" --head "$HEAD_REF"

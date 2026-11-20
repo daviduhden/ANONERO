@@ -208,3 +208,9 @@ synchronized embedded release suite. See [report](../development-iteration-2026-
 Existing run 43633496677 passed source compilation, native/JVM/lint/assemble gates on
 committed a2c9cfb, but instrumentation failed before test execution. It does not validate
 this uncommitted tree.
+
+The independent manual `agent-knowledge-validation.yml` workflow checks Python
+validator regressions and instruction structure, with an optional base ref for
+committed knowledge synchronization. It requires the owner gate, read-only repository
+access and full history; it performs no Android builds or artifact publishing.
+Workflow execution remains unverified until an authorized manual CI run.

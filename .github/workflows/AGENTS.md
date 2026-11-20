@@ -35,11 +35,17 @@ authoritative for anonymity, privacy, security, language, build, and Git policy.
   - `publish`: only when `publish == true`; re-checks the tag, verifies checksums, and
     publishes without overwriting existing assets.
 
+- `agent-knowledge-validation.yml` — manually dispatched Python validator and CI-only
+  regression module. `authorize` gates the validation job. Full history is fetched at
+  the dispatched SHA; optional `base` compares its merge base against that SHA.
+  Worktree validation always runs; without `base`, synchronization of committed project
+  changes is not assessed. No Android build, cache, secrets or artifact upload is used.
+
 ## 2. Manual-only and owner authorization
 
 - No workflow may have `push`, `pull_request`, `pull_request_target`, `schedule`,
   `release`, `workflow_run`, `repository_dispatch`, or any other automatic trigger.
-- Both workflows accept only `workflow_dispatch`; no callable entry point is allowed.
+- All workflows accept only `workflow_dispatch`; no callable entry point is allowed.
   Release embeds synchronized test jobs and runs the full suite in its own manual run.
   `scripts/sync-release-test-jobs.py --check` rejects drift; `--write` regenerates only
   the marked release job block. Every shared job retains its owner dependency; the
@@ -152,7 +158,7 @@ Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
 - [ ] Least-privilege permissions preserved.
 - [ ] All actions pinned by SHA.
 - [ ] No automatic triggers (`push`, `pull_request`, `schedule`, tags, etc.).
-- [ ] `workflow_dispatch` is the only entry point in both workflows; shared jobs and
+- [ ] `workflow_dispatch` is the only entry point in all workflows; shared jobs and
       aggregate remain synchronized and fail closed.
 - [ ] Every job needs the `authorize` owner gate.
 - [ ] No secret reachable from untrusted PR code.
