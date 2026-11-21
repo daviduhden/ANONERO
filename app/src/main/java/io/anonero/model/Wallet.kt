@@ -34,6 +34,7 @@ class Wallet {
     private var accountIndex = 0
     private var handle: Long = 0
     private var listenerHandle: Long = 0
+    private val listenerLifecycle = Any()
     private var pendingTransaction: PendingTransaction? = null
     private var unsignedTransaction: UnsignedTransaction? = null
     var history: TransactionHistory? = null
@@ -613,8 +614,16 @@ class Wallet {
     private external fun setListenerJ(listener: WalletListener?): Long
 
     fun setListener(listener: WalletListener?) {
-        listenerHandle = setListenerJ(listener)
+        synchronized(listenerLifecycle) {
+            if (listenerHandle == 0L && listener == null) return
+            val installed = setListenerJ(listener)
+            check(installed != 0L) { "Wallet listener setup failed" }
+            listenerHandle = installed
+        }
     }
+
+    // Use a separate monitor from store(), which wallet2 callbacks can invoke during close.
+    internal fun <T> withListenerLifecycle(action: () -> T): T = synchronized(listenerLifecycle, action)
 
     external fun getDefaultMixin(): Int
 

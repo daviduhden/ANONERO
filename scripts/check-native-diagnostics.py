@@ -139,6 +139,32 @@ for owner, operation, call in (
     if operation == "initJ" and "upper_transaction_size_limit < 0" not in before_try:
         failures.append("Wallet.initJ: check size limit before converting to unsigned")
 
+# wallet2 does not serialize listener pointer swaps against callback delivery.
+listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")
+listener_end = code.index("\n}\n", listener_start)
+listener_setup = code[listener_start:listener_end]
+if (
+    listener_setup.count("wallet->setListener(") != 1
+    or "wallet->setListener(listener.get());" not in listener_setup
+    or "delete installed" in listener_setup
+    or "installed->replaceJavaListener(env, javaListener)" not in listener_setup
+):
+    failures.append("Wallet.setListenerJ: replace only the installed adapter's Java target")
+
+close_start = code.index("Java_io_anonero_model_WalletManager_closeJ(")
+close_end = code.index("\n}\n", close_start)
+lookups, _, close_result = code[close_start:close_end].partition("->closeWallet(")
+if (
+    'getHandleField(env, walletInstance, "listenerHandle")' not in lookups
+    or "delete listener;" in lookups
+    or close_result.count("return JNI_FALSE;") != 2
+    or close_result.count("env->SetLongField(") != 2
+    or "catch (...)" not in close_result
+    or close_result.find("env->SetLongField(") < close_result.find("catch (...)")
+    or close_result.find("delete listener;") < close_result.find("env->SetLongField(")
+):
+    failures.append("WalletManager.closeJ: clear fields and free the listener after successful close")
+
 if failures:
     raise SystemExit("\n".join(failures))
 print("Native diagnostic static policy passed (not runtime or security proof)")

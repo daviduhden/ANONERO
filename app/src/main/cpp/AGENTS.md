@@ -44,8 +44,11 @@ These instructions apply to `app/src/main/cpp/` and `app/CMakeLists.txt`. The ro
 - `PendingTransaction` and `UnsignedTransaction` handles are owned by wallet2. Dispose
   them through the existing wallet methods where provided; do not add a second owner
   or a finalizer that races with wallet2.
-- `setListenerJ` installs a `MyWalletListener` with a global Java reference. Removing or
-  replacing it must delete the old global reference and the native listener.
+- Install a single `MyWalletListener` per wallet during startup before enabling refresh.
+  Replace or clear only its global Java target under the listener mutex. A callback
+  holding a local reference can finish against that target. Destroy the adapter only
+  after successful wallet2 close, which joins the native refresh thread. Failed close
+  preserves both opaque handles.
 
 ## 3. Memory and JNI rules
 
@@ -88,8 +91,9 @@ Additional rules:
 
 ## 4. Concurrency
 
-- Native callbacks may arrive on wallet2 threads. `MyWalletListener` serializes
-  callback delivery with `_listenerMutex`.
+- Native callbacks may arrive on wallet2 threads. `_listenerMutex` serializes the
+  reference swap and acquisition of a local callback reference. Kotlin serializes
+  listener mutation with native close on a dedicated monitor distinct from `store()`.
 - `ScopedCallbackEnv` attaches the current thread and detaches only if it attached.
   Do not call `DetachCurrentThread` on a thread you did not attach.
 - Do not hold `_listenerMutex` while calling into code that can re-enter the listener.

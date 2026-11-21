@@ -26,7 +26,7 @@ class WalletManager {
     @Volatile
     var wallet: Wallet? = null
         private set
-    private val unmanagedWallets = RetainedWallets<Wallet> { closeJ(it) }
+    private val unmanagedWallets = RetainedWallets<Wallet>(::closeNativeWallet)
     private var daemonAddress: String? = null
     var daemonUsername = ""
         private set
@@ -290,12 +290,14 @@ class WalletManager {
         subaddressLookahead: String,
     ): Long
 
-    external fun closeJ(wallet: Wallet?): Boolean
+    private external fun closeJ(wallet: Wallet?): Boolean
+
+    private fun closeNativeWallet(wallet: Wallet): Boolean = wallet.withListenerLifecycle { closeJ(wallet) }
 
     fun close(wallet: Wallet): Boolean {
         unmanageWallet(wallet)
         return try {
-            val closed = closeJ(wallet)
+            val closed = closeNativeWallet(wallet)
             if (!closed) {
                 // in case we could not close it
                 // we manage it again

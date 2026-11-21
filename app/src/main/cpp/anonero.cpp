@@ -210,29 +210,31 @@ class ScopedLocalRef {
 };
 
 /*
- * Native listener adapter. One instance is allocated by setListenerJ and owns a global
- * reference to the Kotlin WalletListener. _listenerMutex protects that global reference;
- * callbacks take a local reference under the lock and then call Kotlin without holding it,
- * so close/replace cannot deadlock against a re-entrant listener. The adapter attaches the
- * wallet2 thread only for the duration of a callback and detaches it only if it attached it.
+ * Keep the adapter installed for the lifetime of the native wallet. wallet2
+ * does not synchronize listener pointer replacement with its refresh callbacks.
+ * Only the Java target is replaceable. Callbacks hold a local reference and
+ * release the mutex before calling Kotlin.
  */
 struct MyWalletListener : Monero::WalletListener {
-    jobject jlistener;
+    jobject jlistener = nullptr;
 
-    MyWalletListener(JNIEnv *env, jobject aListener) {
-        jlistener = env->NewGlobalRef(aListener);
-        if (jlistener == nullptr && env->ExceptionCheck())
-            env->ExceptionClear();
+    bool replaceJavaListener(JNIEnv *env, jobject listener) {
+        std::lock_guard<std::mutex> lock(_listenerMutex);
+        if (env->ExceptionCheck())
+            return false;
+        jobject replacement = listener == nullptr ? nullptr : env->NewGlobalRef(listener);
+        if (listener != nullptr && replacement == nullptr)
+            return false;
+        if (jlistener != nullptr)
+            env->DeleteGlobalRef(jlistener);
+        jlistener = replacement;
+        return true;
     }
 
-    ~MyWalletListener() = default;
-
-    void deleteGlobalJavaRef(JNIEnv *env) {
-        std::lock_guard<std::mutex> lock(_listenerMutex);
-        if (jlistener != nullptr) {
+    // Only use before publication or after wallet2 has joined the refresh thread.
+    void releaseJavaListener(JNIEnv *env) noexcept {
+        if (jlistener != nullptr)
             env->DeleteGlobalRef(jlistener);
-            jlistener = nullptr;
-        }
     }
 
     /*
@@ -880,41 +882,34 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
                                                                       jobject walletInstance) {
     if (walletInstance == nullptr)
         return JNI_FALSE;
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, walletInstance);
+    const auto walletField = getHandleField(env, walletInstance);
+    const auto listenerField = getHandleField(env, walletInstance, "listenerHandle");
+    if (walletField == nullptr || listenerField == nullptr)
+        return JNI_FALSE;
+    auto *wallet = reinterpret_cast<Monero::Wallet *>(env->GetLongField(walletInstance, walletField));
     if (wallet == nullptr)
         return JNI_FALSE;
-    bool closeSuccess = false;
+    auto *listener = reinterpret_cast<MyWalletListener *>(
+        env->GetLongField(walletInstance, listenerField));
+
     try {
-        closeSuccess = Monero::WalletManagerFactory::getWalletManager()->closeWallet(wallet, false);
+        if (!Monero::WalletManagerFactory::getWalletManager()->closeWallet(wallet, false)) {
+            LOGE("wallet close failed");
+            return JNI_FALSE;
+        }
     } catch (...) {
-        // Keep the wrapper and listener reachable for the failed-close owner.
+        // The owner retains both handles until wallet2 confirms a successful close.
         LOGE("wallet close failed");
         return JNI_FALSE;
     }
-    if (closeSuccess) {
-        // Invalidate the raw handle before the Kotlin wrapper can be used again.
-        setHandleFromLong(env, walletInstance, 0);
-        MyWalletListener *walletListener =
-            getHandle<MyWalletListener>(env, walletInstance, "listenerHandle");
-        if (walletListener != nullptr) {
-            walletListener->deleteGlobalJavaRef(env);
-            delete walletListener;
-        }
-        // The Kotlin wrapper must not retain a pointer to the deleted listener.
-        jclass walletClass = env->GetObjectClass(walletInstance);
-        if (walletClass != nullptr) {
-            jfieldID listenerField = env->GetFieldID(walletClass, "listenerHandle", "J");
-            if (listenerField != nullptr) {
-                env->SetLongField(walletInstance, listenerField, 0);
-            }
-            env->DeleteLocalRef(walletClass);
-            if (env->ExceptionCheck())
-                env->ExceptionClear();
-        }
-    } else {
-        LOGE("wallet close failed");
+
+    env->SetLongField(walletInstance, walletField, 0);
+    env->SetLongField(walletInstance, listenerField, 0);
+    if (listener != nullptr) {
+        listener->releaseJavaListener(env);
+        delete listener;
     }
-    return static_cast<jboolean>(closeSuccess);
+    return JNI_TRUE;
 }
 
 /* Wallet */
@@ -1987,34 +1982,35 @@ JNIEXPORT void JNICALL Java_io_anonero_model_Coins_thawJ(JNIEnv *env, jobject in
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_setListenerJ(JNIEnv *env, jobject instance,
                                                                   jobject javaListener) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    // Delete the old listener before any early return: returning 0 from here would
-    // otherwise lose the only pointer to the global Java reference.
-    MyWalletListener *oldListener = getHandle<MyWalletListener>(env, instance, "listenerHandle");
-    if (oldListener != nullptr) {
-        oldListener->deleteGlobalJavaRef(env);
-        delete oldListener;
-    }
     if (wallet == nullptr)
         return 0;
-    wallet->setListener(nullptr); // clear old listener
-    if (javaListener == nullptr) {
-        return 0;
-    }
-    MyWalletListener *listener = new (std::nothrow) MyWalletListener(env, javaListener);
-    if (listener == nullptr || listener->jlistener == nullptr) {
-        // NewGlobalRef failed (OOM or a pending JNI exception). Do not install a listener
-        // that would silently drop every callback.
-        delete listener;
-        return 0;
-    }
+
+    auto *installed = getHandle<MyWalletListener>(env, instance, "listenerHandle");
     try {
-        wallet->setListener(listener);
+        if (installed != nullptr) {
+            return installed->replaceJavaListener(env, javaListener)
+                       ? reinterpret_cast<jlong>(installed)
+                       : 0;
+        }
+        if (javaListener == nullptr)
+            return 0;
+
+        auto listener = std::unique_ptr<MyWalletListener>(new (std::nothrow) MyWalletListener);
+        if (!listener || !listener->replaceJavaListener(env, javaListener))
+            return 0;
+        // First installation occurs during wallet startup, before enabling refresh.
+        // The pinned wallet2 setter only assigns the listener pointer.
+        try {
+            wallet->setListener(listener.get());
+        } catch (...) {
+            listener->releaseJavaListener(env);
+            throw;
+        }
+        return reinterpret_cast<jlong>(listener.release());
     } catch (...) {
-        listener->deleteGlobalJavaRef(env);
-        delete listener;
+        LOGE("Wallet listener setup failed");
         return 0;
     }
-    return reinterpret_cast<jlong>(listener);
 }
 
 JNIEXPORT jint JNICALL Java_io_anonero_model_Wallet_getDefaultMixin(JNIEnv *env, jobject instance) {
