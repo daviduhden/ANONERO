@@ -27,7 +27,7 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 ## Invariants
 
 - All workflows use only `workflow_dispatch`; callable and automatic triggers are
-  forbidden. Release embeds the required Tests jobs with explicit tag checkouts and
+  forbidden. Release embeds the required Tests jobs at the immutable dispatched main SHA and
   disabled Gradle caches, then aggregates all results and its same-run native artifact.
 - Every job depends on the `authorize` job, which requires
   `github.actor == github.repository_owner` and

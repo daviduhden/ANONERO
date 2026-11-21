@@ -62,7 +62,10 @@ jobs:
     name: Owner authorization
     # Manual dispatch is not owner-only by itself. This job is the executable gate:
     # every other job needs it, so a non-owner dispatch has no runnable jobs.
-    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     permissions: {}
@@ -85,7 +88,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Verify Gradle wrapper
         shell: bash
@@ -157,7 +160,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Verify Gradle wrapper
         shell: bash
@@ -225,7 +228,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Compare Kotlin external declarations and JNI exports
         shell: bash
@@ -263,7 +266,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Check resource parity and hardcoded UI text
         shell: bash
@@ -281,7 +284,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Reject project-owned Java sources
         shell: bash
@@ -330,7 +333,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Verify pinned native inputs
         shell: bash
@@ -400,7 +403,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Verify Gradle wrapper
         shell: bash
@@ -528,7 +531,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
 
       - name: Verify Gradle wrapper
         shell: bash
@@ -827,7 +830,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.sha }}
           submodules: false
           persist-credentials: false
 
@@ -845,6 +848,7 @@ jobs:
         shell: bash
         env:
           TAG_INPUT: ${{ inputs.tag }}
+          DISPATCH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           VERSION="$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
@@ -875,8 +879,8 @@ jobs:
           }
           TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
           HEAD_COMMIT="$(git rev-parse HEAD)"
-          if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
-            echo "::error::Tag '$TAG' does not point at the checked-out commit"
+          if [[ "$HEAD_COMMIT" != "$TAG_COMMIT" ]] || [[ "$HEAD_COMMIT" != "$DISPATCH_SHA" ]]; then
+            echo "::error::Tag '$TAG' does not match the dispatched main commit"
             exit 1
           fi
 

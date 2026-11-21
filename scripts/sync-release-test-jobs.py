@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 START = "  # BEGIN GENERATED TEST JOBS\n"
 END = "  # END GENERATED TEST JOBS\n"
 SOURCE_REF = "${{ inputs.ref || github.ref }}"
-RELEASE_REF = "refs/tags/${{ inputs.tag }}"
+RELEASE_REF = "${{ github.sha }}"
 
 
 def require_manual_dispatch(text: str, name: str) -> None:

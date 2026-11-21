@@ -147,8 +147,8 @@ git diff --check
 If PyYAML is unavailable, parse structurally by reading and use a minimal YAML
 sanity check; do not install packages.
 
-The generated release suite disables Gradle caches, binds every checkout to
-`refs/tags/${{ inputs.tag }}` and preserves the same-run native artifact contract.
+The generated release suite disables Gradle caches, binds every test checkout to
+`${{ github.sha }}` and preserves the same-run native artifact contract.
 `zizmor --offline` reported no findings in this iteration; that is a static result only.
 
 Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
