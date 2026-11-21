@@ -116,6 +116,11 @@ CI-only mutation tests under scripts/tests; never execute them locally under age
 
 A pending JNI read error must stop the current operation. Preserve the distinction between an empty message and unreadable bytes, check erased key-image element types, and place native input allocations within exception handling.
 
+If a conversion leaves a JVM exception pending, stop the operation before
+another JNI string acquisition or result allocation. A normal null input can
+still use an established fallback when no exception is pending. Include CheckJNI
+in the failure-path verification for changes to this boundary.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

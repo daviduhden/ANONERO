@@ -103,6 +103,23 @@ for converter in ("java2cpp_long", "java2cpp_bytes", "java2cpp_string_array", "j
     if converter == "java2cpp_set" and "IsInstanceOf(element.get()," not in body:
         failures.append("java2cpp_set: check runtime element type before casting to jstring")
 
+# A failed Java string acquisition can leave a pending OOM. Further string
+# acquisitions and fallback allocations are invalid until the JVM handles it.
+utf_helper = code.split("class ScopedUtfChars", 1)[1].split("};", 1)[0]
+if not re.search(
+    r"env->ExceptionCheck\(\)\s*\?\s*nullptr\s*:\s*env->GetStringUTFChars\(",
+    utf_helper,
+):
+    failures.append("ScopedUtfChars: guard chained acquisitions against pending JVM errors")
+if len(re.findall(r"->GetStringUTFChars\s*\(", code)) != 1:
+    failures.append("GetStringUTFChars: use ScopedUtfChars for string acquisition")
+if re.search(
+    r"if\s*\([^;{}]*\.get\(\)\s*==\s*nullptr[^;{}]*?\)\s*\{?\s*"
+    r"return\s+env->NewStringUTF\(",
+    code,
+):
+    failures.append("UTF acquisition failure must preserve the JVM error before returning text")
+
 if failures:
     raise SystemExit("\n".join(failures))
 print("Native diagnostic static policy passed (not runtime or security proof)")

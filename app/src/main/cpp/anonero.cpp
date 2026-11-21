@@ -391,8 +391,9 @@ struct MyWalletListener : Monero::WalletListener {
 class ScopedUtfChars {
   public:
     ScopedUtfChars(JNIEnv *env, jstring value)
-        : env_(env), value_(value),
-          chars_(value == nullptr ? nullptr : env->GetStringUTFChars(value, nullptr)) {}
+        : env_(env), value_(value), chars_(value == nullptr || env->ExceptionCheck()
+                                               ? nullptr
+                                               : env->GetStringUTFChars(value, nullptr)) {}
 
     ~ScopedUtfChars() noexcept {
         if (chars_ != nullptr)
@@ -1080,7 +1081,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getIntegratedAddress(JNIE
         return env->NewStringUTF("");
     ScopedUtfChars paymentChars(env, payment_id);
     if (paymentChars.get() == nullptr)
-        return env->NewStringUTF("");
+        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
     std::string address = wallet->integratedAddress(paymentChars.get());
     return env->NewStringUTF(address.c_str());
 }
@@ -1675,7 +1676,8 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_submitTransaction(JNIEnv 
         return env->NewStringUTF("Wallet is unavailable");
     ScopedUtfChars filenameChars(env, filename);
     if (filenameChars.get() == nullptr) {
-        return env->NewStringUTF("Transaction file is unavailable");
+        return env->ExceptionCheck() ? nullptr
+                                     : env->NewStringUTF("Transaction file is unavailable");
     }
     bool success = false;
     try {
@@ -1742,7 +1744,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_importOutputs(JNIEnv *env
         return env->NewStringUTF("Wallet is unavailable");
     ScopedUtfChars filenameChars(env, filename);
     if (filenameChars.get() == nullptr) {
-        return env->NewStringUTF("Outputs file is unavailable");
+        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("Outputs file is unavailable");
     }
     bool success = false;
     try {
@@ -1768,7 +1770,8 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_signAndExportJ(JNIEnv *en
     ScopedUtfChars inputChars(env, input_file);
     ScopedUtfChars outputChars(env, output_file);
     if (inputChars.get() == nullptr || outputChars.get() == nullptr) {
-        return env->NewStringUTF("Transaction path is unavailable");
+        return env->ExceptionCheck() ? nullptr
+                                     : env->NewStringUTF("Transaction path is unavailable");
     }
     bool success = false;
     const char *error = "Transaction signing failed";
@@ -2030,7 +2033,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getUserNote(JNIEnv *env, 
         return env->NewStringUTF("");
     ScopedUtfChars txidChars(env, txid);
     if (txidChars.get() == nullptr)
-        return env->NewStringUTF("");
+        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return env->NewStringUTF("");
@@ -2044,7 +2047,7 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getTxKey(JNIEnv *env, job
         return env->NewStringUTF("");
     ScopedUtfChars txidChars(env, txid);
     if (txidChars.get() == nullptr)
-        return env->NewStringUTF("");
+        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return env->NewStringUTF("");

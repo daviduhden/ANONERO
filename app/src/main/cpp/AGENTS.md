@@ -67,6 +67,8 @@ unreadable message from a successfully read empty byte array.
 Additional rules:
 
 - Check every `GetStringUTFChars` result before constructing `std::string`.
+  Chained acquisitions must stop when the JVM raises an exception. A UTF failure
+  may allocate a fallback Java string only if no exception is pending.
 - Release every `GetStringUTFChars` / `GetByteArrayElements` / `GetArrayLength`-paired
   resource. `JNI_ABORT` is correct for input byte arrays that must not be copied back.
 - Delete local references in loops and for created `jstring`/`jobject` values.
