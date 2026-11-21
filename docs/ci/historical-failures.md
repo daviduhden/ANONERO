@@ -4,6 +4,8 @@
 
 | Run | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- |
+| [`44932222747`](https://github.com/daviduhden/ANONERO/actions/runs/44932222747) | `81f17ef` | `workflow_dispatch` | success | none | Owner authorization and nine agent-knowledge Python regressions passed. |
+| [`44932222742`](https://github.com/daviduhden/ANONERO/actions/runs/44932222742) | `81f17ef` | `workflow_dispatch` | success | none | All nine jobs passed. Hardware-accelerated API 35 boot took about 45 s. Archived reports show 113 JVM tests and four instrumented tests per flavor, all passing. Kotlin source warnings absent; lint retains 11 warnings per flavor. |
 | [`44927810481`](https://github.com/daviduhden/ANONERO/actions/runs/44927810481) | `75939ea` | `workflow_dispatch` | success | none | Owner authorization and agent-knowledge Python checks passed. No Android build or device execution in this workflow. |
 | [`44927810332`](https://github.com/daviduhden/ANONERO/actions/runs/44927810332) | `75939ea` | `workflow_dispatch` | cancelled | Instrumented tests (API 35), cancelled | The eight other jobs passed, including both flavors and ARM native/assemble. The software emulator started with TCG and was cancelled during boot polling after about one minute, before tests. See CI-037. |
 | [`44924483639`](https://github.com/daviduhden/ANONERO/actions/runs/44924483639) | `0a44b76` | `workflow_dispatch` | success | none | Owner authorization and agent-knowledge Python checks passed. No Android build or device execution in this workflow. |
@@ -45,18 +47,18 @@
 | [`42547686992`](https://github.com/daviduhden/ANONERO/actions/runs/42547686992) | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
 No release, sanitizer, or fuzz run exists. The native archives build, and instrumented
-passed on `42874760135`, `43528256395` and `43640612517`, with inconsistent results without usable KVM. The two
+passed on `42874760135`, `43528256395`, `43640612517` and `44932222742`, with inconsistent results without usable KVM. The two
 historical `push` triggers are no longer present; workflows are manual-only.
 
 ### Provenance and platform coverage
 
-The paginated API returned 39 runs in this repository on 2026-11-21: 37 Tests runs
-(29 failed, four succeeded, four cancelled) and two successful Agent Knowledge
+The paginated API returned 41 runs in this repository on 2026-11-21: 38 Tests runs
+(29 failed, five succeeded, four cancelled) and three successful Agent Knowledge
 Validation runs. All returned run records are listed above. The separate
 `Build and publish APKs` workflow has no returned runs. GitHub CLI retrieved complete
-run logs for 37 runs and returned `log not found` on missing jobs in the cancelled
+run logs for 39 runs and returned `log not found` on missing jobs in the cancelled
 runs `42692271873` and `43632817394`. The latter's JVM failure log was available
-by job ID. The API lists 82 artifacts, all marked unexpired at the time of review.
+by job ID. The API lists 86 artifacts, all marked unexpired at the time of review.
 Logs and selected reports were kept outside the repository.
 
 The two Tests push runs at the bottom of the table pinned Gradle 9.7.0, AGP 9.3.3,
@@ -70,13 +72,13 @@ floor is API 29, while guest execution evidence comes from the API 35 x86_64 AVD
 There is no x86_64 release ABI. Older skipped or cancelled emulator jobs are not
 device evidence.
 
-The [latest Tests log](https://github.com/daviduhden/ANONERO/actions/runs/44927810332)
+The [latest Tests log](https://github.com/daviduhden/ANONERO/actions/runs/44932222742)
 records Clang 21.0.0 in native compiler identification and both API 29 ARM target
 wrappers. Individual run dependencies are reproducible from the linked SHA via
 `gradle/libs.versions.toml`, `external-libs/build.sh` and the Monero gitlink. For the
 latest run the native recipe includes Boost 1.92.0, OpenSSL 3.5.9 and libsodium
 1.0.22. Agent Knowledge Validation executes Python checks only, so Android and
-native toolchain coverage does not apply to those two rows.
+native toolchain coverage does not apply to those three rows.
 
 ## Failure records
 
@@ -885,7 +887,10 @@ timeout, or a passing test.
   TCG fallback when the device is absent.
 - **Regression evidence:** check generated-suite synchronization, then require boot,
   the repository instrumented script and both result sets on an authorized Linux CI
-  run. Permission preparation, hardware acceleration and test outcomes are unverified.
+  run. The [instrumented job in 44932222742](https://github.com/daviduhden/ANONERO/actions/runs/44932222742/job/136938186389)
+  reports hardware acceleration enabled. Emulator 37.3.10 booted in about 45 seconds.
+  Both XML reports contain four tests with zero failures, errors or skips. This
+  confirms the prepared Linux path on that runner.
 
 ### CI-038 — Preventive review of instrumented fallback exit accounting
 
@@ -906,8 +911,10 @@ limit this failure mode, but do not justify incorrect aggregation.
   the aggregate remains failed even if both final XML files report success. The
   `43034549647` artifact preserves the original ANON shape: `tests=1 failures=1
   errors=0 skipped=0`, with a `failure` element reporting an attach error. Confirm
-  that missing results or unrelated install/Gradle errors fail. Runtime verification
-  requires authorized CI.
+  that missing results or unrelated install/Gradle errors fail. The Python regression
+  suite passed in [44932222742](https://github.com/daviduhden/ANONERO/actions/runs/44932222742/job/136931166407).
+  Both flavor jobs completed normally in the emulator run without exercising a
+  real attach retry.
 
 ### W-007 — Kotlin safe calls after a proven non-null receiver
 
@@ -920,7 +927,8 @@ already prove the receiver non-null. The warning appeared in successful
 compilation of both flavors. Earlier logs show the same family in other files,
 including Send, NodeSettings and BackupHelper. The present warning correction
 removes the five redundant safe calls and keeps the guards around genuinely
-nullable state. Both flavors must compile with no recurrence in the next CI run.
+nullable state. Both flavors compiled in `44932222742` with no captured Kotlin
+source warnings. No Gradle compiler warning policy was weakened.
 
 ### W-008 — OpenSSL configuration duplicates the NDK Android API definition
 
@@ -932,9 +940,11 @@ invocation from the project-owned [build recipe](../../external-libs/build.sh),
 even though OpenSSL source units emit the diagnostics. Both ARM target wrappers
 show the pattern. The pin's OpenSSL Android Configure target parses that option
 to select its compiler API level. Removing it without replacing that selection
-could silently target the NDK's highest API. Keep this warning open until an
-upstream-compatible selection method is verified with both ABI build logs and
-API 29 compatibility. Do not suppress the diagnostic or change the app floor.
+could silently target the NDK's highest API. The local fix adds a
+separate API selector to the pinned OpenSSL configuration and checks that
+Configure selected the exact NDK wrapper without redefining the built-in
+macro. The proposed correction is statically checked and pending native CI
+for both ABIs. See [configuration and rollback](openssl-android-api.md).
 
 ### W-009 — Lint findings from a successful job
 
@@ -950,4 +960,7 @@ semantics, remove legacy strings only after searching references and all locales
 and verify a new lint XML report for both flavors. This audit removes the unused
 string definitions across all four catalogs and migrates the one URI call. The
 three commit-result call sites stay explicit, and no dependency pin changed.
-See the [preventive audit](preventive-audit.md) for validation status.
+In [44932222742](https://github.com/daviduhden/ANONERO/actions/runs/44932222742)
+the archived lint XML contains zero errors and 11 warnings per flavor, all from
+the eight dependency notices and the three checked editor calls. The unused
+resource and URI warnings are absent. See the [preventive audit](preventive-audit.md).

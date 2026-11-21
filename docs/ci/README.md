@@ -61,6 +61,15 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
 
 ## Latest evidence
 
+- [Tests 44932222742](https://github.com/daviduhden/ANONERO/actions/runs/44932222742)
+  on `81f17ef` passed all nine jobs. The API 35 emulator used hardware acceleration
+  and booted in about 45 seconds. Archived XML confirms 113 JVM tests and four
+  instrumented tests per flavor, with zero failures, errors or skips. The Kotlin
+  logs contain no project source warnings. Android Lint recorded zero errors and
+  11 warnings per flavor: eight dependency update notices and three checked
+  preferences-write suggestions.
+- [Agent Knowledge Validation 44932222747](https://github.com/daviduhden/ANONERO/actions/runs/44932222747)
+  on the same commit passed its two jobs, including nine Python regressions.
 - [Tests 44927810332](https://github.com/daviduhden/ANONERO/actions/runs/44927810332)
   on `75939ea` passed eight jobs before the API 35 job was cancelled. Archived
   XML shows 110 JVM tests per flavor with zero failures, errors or skips. Android
@@ -68,14 +77,14 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
   distinct project-owned warnings. Native ARM archives and debug APK assembly
   passed. No instrumented reports were produced.
 - [Tests 43640612517](https://github.com/daviduhden/ANONERO/actions/runs/43640612517)
-  on `dff2ecb` is the latest fully green run. Archived XML records four API 35
+  on `dff2ecb` is an earlier fully green run. Archived XML records four API 35
   tests per flavor with no failures, errors or skips. The tests cover package
   context, diagnostics isolation, LWS profile isolation and transport persistence
   failure. This predates signing isolation and the current wallet hardening.
 - [Agent Knowledge Validation 44927810481](https://github.com/daviduhden/ANONERO/actions/runs/44927810481)
   on `75939ea` passed the Python regression and knowledge checks. It did not
   execute Android tests.
-- The [historical inventory](historical-failures.md) covers all 39 API records,
+- The [historical inventory](historical-failures.md) covers all 41 API records,
   including successful runs with warnings, incomplete logs and artifact evidence.
   No production signing, sanitizer, fuzz or device-farm execution was found.
 
@@ -87,3 +96,14 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
   string acquisition or result allocation while a JVM exception remains pending.
   The native source guard checks the corrected paths. A future authorized CI run
   still needs native compilation and a CheckJNI fixture for conversion failures.
+
+## New source changes after 81f17ef
+
+- [OpenSSL API level](openssl-android-api.md) explains W-008 and the guard against
+  accidentally selecting a compiler above API 29.
+- [Broadcast recovery](broadcast-recovery.md) distinguishes a transaction accepted
+  by wallet2 from later refresh or persistence failures.
+- JNI network and background-sync entry points map throwing wallet2 calls to the
+  existing failure result. The static guard checks the new catch boundaries and
+  rejection of negative initialization size. Native CI and fault-injection
+  evidence are pending.

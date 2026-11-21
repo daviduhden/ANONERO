@@ -245,7 +245,9 @@ threat models, regression requirements and remaining boundaries.
   even when its job succeeds. Review available logs and artifacts from historical,
   successful, failed, and cancelled runs. Attribute warnings to project code,
   project build configuration, dependencies, or runner tools. Expired evidence
-  must be marked unavailable. For each confirmed diagnosis:
+  must be marked unavailable. When fixing a toolchain warning, verify the
+  compiler and platform selected after configuration before treating its removal
+  as a fix. For each confirmed diagnosis:
   1. root-cause analysis;
   2. a repository-wide search for the same pattern and related variants;
   3. a fail-closed fix;

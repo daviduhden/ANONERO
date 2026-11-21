@@ -123,3 +123,11 @@ Confirm the latest warning fixes and independent instrumented test exit results 
 manual run. A stable KVM-backed API 35 smoke run will still leave archival API 29 build
 coverage, native ARMv7 device runtime, release signing, sanitizers and Tor/LWS integration
 as separate evidence gaps.
+
+## Next CI evidence
+
+Recheck both API 29 ARM wrapper selections, software-only emulator recovery,
+and rejection of native failures after the current patch. Validate accepted
+broadcast recovery independently from transaction authorization. Track the
+remaining Lint persistence advisories, signed release execution and sanitizer
+coverage separately from the green API 35 baseline.

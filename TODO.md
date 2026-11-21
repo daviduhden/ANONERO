@@ -152,3 +152,11 @@ the rationale to `ROADMAP.md`.
       regressions in CI.
 - [ ] Review remaining build-tool/dependency advisories and commit-result lint findings
       individually. Preserve API 29 and explicit persistence failure handling.
+
+## Follow-up after Tests 44932222742
+
+- [x] Confirm accelerated API 35 boot and both instrumented flavor reports on
+      `81f17ef`. TCG-only boot and later local changes remain unverified.
+- [ ] Verify W-008 is absent on both native ABI builds after the OpenSSL patch.
+- [ ] Exercise wallet2 JNI failures and accepted broadcast with failed local
+      refresh or persistence in CI or on a device.

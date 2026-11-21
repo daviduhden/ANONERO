@@ -358,3 +358,12 @@ prepare runner-user KVM access when available, preserve instrumented failures in
 for both flavors, and add coverage for malformed or mixed retry reports. Compiler, JNI and
 coin-selection corrections are pending a new authorized CI run. See
 [CI diagnostics](docs/ci/README.md).
+
+## CI delta after Linux KVM preparation
+
+Tests 44932222742 at `81f17ef` passed all jobs, with 113 JVM and four API 35
+instrumented tests per flavor. The emulator used hardware acceleration.
+The logs contain no recurrence of the five Kotlin compiler warnings. Lint
+reported 11 warnings per flavor and no errors. The OpenSSL selector,
+broadcast post-processing and JNI failure boundaries changed after this
+baseline. Their CI evidence is pending.
