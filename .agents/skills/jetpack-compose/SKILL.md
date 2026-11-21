@@ -100,6 +100,8 @@ inputs again at submission, block repeated mutations and clear signature/verific
 results when inputs change. On account/output action failures show localized feedback;
 catch disposal cleanup refusals without crashing the UI. Updated back buttons use a11y_back.
 
+Derive send readiness from the validated recipient and current balance, spend mode, and coin selection. Keep an unresolved explicit selection distinct from an empty selection, and bind NERO preflight to the same request as review.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

@@ -127,6 +127,8 @@ refreshed native flag and publishes observed state even if persistence later fai
 returning failure. Failed account snapshot refresh must not display prior-account funds
 under the new index. Use the retained auxiliary-wallet registry for backup/decoy files.
 
+Before using explicit selected outputs in single-send, require the full current selection to be eligible in the active account. A failed or incomplete lookup must never turn into an unrestricted sweep.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

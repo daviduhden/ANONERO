@@ -234,3 +234,9 @@ Decoy provisioning and backup exports require successful auxiliary close before 
 and incomplete decoys expose explicit removal/recovery. Legacy proxy setup offers the
 same transport/network choices as Network & Nodes. See the
 [feature-state table](development-iteration-2026-11.md); runtime behavior remains pending.
+
+An explicit coin selection in single-send must resolve completely and still be
+spendable at construction. The screen recomputes readiness for the current recipient,
+amount, spend mode and balance, and NERO binds the preflight to the captured wallet.
+See [Kotlin, JNI and transport hardening](development-iteration-modernization.md)
+for the device checks that remain.

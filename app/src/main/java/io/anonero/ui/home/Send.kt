@@ -25,7 +25,6 @@ import android.view.HapticFeedbackConstants
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +66,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -119,7 +117,6 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.java.KoinJavaComponent.inject
 import timber.log.Timber
 import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "Send"
 
@@ -152,14 +149,13 @@ class SendViewModel : ViewModel() {
     private val transportController: TransportController by inject(TransportController::class.java)
     private val _balance = walletState.unLockedBalance.asLiveData()
     private val _paymentUri = MutableLiveData<SendScreenRoute?>(null)
-    private val _coinsSelected = MutableLiveData<Set<CoinsInfo>>(emptySet())
+    private val _coinsSelected = MutableLiveData<Set<CoinsInfo>?>(emptySet())
     private var coinsJob: Job? = null
-    private val coinsRequest = AtomicInteger(0)
     private val _txComposeError = MutableLiveData<SendError?>(null)
     private val _spendType = MutableLiveData(SpendType.NORMAL)
     val paymentUri = _paymentUri as LiveData<SendScreenRoute?>
     val spendType = _spendType as LiveData<SpendType>
-    val coins = _coinsSelected as LiveData<Set<CoinsInfo>>
+    val coins: LiveData<Set<CoinsInfo>?> = _coinsSelected
     val txComposeError = _txComposeError as LiveData<SendError?>
 
     private fun writeUnsignedTransaction(pendingTx: PendingTransaction) {
@@ -179,11 +175,16 @@ class SendViewModel : ViewModel() {
     }
 
     suspend fun prepareTransaction(
+        wallet: Wallet,
         addressField: String,
         amount: String,
+        isSweep: Boolean,
+        selectedCoins: Set<CoinsInfo>,
     ): PendingTransaction? {
-        val wallet = WalletManager.instance?.wallet
-        val isSweep = spendType.value == SpendType.SWEEP
+        if (walletState.backgroundSync || _coinsSelected.value != selectedCoins) {
+            _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
+            return null
+        }
         val transport = transportController.config.value
         if (transport.validationError() != null) {
             _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
@@ -197,6 +198,12 @@ class SendViewModel : ViewModel() {
         }
         return withContext(Dispatchers.IO) {
             try {
+                if (walletState.backgroundSync || WalletManager.instance?.wallet !== wallet ||
+                    !wallet.validateAddress(addressField)
+                ) {
+                    _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
+                    return@withContext null
+                }
                 // Sweep ignores the amount; a normal send must never pass through Double or
                 // the native parser, which can accept values the review screen did not show.
                 val amountAtomic =
@@ -206,9 +213,24 @@ class SendViewModel : ViewModel() {
                         MoneroAmount.parseExact(amount)
                             ?: throw IllegalArgumentException("invalid amount")
                     }
+                if (selectedCoins.isNotEmpty()) {
+                    wallet.refreshCoins()
+                    val account = wallet.getAccountIndex()
+                    val selectedKeys = selectedCoins.map { it.key }.toSet()
+                    val spendableKeys =
+                        wallet
+                            .getUtxos()
+                            .filter {
+                                it.keyImageKnown && it.unlocked && !it.spent && !it.frozen && it.subaddrAccount == account
+                            }.mapTo(mutableSetOf()) { it.key }
+                    if (selectedKeys.size != selectedCoins.size || !spendableKeys.containsAll(selectedKeys)) {
+                        _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
+                        return@withContext null
+                    }
+                }
                 _txComposeError.postValue(null)
-                if (isSweep && _coinsSelected.value.isNullOrEmpty()) {
-                    if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
+                if (isSweep && selectedCoins.isEmpty()) {
+                    if (wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
                     }
@@ -218,14 +240,15 @@ class SendViewModel : ViewModel() {
                             priority = PendingTransaction.Priority.Priority_Default,
                             keyImages = arrayListOf(),
                         )
-                    if (!pendingTx?.getErrorString().isNullOrEmpty()) {
-                        throw Exception(pendingTx.getErrorString())
+                    if (pendingTx == null || !pendingTx.getErrorString().isNullOrEmpty()) {
+                        _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
+                        return@withContext null
                     }
 
-                    pendingTx?.let { writeUnsignedTransaction(it) }
+                    writeUnsignedTransaction(pendingTx)
                     pendingTx
                 } else {
-                    if (wallet?.fullStatus?.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
+                    if (wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
                     }
@@ -234,11 +257,10 @@ class SendViewModel : ViewModel() {
                             dst_addr = addressField,
                             amount = amountAtomic,
                             sweepAll = isSweep,
-                            selectedUtxos = _coinsSelected.value?.toList() ?: listOf(),
+                            selectedUtxos = selectedCoins.toList(),
                         )
 
                     if (!pendingTx.getErrorString().isNullOrEmpty()) {
-                        Timber.tag(TAG).e("transaction error: %s", pendingTx.getErrorString())
                         _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
                         return@withContext null
                     }
@@ -249,7 +271,7 @@ class SendViewModel : ViewModel() {
                 throw cancelled
             } catch (e: Exception) {
                 _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
-                Timber.tag(TAG).e(e)
+                Timber.tag(TAG).e("send transaction construction failed")
                 null
             }
         }
@@ -305,13 +327,13 @@ class SendViewModel : ViewModel() {
     }
 
     fun setSpendType(type: SpendType) {
-        _spendType.postValue(type)
+        _spendType.value = type
     }
 
     // Computed balance based on selected coins or unlocked balance
     val balance =
         MediatorLiveData<Long>().apply {
-            addSource(walletState.unLockedBalance.asLiveData()) { updateComputedBalance() }
+            addSource(_balance) { updateComputedBalance() }
             addSource(_coinsSelected) { updateComputedBalance() }
         }
 
@@ -319,43 +341,46 @@ class SendViewModel : ViewModel() {
         val selectedCoins = _coinsSelected.value
         val unlockedBal = _balance.value ?: 0L
         value =
-            if (selectedCoins.isNullOrEmpty()) {
-                unlockedBal
-            } else {
-                selectedCoins.sumOf { it.amount }
+            when {
+                selectedCoins == null -> 0L
+                selectedCoins.isEmpty() -> unlockedBal
+                else -> selectedCoins.sumOf { it.amount }
             }
     }
 
     fun setCoins(coins: List<String>) {
-        // wallet2 coins/account reads are native calls; keep them off the main thread and
-        // let a newer selection cancel an older, slower one.
         coinsJob?.cancel()
-        val request = coinsRequest.incrementAndGet()
+        _txComposeError.value = null
+        if (coins.isEmpty()) {
+            _coinsSelected.value = emptySet()
+            return
+        }
+
+        // An unresolved or invalid selection must not become a wallet-wide sweep.
+        _coinsSelected.value = null
+        val requested = coins.toSet()
         coinsJob =
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch {
                 try {
-                    val wallet = WalletManager.instance?.wallet
-                    val walletCoins = wallet?.coins?.all ?: listOf()
-                    val accountIndex = wallet?.getAccountIndex() ?: 0
-                    // Frozen outputs must never be preselected, even if a stale route or QR
-                    // payload names one. wallet2 also refuses them, but silently letting the UI
-                    // show a spendable selection would be misleading.
-                    val selectedCoins =
-                        walletCoins
-                            .filter {
-                                coins.contains(it.pub_key) && !it.frozen && !it.spent &&
-                                    it.subaddrAccount == accountIndex
-                            }.toSet()
-                    if (coinsRequest.get() == request) {
-                        _coinsSelected.postValue(selectedCoins)
+                    val selected =
+                        withContext(Dispatchers.IO) {
+                            val wallet = WalletManager.instance?.wallet ?: return@withContext emptySet()
+                            val account = wallet.getAccountIndex()
+                            wallet
+                                .getUtxos()
+                                .filter { it.pub_key in requested && !it.frozen && !it.spent && it.subaddrAccount == account }
+                                .toSet()
+                        }
+                    if (selected.map { it.pub_key }.toSet() == requested) {
+                        _coinsSelected.value = selected
+                    } else {
+                        _txComposeError.value = SendError.CONSTRUCTION_FAILED
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (e: Exception) {
-                    Timber.tag(TAG).e(e, "coin selection failed")
-                    if (coinsRequest.get() == request) {
-                        _coinsSelected.postValue(emptySet())
-                    }
+                    Timber.tag(TAG).e("coin selection failed")
+                    _txComposeError.value = SendError.CONSTRUCTION_FAILED
                 }
             }
     }
@@ -374,19 +399,19 @@ fun SendScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var addressField by rememberSaveable { mutableStateOf("") }
     var amountField by rememberSaveable { mutableStateOf("") }
-    var validSpend by rememberSaveable { mutableStateOf(false) }
     var preparingTx by remember { mutableStateOf(false) }
     var showCoinSelection by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
     var qrScannerParam by remember { mutableStateOf<SpendQRExchangeParam?>(null) }
-    var inValidAddress by remember { mutableStateOf<Boolean?>(null) }
+    var checkedAddress by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     val labelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
     val scope = rememberCoroutineScope()
     val sendViewModel = koinViewModel<SendViewModel>()
     val unlockedBalance by sendViewModel.balance.observeAsState(0L)
     val paymentUriFromScanner by sendViewModel.paymentUri.observeAsState(null)
     val spendType by sendViewModel.spendType.observeAsState(SpendType.NORMAL)
-    val coins by sendViewModel.coins.observeAsState(emptySet())
+    val coinSelection by sendViewModel.coins.observeAsState(emptySet())
+    val coins = coinSelection.orEmpty()
     val txComposeError by sendViewModel.txComposeError.observeAsState()
     val view = LocalView.current
     val walletState: WalletState by inject(WalletState::class.java)
@@ -435,52 +460,80 @@ fun SendScreen(
     }
     val sweep = spendType == SpendType.SWEEP
 
-    LaunchedEffect(addressField, amountField) {
-        scope
-            .launch {
-                unlockedBalance?.let { maxSpendableBalance ->
-                    val amountAtomic = MoneroAmount.parseExact(amountField)
-
-                    validSpend =
-                        when {
-                            inValidAddress == true -> false
-                            spendType == SpendType.SWEEP -> true
-                            amountAtomic == null || maxSpendableBalance == 0L -> false
-                            amountAtomic >= maxSpendableBalance -> false
-                            else -> true
-                        }
+    LaunchedEffect(addressField) {
+        val address = addressField
+        if (address.isBlank()) {
+            checkedAddress = null
+        } else {
+            val valid =
+                withContext(Dispatchers.IO) {
+                    try {
+                        WalletManager.instance?.wallet?.validateAddress(address) == true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).e("send address validation failed")
+                        false
+                    }
                 }
-            }.invokeOnCompletion {
-                if (it != null) {
-                    Timber.tag(TAG).e(it)
-                }
-            }
+            checkedAddress = address to valid
+        }
     }
 
-    fun prepare() {
+    val addressValid = checkedAddress?.takeIf { it.first == addressField }?.second
+    val amountAtomic = MoneroAmount.parseExact(amountField)
+    val validSpend =
+        addressValid == true && coinSelection != null && !showIndefiniteLoading &&
+            (sweep || (amountAtomic != null && amountAtomic < (unlockedBalance ?: 0L)))
+    val resources = LocalResources.current
+
+    fun prepare(checkKeyImages: Boolean = false) {
+        if (!validSpend || preparingTx) return
+        val address = addressField
+        val amount = amountField
+        val isSweep = sweep
+        val selectedCoins = coinSelection ?: return
+        val spendAmount = if (isSweep) 0L else amountAtomic ?: return
+        val wallet = WalletManager.instance?.wallet ?: return
+        preparingTx = true
         scope.launch {
             try {
-                preparingTx = true
-                val pendingTx =
-                    sendViewModel.prepareTransaction(addressField, amountField)
-                if (pendingTx != null) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        view.performHapticFeedback(
-                            HapticFeedbackConstants.CONFIRM,
-                        )
-                    }
-                    if (!pendingTx.getErrorString().isNullOrEmpty()) {
+                if (checkKeyImages) {
+                    val needsKeyImages =
+                        withContext(Dispatchers.IO) {
+                            if (isSweep) {
+                                wallet.hasUnknownKeyImages()
+                            } else {
+                                val withFee =
+                                    runCatching {
+                                        Math.addExact(spendAmount, 1_000_000_000L)
+                                    }.getOrDefault(Long.MAX_VALUE)
+                                withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
+                            }
+                        }
+                    if (WalletManager.instance?.wallet !== wallet) return@launch
+                    if (needsKeyImages) {
+                        qrScannerParam =
+                            SpendQRExchangeParam(
+                                exportType = ExportType.OUTPUT,
+                                title = resources.getString(R.string.outputs),
+                                ctaText = resources.getString(R.string.scan_key_images),
+                            )
                         return@launch
                     }
-                    navigateToReview.invoke(ReviewTransactionRoute(addressField))
-                } else {
-                    Timber.tag(TAG).i("prepare: Pending tx is null")
-                    // show error
+                }
+
+                val pendingTx = sendViewModel.prepareTransaction(wallet, address, amount, isSweep, selectedCoins)
+                if (pendingTx != null && WalletManager.instance?.wallet === wallet) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    }
+                    navigateToReview.invoke(ReviewTransactionRoute(address))
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e)
+                Timber.tag(TAG).e("send preparation failed")
             } finally {
                 preparingTx = false
             }
@@ -488,7 +541,6 @@ fun SendScreen(
     }
 
     val context = LocalContext.current
-    val resources = LocalResources.current
 
     if (showCoinSelection) {
         ModalBottomSheet(
@@ -615,9 +667,9 @@ fun SendScreen(
                                 value = addressField,
                                 shape = MaterialTheme.shapes.medium,
                                 minLines = 4,
-                                isError = inValidAddress == true,
+                                isError = addressValid == false,
                                 supportingText = {
-                                    if (inValidAddress == true) {
+                                    if (addressValid == false) {
                                         Text(stringResource(R.string.invalid_address))
                                     }
                                 },
@@ -635,23 +687,7 @@ fun SendScreen(
                                         color = labelColor,
                                     )
                                 },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .onFocusChanged {
-                                            if (!it.hasFocus && addressField.isNotEmpty()) {
-                                                scope.launch(Dispatchers.Default) {
-                                                    inValidAddress =
-                                                        WalletManager.instance?.wallet?.validateAddress(
-                                                            addressField,
-                                                        ) != true
-                                                }
-                                            } else {
-                                                if (addressField.isEmpty()) {
-                                                    inValidAddress = null
-                                                }
-                                            }
-                                        }.focusable(),
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         },
                     )
@@ -763,55 +799,7 @@ fun SendScreen(
                             .padding(
                                 horizontal = 16.dp,
                             ),
-                    onClick = {
-                        val wallet = WalletManager.instance?.wallet ?: return@AnonOutlineButton
-                        val isSweep = spendType == SpendType.SWEEP
-                        val spendAmount =
-                            if (isSweep) {
-                                0L
-                            } else {
-                                MoneroAmount.parseExact(amountField) ?: return@AnonOutlineButton
-                            }
-                        if (AnonConfig.viewOnly) {
-                            scope.launch {
-                                try {
-                                    val needsKeyImages =
-                                        withContext(Dispatchers.IO) {
-                                            if (isSweep) {
-                                                wallet.hasUnknownKeyImages()
-                                            } else {
-                                                // Reserve a fee for the key-image check without
-                                                // letting a near-Long.MAX amount wrap negative.
-                                                val withFee =
-                                                    runCatching {
-                                                        Math.addExact(spendAmount, 1_000_000_000L)
-                                                    }.getOrDefault(Long.MAX_VALUE)
-                                                withFee > wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
-                                            }
-                                        }
-
-                                    if (needsKeyImages) {
-                                        qrScannerParam =
-                                            SpendQRExchangeParam(
-                                                exportType = ExportType.OUTPUT,
-                                                title = resources.getString(R.string.outputs),
-                                                ctaText = resources.getString(R.string.scan_key_images),
-                                            )
-                                    } else {
-                                        prepare()
-                                    }
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (e: Exception) {
-                                    Timber.tag(TAG).e(e, "view-only key image check failed")
-                                }
-                            }
-
-                            return@AnonOutlineButton
-                        } else {
-                            prepare()
-                        }
-                    },
+                    onClick = { prepare(checkKeyImages = AnonConfig.viewOnly) },
                 ) {
                     Text(stringResource(R.string.next))
                 }

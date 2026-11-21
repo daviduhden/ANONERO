@@ -620,7 +620,6 @@ class Wallet {
 
     fun refreshCoins() {
         if (isSynchronized) {
-            Timber.tag("Wallet").d("Coin Refreshed: %s", coins?.getCount())
             coins?.refresh()
         }
     }

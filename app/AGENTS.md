@@ -57,6 +57,9 @@ anonymity, privacy, security, language, build, and Git policy. Read it first.
   lock/unlock, wipe) must be serialized or guarded; concurrent calls can leave the
   process with keys or a proxy from the wrong profile.
 
+Explicit coin actions must resolve all requested outputs. A failed selection must not
+be treated as an account-wide sweep. Recheck wallet identity after asynchronous preflight.
+
 ## 4. Persistence
 
 - The `SharedPreferences` file is `anonPref` (`AnonConfig.PREFS`), injected under the
