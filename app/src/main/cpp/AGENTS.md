@@ -106,6 +106,9 @@ Additional rules:
   existing wallet2 API and the Kotlin flow already require it and it is documented.
 - Preserve the wallet2 status/error contract. If a native call fails, return a value
   that Kotlin will treat as failure; do not fabricate success.
+- Wallet initialization, both proxy setters, LWS login and background-sync start/stop
+  report native exceptions through their existing false result. Keep implicit string
+  allocations inside the catch boundary and reject negative limits before conversion.
 - Keep `setTrustedDaemon`, `setProxy`, and light-wallet calls faithful to wallet2. Do
   not “fix” trust by hardcoding a safe-looking value on the native side.
 - Do not weaken validation to make a test or UI path easier.

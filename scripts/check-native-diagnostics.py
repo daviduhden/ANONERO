@@ -120,6 +120,25 @@ if re.search(
 ):
     failures.append("UTF acquisition failure must preserve the JVM error before returning text")
 
+# These Boolean exports gate transport setup and the lock screen. Both argument
+# conversion and wallet2 failures must stay inside the export's catch boundary.
+for owner, operation, call in (
+    ("WalletManager", "setProxyJ", "->setProxy("),
+    ("Wallet", "setProxyJ", "->setProxy("),
+    ("Wallet", "initJ", "->init("),
+    ("Wallet", "lightWalletLogin", "->lightWalletLogin("),
+    ("Wallet", "startBackgroundSync", "->startBackgroundSync("),
+    ("Wallet", "stopBackgroundSync", "->stopBackgroundSync("),
+):
+    start = code.index(f"Java_io_anonero_model_{owner}_{operation}(")
+    end = code.index("\n}\n", start)
+    before_try, _, implementation = code[start:end].partition("try {")
+    native_call, _, fallback = implementation.partition("catch (...)")
+    if call in before_try or call not in native_call or "return JNI_FALSE;" not in fallback:
+        failures.append(f"{owner}.{operation}: native call must fail closed inside a catch")
+    if operation == "initJ" and "upper_transaction_size_limit < 0" not in before_try:
+        failures.append("Wallet.initJ: check size limit before converting to unsigned")
+
 if failures:
     raise SystemExit("\n".join(failures))
 print("Native diagnostic static policy passed (not runtime or security proof)")

@@ -865,9 +865,13 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_setProxyJ(JNIEnv 
     ScopedUtfChars addressChars(env, address);
     if (addressChars.get() == nullptr)
         return JNI_FALSE;
-    bool rc =
-        Monero::WalletManagerFactory::getWalletManager()->setProxy(std::string(addressChars.get()));
-    return rc;
+    try {
+        return static_cast<jboolean>(
+            Monero::WalletManagerFactory::getWalletManager()->setProxy(addressChars.get()));
+    } catch (...) {
+        LOGE("WalletManager.setProxy failed");
+        return JNI_FALSE;
+    }
 }
 
 //TODO static std::tuple<bool, std::string, std::string, std::string, std::string> checkUpdates(const std::string &software, const std::string &subdir);
@@ -1132,8 +1136,8 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_initJ(
     JNIEnv *env, jobject instance, jstring daemon_address, jlong upper_transaction_size_limit,
     jstring daemon_username, jstring daemon_password, jstring proxy_address,
     jboolean light_wallet) {
-    if (daemon_address == nullptr || daemon_username == nullptr || daemon_password == nullptr ||
-        proxy_address == nullptr) {
+    if (upper_transaction_size_limit < 0 || daemon_address == nullptr ||
+        daemon_username == nullptr || daemon_password == nullptr || proxy_address == nullptr) {
         return JNI_FALSE;
     }
     ScopedUtfChars daemonChars(env, daemon_address);
@@ -1147,10 +1151,15 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_initJ(
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    bool status =
-        wallet->init(daemonChars.get(), (uint64_t)upper_transaction_size_limit, usernameChars.get(),
-                     passwordChars.get(), false, static_cast<bool>(light_wallet), proxyChars.get());
-    return static_cast<jboolean>(status);
+    try {
+        return static_cast<jboolean>(
+            wallet->init(daemonChars.get(), static_cast<uint64_t>(upper_transaction_size_limit),
+                         usernameChars.get(), passwordChars.get(), false,
+                         static_cast<bool>(light_wallet), proxyChars.get()));
+    } catch (...) {
+        LOGE("Wallet.init failed");
+        return JNI_FALSE;
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_lightWalletLogin(JNIEnv *env,
@@ -1158,18 +1167,16 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_lightWalletLogin(JNIEnv 
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    bool isNewWallet = false;
-    bool ok;
     try {
-        ok = wallet->lightWalletLogin(isNewWallet);
-    } catch (const std::exception &) {
+        bool isNewWallet = false;
+        if (wallet->lightWalletLogin(isNewWallet))
+            return JNI_TRUE;
+    } catch (...) {
         LOGE("lightWalletLogin threw");
-        ok = false;
+        return JNI_FALSE;
     }
-    if (!ok) {
-        LOGE("lightWalletLogin failed");
-    }
-    return static_cast<jboolean>(ok);
+    LOGE("lightWalletLogin failed");
+    return JNI_FALSE;
 }
 
 //    virtual bool createWatchOnly(const std::string &path, const std::string &password, const std::string &language) const = 0;
@@ -1229,7 +1236,12 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_setProxyJ(JNIEnv *env, j
     ScopedUtfChars addressChars(env, address);
     if (addressChars.get() == nullptr)
         return JNI_FALSE;
-    return static_cast<jboolean>(wallet->setProxy(std::string(addressChars.get())));
+    try {
+        return static_cast<jboolean>(wallet->setProxy(addressChars.get()));
+    } catch (...) {
+        LOGE("Wallet.setProxy failed");
+        return JNI_FALSE;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getBalance(JNIEnv *env, jobject instance,
@@ -1404,8 +1416,12 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_startBackgroundSync(JNIE
     if (wallet == nullptr)
         return JNI_FALSE;
 
-    bool bgsyncStatus = wallet->startBackgroundSync();
-    return static_cast<jboolean>(bgsyncStatus);
+    try {
+        return static_cast<jboolean>(wallet->startBackgroundSync());
+    } catch (...) {
+        LOGE("startBackgroundSync failed");
+        return JNI_FALSE;
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_stopBackgroundSync(JNIEnv *env,
@@ -1417,8 +1433,12 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_stopBackgroundSync(JNIEn
     ScopedUtfChars passwordChars(env, password);
     if (passwordChars.get() == nullptr)
         return JNI_FALSE;
-    bool bgsyncStatus = wallet->stopBackgroundSync(std::string(passwordChars.get()));
-    return static_cast<jboolean>(bgsyncStatus);
+    try {
+        return static_cast<jboolean>(wallet->stopBackgroundSync(passwordChars.get()));
+    } catch (...) {
+        LOGE("stopBackgroundSync failed");
+        return JNI_FALSE;
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_refresh(JNIEnv *env, jobject instance) {
