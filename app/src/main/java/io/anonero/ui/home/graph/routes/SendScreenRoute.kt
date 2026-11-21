@@ -18,18 +18,14 @@
 
 package io.anonero.ui.home.graph.routes
 
-import android.net.Uri
-import androidx.core.net.toUri
 import io.anonero.AnonConfig
 import io.anonero.model.Wallet
 import io.anonero.util.MoneroAmount
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import timber.log.Timber
-
-// PaymentUri is a data class that represents a payment URI.
-// example: monero:84jaiKcu3....d9a49f5&tx_amount=0.000000000010&recipient_name=el00ruobuob%20Stagenet%20wallet&tx_description=Testing%20out%20the%20make_uri%20function.
-// PaymentUri can also handle non-URI addresses, which will be validated and wrapped in a PaymentUri object.
+import java.net.URI
+import java.net.URISyntaxException
+import java.net.URLDecoder
 
 @Serializable
 data class SendScreenRoute(
@@ -61,54 +57,58 @@ data class SendScreenRoute(
             return if (ZERO_AMOUNT.matches(text)) 0L else null
         }
 
-        fun parse(uri: String): SendScreenRoute? {
+        fun parse(uri: String): SendScreenRoute? =
+            parse(uri) { address -> Wallet.isAddressValid(address, AnonConfig.getNetworkType().value) }
+
+        internal fun parse(
+            uri: String,
+            validateAddress: (String) -> Boolean,
+        ): SendScreenRoute? =
             try {
-                if (uri.startsWith("monero")) {
-                    var parsedUri = uri.toUri()
-
-                    if (parsedUri.schemeSpecificPart != "monero://") {
-                        parsedUri = uri.replace("monero:", "monero://").toUri()
-                    }
-
-                    // Extract address from scheme-specific part
-                    val address = parsedUri.host ?: return null
-
-                    if (!Wallet.isAddressValid(address, AnonConfig.getNetworkType().value)) {
-                        return null
-                    }
-                    // Extract query parameters safely. Reject a malformed or over-precise
-                    // amount instead of silently changing what the user will send.
-                    val amount =
-                        parseAmountParameter(
-                            parsedUri.getQueryParameter("tx_amount"),
-                        ) ?: return null
-                    val paymentId = parsedUri.getQueryParameter("payment_id")
-                    val recipientName = parsedUri.getQueryParameter("recipient_name") ?: ""
-                    val txDescription = parsedUri.getQueryParameter("tx_description") ?: ""
-
-                    return SendScreenRoute(
-                        address = address,
-                        amount = amount,
-                        paymentId = paymentId,
-                        recipientName = recipientName,
-                        txDescription = txDescription,
-                    )
+                if (uri.startsWith("monero:", ignoreCase = true)) {
+                    parsePaymentUri(uri.substringAfter(':'), validateAddress)
                 } else {
-                    Wallet
-                        .isAddressValid(
-                            uri,
-                            AnonConfig.getNetworkType().value,
-                        ).let {
-                            if (it) {
-                                return SendScreenRoute(address = uri)
-                            }
-                        }
+                    uri.takeIf(validateAddress)?.let { SendScreenRoute(address = it) }
                 }
-            } catch (e: Exception) {
-                Timber.tag("PaymentUri:Parse ").e(e)
+            } catch (_: IllegalArgumentException) {
+                null
+            } catch (_: URISyntaxException) {
+                null
+            }
+
+        private fun parsePaymentUri(
+            body: String,
+            validateAddress: (String) -> Boolean,
+        ): SendScreenRoute? {
+            val parsed = URI("monero://${body.removePrefix("//")}")
+            val address = parsed.rawAuthority ?: return null
+            if (!address.all { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' } ||
+                !parsed.rawPath.isNullOrEmpty() ||
+                parsed.rawFragment != null ||
+                !validateAddress(address)
+            ) {
                 return null
             }
-            return null
+
+            val recognized = setOf("tx_amount", "payment_id", "recipient_name", "tx_description")
+            val parameters = mutableMapOf<String, String>()
+            parsed.rawQuery?.split('&')?.forEach { pair ->
+                val name = decodeQueryComponent(pair.substringBefore('='))
+                if (name in recognized) {
+                    val encodedValue = pair.substringAfter('=', "")
+                    val value = decodeQueryComponent(if (name == "tx_amount") encodedValue.replace("+", "%2B") else encodedValue)
+                    if (parameters.put(name, value) != null) return null
+                }
+            }
+            return SendScreenRoute(
+                address = address,
+                amount = parseAmountParameter(parameters["tx_amount"]) ?: return null,
+                paymentId = parameters["payment_id"],
+                recipientName = parameters["recipient_name"].orEmpty(),
+                txDescription = parameters["tx_description"].orEmpty(),
+            )
         }
+
+        private fun decodeQueryComponent(value: String): String = URLDecoder.decode(value, Charsets.UTF_8.name())
     }
 }

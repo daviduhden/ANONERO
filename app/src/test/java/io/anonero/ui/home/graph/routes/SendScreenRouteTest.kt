@@ -23,6 +23,39 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SendScreenRouteTest {
+    private val address = "SyntheticAddress"
+
+    @Test
+    fun `bare opaque and hierarchical addresses are equivalent`() {
+        assertEquals(SendScreenRoute(address), parse(address))
+        assertEquals(SendScreenRoute(address, 1L), parse("monero:$address?tx_amount=0.000000000001"))
+        assertEquals(SendScreenRoute(address, 1L), parse("MONERO://$address?tx_amount=0.000000000001"))
+    }
+
+    @Test
+    fun `metadata preserves colons and decodes percent escapes`() {
+        assertEquals(
+            SendScreenRoute(address, recipientName = "Alice Bob", txDescription = "monero:example & memo"),
+            parse("monero:$address?recipient_name=Alice%20Bob&tx_description=monero:example%20%26%20memo"),
+        )
+    }
+
+    @Test
+    fun `ambiguous amount parameters and non address syntax are rejected`() {
+        assertNull(parse("monero:$address?tx_amount=1&tx_amount=2"))
+        assertNull(parse("monero:$address?tx_amount=1&%74x_amount=1"))
+        assertNull(parse("monero:$address?tx_amount=+1"))
+        assertNull(parse("monero:$address?tx_amount=%ZZ"))
+        assertNull(parse("monero://wrong@$address"))
+        assertNull(parse("monero://$address:80"))
+        assertNull(parse("monero://$address/path"))
+        assertNull(parse("monero:$address#fragment"))
+        assertNull(parse("monero:///$address"))
+        assertNull(parse("monerox:$address"))
+    }
+
+    private fun parse(uri: String) = SendScreenRoute.parse(uri) { it == address }
+
     @Test
     fun `omitted, empty and zero URI amounts mean no prefilled amount`() {
         assertEquals(0L, SendScreenRoute.parseAmountParameter(null))
