@@ -208,3 +208,12 @@ refresh catches native exceptions and preserves/raises Java failure. closeJ catc
 failure without invalidating the wrapper until confirmed success. Kotlin owns auxiliary
 wrappers through RetainedWallets and retries closure. Listener quiescence, destruction
 interleavings and upstream exception-lifetime semantics remain unverified.
+
+## Native input conversion
+
+Message signing and verification distinguish valid zero-length input from unreadable
+JNI input. A failed array read leaves the JVM exception pending and stops before
+wallet2 processes the message. The transaction and fee exports perform container
+allocation and input conversion inside their C++ exception guards and check the Java
+types of erased key-image collection elements. These checks do not serialize raw handle
+use or make callback replacement safe by themselves.

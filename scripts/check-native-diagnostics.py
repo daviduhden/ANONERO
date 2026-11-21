@@ -77,6 +77,32 @@ for model in ("Coins", "TransactionHistory"):
     if "catch (...)" not in body or "throwSnapshotFailure(env)" not in body:
         failures.append(f"{model}: refresh must contain native exceptions and reject null snapshots")
 
+# Collections can allocate before wallet2 itself is reached. Review the
+# complete export boundary, not just the wallet2 call.
+for operation in (
+    "createTransactionJ",
+    "createTransactionMultDestJ",
+    "estimateTransactionFeeJ",
+    "createSweepTransaction",
+    "signMessageJ",
+    "verifySignedMessageJ",
+):
+    start = text.index(f"Java_io_anonero_model_Wallet_{operation}(")
+    end = text.index("\n}\n", start)
+    body = text[start:end]
+    preamble, _, implementation = body.partition("try {")
+    if "java2cpp_" in preamble or "catch (...)" not in implementation:
+        failures.append(f"{operation}: JNI input conversion must stay inside the native catch")
+
+for converter in ("java2cpp_long", "java2cpp_bytes", "java2cpp_string_array", "java2cpp_set"):
+    start = text.index(f"{converter}(")
+    end = text.index("\n}\n", start)
+    body = text[start:end]
+    if "ExceptionClear" in body:
+        failures.append(f"{converter}: preserve pending JNI input errors")
+    if converter == "java2cpp_set" and "IsInstanceOf(element.get()," not in body:
+        failures.append("java2cpp_set: check runtime element type before casting to jstring")
+
 if failures:
     raise SystemExit("\n".join(failures))
 print("Native diagnostic static policy passed (not runtime or security proof)")

@@ -423,81 +423,53 @@ class ScopedAtomicFlagReset {
     std::atomic<bool> &flag_;
 };
 
-jlong getElement(JNIEnv *env, jlongArray arr_j, int element) {
-    jlong result = 0;
-    if (arr_j == nullptr)
-        return result;
-    // JNI C++ Get*ArrayRegion returns void and raises a pending exception on failure.
-    env->GetLongArrayRegion(arr_j, element, 1, &result);
-    if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-        return 0;
-    }
-    return result;
-}
-
 std::vector<std::uint64_t> java2cpp_long(JNIEnv *env, jlongArray longArray) {
     std::vector<std::uint64_t> result;
-    if (longArray == nullptr)
+    if (longArray == nullptr || env->ExceptionCheck())
         return result;
-    jint len = env->GetArrayLength(longArray);
-    if (len < 0)
+    const jsize len = env->GetArrayLength(longArray);
+    if (env->ExceptionCheck())
         return result;
     result.reserve(len);
-    for (jint i = 0; i < len; i++) {
-        jlong amount = getElement(env, longArray, i);
-        // Amounts are unsigned in wallet2; zero and negative jlong values are invalid
-        // input. Reject the whole array so a failed read cannot become a zero payment.
-        if (amount <= 0)
+    for (jsize i = 0; i < len; i++) {
+        jlong amount = 0;
+        env->GetLongArrayRegion(longArray, i, 1, &amount);
+        if (env->ExceptionCheck() || amount <= 0)
             return {};
         result.emplace_back(static_cast<std::uint64_t>(amount));
     }
     return result;
 }
 
-std::string java2cpp_bytes(JNIEnv *env, jbyteArray array) {
-    if (array == nullptr)
-        return std::string();
-    jsize len = env->GetArrayLength(array);
-    if (len < 0)
-        return std::string();
-    std::string result;
+// Empty input is valid for message signing. A missing or unreadable array is not.
+bool java2cpp_bytes(JNIEnv *env, jbyteArray array, std::string &result) {
+    if (array == nullptr || env->ExceptionCheck())
+        return false;
+    const jsize len = env->GetArrayLength(array);
+    if (env->ExceptionCheck())
+        return false;
     result.resize(len);
-    if (len > 0) {
+    if (len > 0)
         env->GetByteArrayRegion(array, 0, len, reinterpret_cast<jbyte *>(&result[0]));
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-            return std::string();
-        }
-    }
-    return result;
+    return !env->ExceptionCheck();
 }
 
 std::vector<std::string> java2cpp_string_array(JNIEnv *env, jobjectArray array) {
     std::vector<std::string> result;
-    if (array == nullptr)
+    if (array == nullptr || env->ExceptionCheck())
         return result;
     jsize len = env->GetArrayLength(array);
-    if (len < 0)
+    if (env->ExceptionCheck())
         return result;
     result.reserve(len);
     for (jsize i = 0; i < len; i++) {
         ScopedLocalRef element_ref(env, env->GetObjectArrayElement(array, i));
-        if (element_ref.get() == nullptr) {
-            if (env->ExceptionCheck()) {
-                env->ExceptionClear();
-                return {};
-            }
-            result.emplace_back("");
-            continue;
-        }
+        if (env->ExceptionCheck() || element_ref.get() == nullptr)
+            return {};
         jstring element = static_cast<jstring>(element_ref.get());
         ScopedUtfChars chars(env, element);
-        if (chars.get() == nullptr) {
-            // Treat an unreadable element as invalid input; callers reject empty vectors.
-            env->ExceptionClear();
+        if (chars.get() == nullptr)
             return {};
-        }
         result.emplace_back(chars.get());
     }
     return result;
@@ -508,42 +480,34 @@ std::vector<std::string> java2cpp_string_array(JNIEnv *env, jobjectArray array) 
 // selection.
 bool java2cpp_set(JNIEnv *env, jobject arrayList, std::set<std::string> &result) {
     result.clear();
+    if (env->ExceptionCheck())
+        return false;
     if (arrayList == nullptr)
         return true;
-    if (class_ArrayList == nullptr)
+    if (class_ArrayList == nullptr || !env->IsInstanceOf(arrayList, class_ArrayList))
         return false;
 
-    jmethodID java_util_ArrayList_size = env->GetMethodID(class_ArrayList, "size", "()I");
-    if (java_util_ArrayList_size == nullptr || env->ExceptionCheck()) {
-        env->ExceptionClear();
+    jmethodID size = env->GetMethodID(class_ArrayList, "size", "()I");
+    if (env->ExceptionCheck() || size == nullptr)
         return false;
-    }
-    jmethodID java_util_ArrayList_get =
-        env->GetMethodID(class_ArrayList, "get", "(I)Ljava/lang/Object;");
-    if (java_util_ArrayList_get == nullptr || env->ExceptionCheck()) {
-        env->ExceptionClear();
+    jmethodID get = env->GetMethodID(class_ArrayList, "get", "(I)Ljava/lang/Object;");
+    if (env->ExceptionCheck() || get == nullptr)
         return false;
-    }
 
-    jint len = env->CallIntMethod(arrayList, java_util_ArrayList_size);
-    if (env->ExceptionCheck() || len < 0) {
-        env->ExceptionClear();
+    const jint len = env->CallIntMethod(arrayList, size);
+    if (env->ExceptionCheck() || len < 0)
         return false;
-    }
+    ScopedLocalRef stringClass(env, env->FindClass("java/lang/String"));
+    if (env->ExceptionCheck() || stringClass.get() == nullptr)
+        return false;
     for (jint i = 0; i < len; i++) {
-        ScopedLocalRef element_ref(env,
-                                   env->CallObjectMethod(arrayList, java_util_ArrayList_get, i));
-        if (element_ref.get() == nullptr) {
-            if (env->ExceptionCheck())
-                env->ExceptionClear();
+        ScopedLocalRef element(env, env->CallObjectMethod(arrayList, get, i));
+        if (env->ExceptionCheck() || element.get() == nullptr ||
+            !env->IsInstanceOf(element.get(), static_cast<jclass>(stringClass.get())))
             return false;
-        }
-        jstring element = static_cast<jstring>(element_ref.get());
-        ScopedUtfChars chars(env, element);
-        if (chars.get() == nullptr) {
-            env->ExceptionClear();
+        ScopedUtfChars chars(env, static_cast<jstring>(element.get()));
+        if (chars.get() == nullptr)
             return false;
-        }
         result.emplace(chars.get());
     }
     return true;
@@ -1499,14 +1463,14 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_createTransactionJ(
     if (dstChars.get() == nullptr || paymentChars.get() == nullptr)
         return 0;
 
-    std::set<std::string> _key_images;
-    if (!java2cpp_set(env, key_images, _key_images)) {
-        LOGE("createTransactionJ: key images unavailable");
-        return 0;
-    }
-    Monero::PendingTransaction::Priority _priority =
-        static_cast<Monero::PendingTransaction::Priority>(priority);
     try {
+        std::set<std::string> _key_images;
+        if (!java2cpp_set(env, key_images, _key_images)) {
+            LOGE("createTransactionJ: key images unavailable");
+            return 0;
+        }
+        Monero::PendingTransaction::Priority _priority =
+            static_cast<Monero::PendingTransaction::Priority>(priority);
         Monero::PendingTransaction *tx = wallet->createTransaction(
             dstChars.get(), paymentChars.get(), static_cast<uint64_t>(amount),
             static_cast<uint32_t>(mixin_count), _priority, static_cast<uint32_t>(accountIndex), {},
@@ -1527,17 +1491,17 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_createTransactionMultDestJ(
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return 0;
-    std::vector<std::string> destinations = java2cpp_string_array(env, dst_addr);
-    std::vector<uint64_t> amount_vector = java2cpp_long(env, amounts);
-    if (destinations.empty() || destinations.size() != amount_vector.size()) {
-        LOGE("createTransactionMultDestJ: destination/amount count mismatch");
-        return 0;
-    }
-    for (const auto &destination : destinations) {
-        if (destination.empty())
-            return 0;
-    }
     try {
+        std::vector<std::string> destinations = java2cpp_string_array(env, dst_addr);
+        std::vector<uint64_t> amount_vector = java2cpp_long(env, amounts);
+        if (destinations.empty() || destinations.size() != amount_vector.size()) {
+            LOGE("createTransactionMultDestJ: destination/amount count mismatch");
+            return 0;
+        }
+        for (const auto &destination : destinations) {
+            if (destination.empty())
+                return 0;
+        }
         std::set<std::string> _key_images;
         if (!java2cpp_set(env, key_images, _key_images)) {
             LOGE("createTransactionMultDestJ: key images unavailable");
@@ -1563,22 +1527,22 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_estimateTransactionFeeJ(
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return 0;
-    std::vector<std::string> addresses = java2cpp_string_array(env, destinations);
-    std::vector<uint64_t> amount_vector = java2cpp_long(env, amounts);
-    if (addresses.empty() || addresses.size() != amount_vector.size()) {
-        LOGE("estimateTransactionFeeJ: destination/amount count mismatch");
-        return 0;
-    }
-    std::vector<std::pair<std::string, uint64_t>> dest_vector;
-    dest_vector.reserve(addresses.size());
-    for (size_t i = 0; i < addresses.size(); ++i) {
-        if (addresses[i].empty())
-            return 0;
-        dest_vector.emplace_back(addresses[i], amount_vector[i]);
-    }
-    Monero::PendingTransaction::Priority _priority =
-        static_cast<Monero::PendingTransaction::Priority>(priority);
     try {
+        std::vector<std::string> addresses = java2cpp_string_array(env, destinations);
+        std::vector<uint64_t> amount_vector = java2cpp_long(env, amounts);
+        if (addresses.empty() || addresses.size() != amount_vector.size()) {
+            LOGE("estimateTransactionFeeJ: destination/amount count mismatch");
+            return 0;
+        }
+        std::vector<std::pair<std::string, uint64_t>> dest_vector;
+        dest_vector.reserve(addresses.size());
+        for (size_t i = 0; i < addresses.size(); ++i) {
+            if (addresses[i].empty())
+                return 0;
+            dest_vector.emplace_back(addresses[i], amount_vector[i]);
+        }
+        Monero::PendingTransaction::Priority _priority =
+            static_cast<Monero::PendingTransaction::Priority>(priority);
         return static_cast<jlong>(wallet->estimateTransactionFee(dest_vector, _priority));
     } catch (...) {
         LOGE("estimateTransactionFeeJ failed");
@@ -2180,17 +2144,15 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_signMessageJ(JNIEnv *env,
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return env->NewStringUTF("");
-    std::string signature;
     try {
-        signature = wallet->signMessage(java2cpp_bytes(env, message));
+        std::string bytes;
+        if (!java2cpp_bytes(env, message, bytes))
+            return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
+        return env->NewStringUTF(wallet->signMessage(bytes).c_str());
     } catch (...) {
         LOGE("signMessage failed");
-        signature.clear();
+        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
     }
-    if (signature.empty() && wallet->status() != Monero::Wallet::Status_Ok) {
-        LOGE("signMessage failed");
-    }
-    return env->NewStringUTF(signature.c_str());
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_verifySignedMessageJ(
@@ -2198,16 +2160,20 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_verifySignedMessageJ(
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    bool valid = false;
     try {
-        valid =
-            wallet->verifySignedMessage(java2cpp_bytes(env, message), java2cpp_bytes(env, address),
-                                        java2cpp_bytes(env, signature));
+        std::string messageBytes;
+        std::string addressBytes;
+        std::string signatureBytes;
+        if (!java2cpp_bytes(env, message, messageBytes) ||
+            !java2cpp_bytes(env, address, addressBytes) ||
+            !java2cpp_bytes(env, signature, signatureBytes))
+            return JNI_FALSE;
+        return static_cast<jboolean>(
+            wallet->verifySignedMessage(messageBytes, addressBytes, signatureBytes));
     } catch (...) {
         LOGE("verifySignedMessage failed");
-        valid = false;
+        return JNI_FALSE;
     }
-    return static_cast<jboolean>(valid);
 }
 
 //virtual bool parse_uri(const std::string &uri, std::string &address, std::string &payment_id, uint64_t &tvAmount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error) = 0;

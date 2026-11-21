@@ -58,6 +58,12 @@ Use the existing helpers instead of open-coding:
 - `java2cpp_long`, `java2cpp_bytes`, `java2cpp_string_array`, `java2cpp_set` for
   conversions.
 
+Transaction and message JNI exports must enclose allocating input conversion in
+their catch boundaries. Never pass a partial recipient, amount, or key-image
+collection to wallet2. An erased `ArrayList` must be checked before a member is
+cast to `jstring`. Preserve pending JVM read exceptions and distinguish an
+unreadable message from a successfully read empty byte array.
+
 Additional rules:
 
 - Check every `GetStringUTFChars` result before constructing `std::string`.

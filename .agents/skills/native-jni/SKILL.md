@@ -114,6 +114,8 @@ signature. Output/history snapshot conversion fails atomically, checks allocatio
 ScopedLocalRef; refresh errors preserve JVM failures or raise a fixed Java error. Keep the
 CI-only mutation tests under scripts/tests; never execute them locally under agent policy.
 
+A pending JNI read error must stop the current operation. Preserve the distinction between an empty message and unreadable bytes, check erased key-image element types, and place native input allocations within exception handling.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

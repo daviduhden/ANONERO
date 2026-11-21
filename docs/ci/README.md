@@ -58,3 +58,12 @@ failed before the repository script during the runner's optional settings write,
 Broken pipe (32)/adb 224 and no reports. Do not interpret it as executed/passing device tests
 or evidence for the uncommitted working tree. Current CI source uses only workflow_dispatch;
 release embeds synchronized required jobs. See [iteration](../development-iteration-2026-11.md).
+
+## Latest accessible Tests result
+
+[43640612517](https://github.com/daviduhden/ANONERO/actions/runs/43640612517) on
+`dff2ecb` passed the nine jobs, including the API 35 smoke test. It predates Android
+signing isolation and this Kotlin/JNI iteration. The JNI diagnostic guard now also
+checks that input conversion remains inside exception handling and unreadable
+message arrays abort before signing or verifying. Compile and exercise the native
+boundary in CI before treating the regression as dynamically verified.
