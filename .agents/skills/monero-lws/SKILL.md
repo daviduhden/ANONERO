@@ -156,6 +156,8 @@ loopback exemption uses strict DNS-free literal validation, never `startsWith("1
 Profile-specific settings do not establish transport/circuit isolation or prevent linking
 when the same operator is explicitly chosen for both profiles.
 
+After suspending for proxy acquisition, compare the active wallet/profile, LWS settings, and transport against the validated snapshot before configuring the native client. This guard is not a lifecycle lease for native I/O.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

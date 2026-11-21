@@ -31,6 +31,7 @@ import io.anonero.network.ProxyEndpoint
 import io.anonero.network.TransportController
 import io.anonero.network.TransportEndpoint
 import io.anonero.network.TransportMode
+import io.anonero.network.TransportStatus
 import io.anonero.store.NodesRepository
 import io.anonero.util.LwsConfig
 import io.anonero.util.PREFS_PIN_HASH
@@ -122,8 +123,8 @@ class AnonWalletHandler(
         }
         scope.launch {
             transportController.state.collect { state ->
-                if (state.mode != io.anonero.network.TransportMode.SYSTEM_VPN) return@collect
-                if (state.status != io.anonero.network.TransportStatus.UNAVAILABLE) return@collect
+                if (state.mode != TransportMode.SYSTEM_VPN) return@collect
+                if (state.status != TransportStatus.UNAVAILABLE) return@collect
                 val wallet = WalletManager.instance?.wallet ?: return@collect
                 wallet.pauseRefresh()
                 wallet.setOffline(true)
@@ -282,18 +283,23 @@ class AnonWalletHandler(
             ) {
                 // Never reconnect directly after losing the only clearnet transport, and
                 // never re-init through a stale embedded-Tor port.
-                when (transportController.config.value.mode) {
-                    TransportMode.SYSTEM_VPN -> transportController.isVpnActive()
-                    TransportMode.EMBEDDED_TOR -> torService.socks != null
-                    else -> true
-                }
+                val mode = transportController.config.value.mode
+                val state = transportController.state.value
+                state.mode == mode && state.status == TransportStatus.READY &&
+                    when (mode) {
+                        TransportMode.SYSTEM_VPN -> transportController.isVpnActive()
+                        TransportMode.EMBEDDED_TOR -> torService.socks != null
+                        else -> state.endpoint is TransportEndpoint.Socks5
+                    }
             }
 
         wallet.setListener(handler)
         wallet.refreshHistory()
         handler?.start()
 
-        val lws = LwsConfig.load(prefs)
+        val profile = WalletSession.profile
+        val transport = transportController.config.value
+        val lws = LwsConfig.load(prefs, profile)
         val lwsActive = lws.enabled
         val host =
             (if (lwsActive) lws.host else prefs.getString(NodeFields.RPC_HOST.value, "")).orEmpty()
@@ -314,7 +320,6 @@ class AnonWalletHandler(
                 // The LWS receives the view key. Its destination must match the
                 // selected transport network and clearnet servers must use TLS unless
                 // they are local. This is the same fail-closed policy as RPC.
-                val transport = transportController.config.value
                 val compatibility = LwsConfig.validateTransport(lws, transport)
                 if (compatibility != null) throw Exception(compatibility.technicalMessage)
                 val validation = LwsConfig.validate(lws.host, lws.port, lws.useTls)
@@ -323,25 +328,30 @@ class AnonWalletHandler(
             // no node (offline signer): nothing to route, leave the transport off
             if (host.isNotEmpty()) applyProxy()
             // A profile switch or close can replace this session while Tor is starting.
-            if (WalletManager.instance !== manager || manager.wallet !== wallet) return
+            if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) return
+            check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
+                "Wallet network settings changed during startup"
+            }
             if (host.isNotEmpty()) {
                 var node =
-                    nodeFromPrefs(
-                        host,
-                        rpcPort,
-                        rpcUsername,
-                        rpcPassphrase,
-                        lwsActive,
-                        if (lwsActive) lws.useTls else prefs.getBoolean(NodeFields.NODE_TLS.value, false),
-                    )
-                if (!lwsActive && node != null &&
-                    !NodeSelectionPolicy.accepts(transportController.config.value, node)
+                    checkNotNull(
+                        nodeFromPrefs(
+                            host,
+                            rpcPort,
+                            rpcUsername,
+                            rpcPassphrase,
+                            lwsActive,
+                            if (lwsActive) lws.useTls else prefs.getBoolean(NodeFields.NODE_TLS.value, false),
+                        ),
+                    ) { "Invalid saved endpoint" }
+                if (!lwsActive &&
+                    !NodeSelectionPolicy.accepts(transport, node, AnonConfig.getNetworkType())
                 ) {
                     val replacement =
-                        if (transportController.config.value.autoSelectNode) {
+                        if (transport.autoSelectNode) {
                             NodeSelectionPolicy.select(
                                 nodesRepository.getAll(),
-                                transportController.config.value,
+                                transport,
                                 AnonConfig.getNetworkType(),
                             )
                         } else {
@@ -350,7 +360,11 @@ class AnonWalletHandler(
                     if (replacement == null) {
                         throw Exception("No compatible node for the selected transport")
                     }
-                    persistNode(replacement)
+                    if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) return
+                    check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
+                        "Wallet network settings changed during node selection"
+                    }
+                    check(persistNode(replacement)) { "Cannot persist selected node" }
                     node = replacement
                 }
                 updateDaemon(node, lightWallet = lwsActive)
@@ -361,13 +375,17 @@ class AnonWalletHandler(
                 wallet.refreshHistory()
             }
             check(wallet.init(0, lightWallet = lwsActive)) { "Wallet initialization failed" }
+            if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) return
+            check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
+                "Wallet network settings changed during initialization"
+            }
             if (!lwsActive && prefs.getLong(
-                    WalletProfileStore.restoreHeightKey(WalletSession.profile),
+                    WalletProfileStore.restoreHeightKey(profile),
                     0L,
                 ) != 0L
             ) {
                 wallet.setRestoreHeight(
-                    prefs.getLong(WalletProfileStore.restoreHeightKey(WalletSession.profile), 0L),
+                    prefs.getLong(WalletProfileStore.restoreHeightKey(profile), 0L),
                 )
             }
             if (wallet.isInitialized) {
@@ -391,7 +409,7 @@ class AnonWalletHandler(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            if (WalletManager.instance !== manager || manager.wallet !== wallet) return
+            if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) return
             wallet.pauseRefresh()
             wallet.setOffline(true)
             if (lwsActive) wallet.setTrustedDaemon(false)
@@ -425,15 +443,25 @@ class AnonWalletHandler(
     suspend fun reapplyLightWallet() {
         val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
         val wallet = manager.wallet ?: return
-        val lws = LwsConfig.load(prefs)
+        val profile = WalletSession.profile
+        val transport = transportController.config.value
+        val lws = LwsConfig.load(prefs, profile)
         if (!lws.enabled) throw IllegalStateException("LWS is not enabled")
-        val compatibility = LwsConfig.validateTransport(lws, transportController.config.value)
+        val compatibility = LwsConfig.validateTransport(lws, transport)
         if (compatibility != null) throw IllegalStateException(compatibility.technicalMessage)
         val validation = LwsConfig.validate(lws.host, lws.port, lws.useTls)
         if (validation != null) throw IllegalStateException(validation.technicalMessage)
         wallet.pauseRefresh()
+        wallet.setOffline(true)
+        walletState.setOffline(true)
         wallet.setTrustedDaemon(false)
         applyProxy()
+        if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
+            throw CancellationException("Wallet session changed while preparing LWS")
+        }
+        check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
+            "Wallet network settings changed while preparing LWS"
+        }
         val node =
             nodeFromPrefs(
                 lws.host,
@@ -445,6 +473,12 @@ class AnonWalletHandler(
             ) ?: throw IllegalStateException("Invalid LWS endpoint")
         updateDaemon(node, lightWallet = true)
         check(wallet.init(0, lightWallet = true)) { "LWS initialization failed" }
+        if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
+            throw CancellationException("Wallet session changed during LWS initialization")
+        }
+        check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
+            "Wallet network settings changed during LWS initialization"
+        }
         wallet.setTrustedDaemon(false)
         check(wallet.lightWalletLogin()) { "LWS login failed" }
         wallet.setTrustedDaemon(false)
@@ -501,17 +535,17 @@ class AnonWalletHandler(
                 },
         )
 
-    private fun persistNode(node: Node) {
-        prefs.edit(commit = true) {
-            putString(NodeFields.RPC_HOST.value, node.host)
-            putBoolean(NodeFields.NODE_TLS.value, node.useTls)
-            putInt(NodeFields.RPC_PORT.value, node.rpcPort)
-            putString(NodeFields.RPC_USERNAME.value, node.username)
-            putString(NodeFields.RPC_PASSWORD.value, node.password)
-            putString(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
-            putString(NodeFields.NODE_NAME.value, node.name)
-        }
-    }
+    private fun persistNode(node: Node): Boolean =
+        prefs
+            .edit()
+            .putString(NodeFields.RPC_HOST.value, node.host)
+            .putBoolean(NodeFields.NODE_TLS.value, node.useTls)
+            .putInt(NodeFields.RPC_PORT.value, node.rpcPort)
+            .putString(NodeFields.RPC_USERNAME.value, node.username)
+            .putString(NodeFields.RPC_PASSWORD.value, node.password)
+            .putString(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
+            .putString(NodeFields.NODE_NAME.value, node.name)
+            .commit()
 
     fun updateDaemon(
         node: Node?,
@@ -527,11 +561,11 @@ class AnonWalletHandler(
         val lwsActive = lightWallet
         try {
             if (!lwsActive && node != null) {
-                require(NodeSelectionPolicy.accepts(transportController.config.value, node)) {
+                require(NodeSelectionPolicy.accepts(transportController.config.value, node, AnonConfig.getNetworkType())) {
                     "Node network does not match the selected transport"
                 }
             }
-            if (transportController.config.value.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
+            if (transportController.config.value.mode == TransportMode.SYSTEM_VPN &&
                 !transportController.isVpnActive()
             ) {
                 throw IllegalStateException("System VPN is not active")

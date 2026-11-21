@@ -86,6 +86,10 @@ class MoneroHandlerThread(
 
     override fun refreshed() {
         if (!isCurrentSession) return
+        if (walletState.offline) {
+            walletState.setLoading(false)
+            return
+        }
         val status = wallet.fullStatus.connectionStatus
         val daemonHeight = wallet.getDaemonBlockChainHeight()
         val chainHeight = wallet.getBlockChainHeight()
@@ -105,10 +109,7 @@ class MoneroHandlerThread(
             walletState.update()
             return
         }
-        if (walletState.offline) {
-            // no node to reconnect to
-            walletState.setLoading(false)
-        } else if (status === Wallet.ConnectionStatus.ConnectionStatus_Disconnected || status == null) {
+        if (status === Wallet.ConnectionStatus.ConnectionStatus_Disconnected || status == null) {
             tryRestartConnection()
         } else {
             val heightDiff = daemonHeight - chainHeight
@@ -130,7 +131,7 @@ class MoneroHandlerThread(
     }
 
     private fun tryRestartConnection() {
-        if (!isCurrentSession) return
+        if (!isCurrentSession || walletState.offline) return
         val lightWallet = wallet.isLightWallet
         // System VPN is the only direct/clearnet mode, and embedded Tor must have a live
         // SOCKS endpoint. If the transport is unavailable, do not re-init or re-login:

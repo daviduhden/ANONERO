@@ -7,6 +7,8 @@ with an anonymity, privacy, or security invariant in `AGENTS.md`, the invariant 
 **Git authorization:** no skill authorizes a commit, push, tag, or publication.
 `AGENTS.md` §8.1 requires prior, explicit human authorization for each operation.
 
+For changes spanning proxy acquisition and LWS login, use both the transport and LWS skills.
+
 ## Available skills
 
 | Skill | Purpose | Location | Use when |
