@@ -811,3 +811,18 @@ CI-only regression cases now cover it. i18n's explicit catalog list initially mi
 feature strings; discovery now covers strings*.xml in every locale, keeps primary files
 mandatory and has CI-only regression sources. See the [report](../development-iteration-2026-11.md)
 for root causes, files, limits and unexecuted tests. No local compilation or test occurred.
+
+### CI-036 — API 35 emulator refuses software CPU emulation
+
+[Run 44924483602](https://github.com/daviduhden/ANONERO/actions/runs/44924483602/job/136914394319)
+on `0a44b76` passed the eight other jobs. The runner selected `-accel off` and
+the Android Emulator rejected startup without an explicit TCG opt-in. The action
+continued polling `sys.boot_completed` after the emulator exited. The repository's
+instrumentation script never ran and no test reports were generated. The run was
+cancelled manually.
+
+The shared Tests job now sets `ANDROID_I_WANT_MY_TCG=yes` on the emulator action
+step, as described in the [Android command-line documentation](https://developer.android.com/studio/run/emulator-commandline).
+The generated release job carries the same setting. Verify synchronization
+statically and confirm boot plus both instrumented test reports in the next
+authorized run. Software emulation remains slow and unsupported by Android.

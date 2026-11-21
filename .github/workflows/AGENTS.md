@@ -180,5 +180,8 @@ Forbidden: `act`, `gh workflow run`, `./gradlew`, emulator, Docker builds.
 
 The JNI job additionally checks Kotlin cancellation imports and shared-job synchronization,
 then runs Python static-checker regression tests in CI only. Do not run those tests locally.
+Keep the explicit `ANDROID_I_WANT_MY_TCG=yes` environment opt-in scoped to the
+instrumented runner action so its software mode can start when KVM is unavailable.
+Regenerate the shared release job and keep boot and test-result gates intact.
 Optional emulator animation settings are disabled after run 43633496677 failed before the
 repository test script; readiness, instrumentation, report and nonzero-test gates remain.

@@ -135,6 +135,8 @@ put loops or backslash continuations there. Keep the logic in
 - retry only instrumentation attach/zero-test failures while the guest is healthy;
 - leave the XML and `test-result-exit-code.txt` validation as the final authority.
 
+The emulator action needs `ANDROID_I_WANT_MY_TCG=yes` when it selects
+`-accel off`. Keep that opt-in on the runner step in Tests and synchronize Release.
 Hosted Linux runners have no `/dev/kvm`; the x86_64 emulator runs under software
 emulation. Treat instrumented stability as an infrastructure decision (self-hosted KVM or
 device farm), not as a reason to relax the test gate.

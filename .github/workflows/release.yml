@@ -649,6 +649,10 @@ jobs:
 
       - name: Run instrumented tests on API ${{ matrix.api-level }}
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          # The action selects -accel off if KVM is unavailable. Current emulator
+          # versions require an explicit opt-in to start that software path.
+          ANDROID_I_WANT_MY_TCG: 'yes'
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
