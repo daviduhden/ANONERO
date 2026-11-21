@@ -358,16 +358,18 @@ class Wallet {
         priority: PendingTransaction.Priority,
         keyImages: ArrayList<String>,
     ): PendingTransaction? {
+        val account = accountIndex
+        val preferredInputs = ArrayList(keyImages)
+        checkExplicitSelection(preferredInputs, account, null)
         disposePendingTransaction()
-        val _priority = priority.ordinal
-        val txHandle = createSweepTransaction(dstAddr, "", 0, _priority, accountIndex, keyImages)
+        val txHandle = createSweepTransaction(dstAddr, "", 0, priority.ordinal, account, preferredInputs)
         if (txHandle == 0L) return null
         pendingTransaction = PendingTransaction(txHandle)
         unsignedTransaction = null
         return pendingTransaction
     }
 
-    external fun createTransactionJ(
+    private external fun createTransactionJ(
         dstAddr: String,
         paymentId: String,
         amount: Long,
@@ -384,7 +386,7 @@ class Wallet {
 
     /*
      * Builds a pending transaction for the active account. selectedUtxos are key images
-     * from coin control; when non-empty, checkSelectedAmounts verifies the selection before
+     * from coin control; when non-empty, checkExplicitSelection verifies the selection before
      * wallet2 constructs anything. sweepAll uses the native sweep path and ignores the
      * amount. The returned transaction replaces any previous pending transaction.
      */
@@ -397,12 +399,11 @@ class Wallet {
         priority: PendingTransaction.Priority = PendingTransaction.Priority.Priority_Default,
         selectedUtxos: List<CoinsInfo> = arrayListOf(),
     ): PendingTransaction {
-        disposePendingTransaction()
+        val account = accountIndex
         val priority: Int = priority.ordinal
         val preferredInputs = selectedUtxos.map { it.key }.toCollection(ArrayList())
-        if (selectedUtxos.isNotEmpty() && !sweepAll) {
-            checkSelectedAmounts(preferredInputs, amount, false)
-        }
+        checkExplicitSelection(preferredInputs, account, if (sweepAll) null else amount)
+        disposePendingTransaction()
         val txHandle =
             if (sweepAll) {
                 createSweepTransaction(
@@ -410,7 +411,7 @@ class Wallet {
                     "",
                     mixin_count,
                     priority,
-                    accountIndex,
+                    account,
                     preferredInputs,
                 )
             } else {
@@ -420,7 +421,7 @@ class Wallet {
                     amount,
                     mixin_count,
                     priority,
-                    accountIndex,
+                    account,
                     preferredInputs,
                 )
             }
@@ -447,18 +448,17 @@ class Wallet {
         require(amounts.all { it > 0 }) { "amounts must be positive" }
         val total = amounts.fold(0L) { acc, value -> Math.addExact(acc, value) }
         require(total > 0L)
-        disposePendingTransaction()
+        val account = accountIndex
         val preferredInputs = selectedUtxos.map { it.key }.toCollection(ArrayList())
-        if (selectedUtxos.isNotEmpty()) {
-            checkSelectedAmounts(preferredInputs, total, false)
-        }
+        checkExplicitSelection(preferredInputs, account, total)
+        disposePendingTransaction()
         val txHandle =
             createTransactionMultDestJ(
                 destinations.toTypedArray(),
                 amounts.toLongArray(),
                 0,
                 priority.ordinal,
-                accountIndex,
+                account,
                 preferredInputs,
             )
         if (txHandle == 0L) throw Exception("transaction construction returned no transaction")
@@ -527,30 +527,16 @@ class Wallet {
     @Throws(java.lang.Exception::class)
     fun getUtxos(): List<CoinsInfo> = coins?.all ?: listOf()
 
-    /*
-     * Coin-control guard: the selected outputs must exceed the requested amount, leaving
-     * value for the fee. This is a preflight check; wallet2 still performs authoritative
-     * selection and fee calculation.
-     */
-    @Throws(java.lang.Exception::class)
-    private fun checkSelectedAmounts(
-        selectedUtxos: List<String>,
-        amount: Long,
-        sendAll: Boolean,
+    private fun checkExplicitSelection(
+        keyImages: List<String>,
+        account: Int,
+        amount: Long?,
     ) {
-        if (!sendAll) {
-            var amountSelected: Long = 0
-            for (coinsInfo in getUtxos()) {
-                if (selectedUtxos.contains(coinsInfo.key)) {
-                    amountSelected += coinsInfo.amount
-                }
-            }
-            if (amountSelected <= amount) {
-                // Do not log selected/requested amounts; logs are persisted and shareable.
-                Timber.tag("Wallet").e("insufficient selected balance")
-                throw java.lang.Exception("insufficient wallet balance")
-            }
-        }
+        if (keyImages.isEmpty()) return
+        val snapshot = checkNotNull(coins) { "current wallet outputs unavailable" }
+        snapshot.refresh()
+        validateCoinSelection(keyImages, snapshot.all, account, amount)
+        check(accountIndex == account) { "active account changed" }
     }
 
     private external fun createSweepTransaction(

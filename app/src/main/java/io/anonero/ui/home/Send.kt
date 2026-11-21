@@ -213,21 +213,6 @@ class SendViewModel : ViewModel() {
                         MoneroAmount.parseExact(amount)
                             ?: throw IllegalArgumentException("invalid amount")
                     }
-                if (selectedCoins.isNotEmpty()) {
-                    wallet.refreshCoins()
-                    val account = wallet.getAccountIndex()
-                    val selectedKeys = selectedCoins.map { it.key }.toSet()
-                    val spendableKeys =
-                        wallet
-                            .getUtxos()
-                            .filter {
-                                it.keyImageKnown && it.unlocked && !it.spent && !it.frozen && it.subaddrAccount == account
-                            }.mapTo(mutableSetOf()) { it.key }
-                    if (selectedKeys.size != selectedCoins.size || !spendableKeys.containsAll(selectedKeys)) {
-                        _txComposeError.postValue(SendError.CONSTRUCTION_FAILED)
-                        return@withContext null
-                    }
-                }
                 _txComposeError.postValue(null)
                 if (isSweep && selectedCoins.isEmpty()) {
                     if (wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
