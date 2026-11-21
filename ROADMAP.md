@@ -115,3 +115,11 @@ requests and explicit-coin sends on devices. Preserve the fail-closed decisions 
 establish exact signed-transaction binding before claiming safe NERO broadcasts.
 The [iteration record](docs/development-iteration-modernization.md) lists the
 regressions and remaining evidence.
+
+
+## CI audit follow-up
+
+Confirm the latest warning fixes and independent instrumented test exit results in a
+manual run. A stable KVM-backed API 35 smoke run will still leave archival API 29 build
+coverage, native ARMv7 device runtime, release signing, sanitizers and Tor/LWS integration
+as separate evidence gaps.

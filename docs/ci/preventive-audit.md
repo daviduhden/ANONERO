@@ -10,6 +10,36 @@ instrumented smoke test per flavor with zero failures. The emulator booted in 91
 remains non-deterministic; deterministic execution still requires a KVM runner or device
 farm.
 
+## Latest log and artifact review
+
+[Tests 44927810332](https://github.com/daviduhden/ANONERO/actions/runs/44927810332)
+passed the non-instrumented jobs and was cancelled while the API 35 emulator was
+booting with TCG. The [historical inventory](historical-failures.md) records the
+KVM evidence, prior cancellation and recurrent attach failures. The
+`instrumented` orchestration now distinguishes accessibility of an existing
+KVM device from software startup and retains the required checks for both
+flavors. These changes are pending an authorized runtime check.
+
+The lint XML from the latest run contains **24 warnings per flavor**, even
+though the lint job succeeded. The JVM XML contains **110 passing tests per
+flavor**. Treat build and test outcomes separately from warning counts.
+
+| Finding | Audit result | Validation |
+| --- | --- | --- |
+| Five project Kotlin warnings, W-007 | Removed only redundant safe calls on receivers proven non-null in `NetworkSettings.kt` | Both flavors must compile again |
+| 12 unused proxy-setting resources, W-009 | Removed 12 unused strings across English, Spanish, Russian and Simplified Chinese after checking references. The transport editor remains the active path | Verify resource checks and absence in new per-flavor lint XML |
+| Four `UseKtx` warnings, W-009 | The website action uses `toUri()`. The three explicit preference editor calls must retain checked `commit()` results. The unit-returning extension cannot replace them | Verify URI site and verify commit-failure coverage after any persistence change |
+| Eight dependency update advisories, W-009 | Lifecycle, Compose BOM and CameraX advisories are dependency metadata. Review compatibility before upgrading pins | Both flavor lint reports and dependency resolution |
+| Android API macro redefinition, W-008 | The OpenSSL Configure invocation must keep the API used by its NDK compiler selection. Removing the macro option alone risks picking the highest API. Warning remains open | Both ABI archive builds and API 29 link/runtime evidence |
+| Runner and dependency warnings, W-005/W-006 | Node action deprecation, SDK XML version skew, emulator host warnings and vendored C++/C builds are distinct from app adapter and Kotlin diagnostics | Upstream updates and separate source attribution |
+
+Older compiler warnings were also compared with current call sites. This
+includes deprecated Activity result overrides, old Koin preview setup,
+redundant nullable syntax in Send/NodeSettings/BackupHelper and a redundant
+conversion in SeedSettings. Their past appearance does not imply reproduction
+in the current checkout. The latest captured Kotlin source warnings came from
+the five NetworkSettings call sites.
+
 ## Warning policy
 
 - Project-owned Kotlin, C++, JNI, Gradle, and resource warnings must be treated as defects:
@@ -62,20 +92,20 @@ farm.
 - `app/build.gradle.kts` uses AGP 9.5.1, Kotlin 2.4.21, compileSdk 37.2, NDK 30.0.16248370,
   CMake 4.1.2, and Gradle 9.9.0. Run `43122308945` compiled both flavors, passed JVM tests
   and Android Lint, and assembled/linked the APKs with these pins.
-- Android Lint runs for both flavors. It reports zero errors and, after the pending W-004
-  version update, no project-code warnings; the only findings were two dependency-update
-  advisories.
+- Android Lint runs for both flavors. Older zero-warning reports are specific to their
+  runs and dependency metadata. W-009 describes the latest reports.
 - No dependency lockfile or verification metadata exists.
 
 ### C++/JNI
 
 - `app/CMakeLists.txt` enables `-Wall -Wextra -Wpedantic -Werror` for the `anonero` target
   and marks external include trees as SYSTEM. No `anonero.cpp`/`anonero.h` warning line
-  appears in the `43122308945` job log; the `-Werror` flag needs the next CI run to
-  validate. If it surfaces a warning, revert only `-Werror`, record the offending API, and
-  do not suppress it globally.
-- The JNI contract script checks exact class/method names; it cannot validate JNI
-  signatures, constructor descriptors, or link-time symbol availability.
+  appears in the `43122308945` job log. The latest ARM build and link jobs also passed
+  with the adapter's `-Werror` configuration. Investigate any recurrence at the call site
+  or compiler configuration.
+- The JNI contract script checks exact class/method names and four reviewed model
+  constructor contracts. Native linkage and remaining export signatures require
+  build and device evidence.
 - The native compile and link run in CI: the archives build and the adapter links. The
   patch series is present and applies to the pinned commit.
 - `0008-enforce-tls-for-https-daemon-address.patch` forces epee SSL support for
@@ -99,23 +129,29 @@ farm.
   have no device coverage.
 - The emulator matrix is API 35 x86_64 only; API 29 compile/manifest checks are separated
   in the assemble step. No ARM64 hardware run exists.
-- `app/src/androidTest/` contains a single package-name smoke test; wallet, Tor, and LWS
-  behavior has no automated instrumented coverage.
+- The package-name smoke test is joined by diagnostics isolation, transport
+  persistence and LWS profile isolation tests. Those checks do not exercise
+  live wallet, Tor or LWS network behavior.
 
 ### Release and signing
 
-- No release run exists.
-- `release` environment does not exist; signing secrets and required reviewers are not
-  configured.
-- `main` is unprotected, there is no `CODEOWNERS`, and Actions still allows any action
-  because SHA pinning is not enforced repository-wide.
-- The release certificate identity is not pinned; signature verification currently proves
-  validity, not the expected signer.
-- Unsigned APKs now carry `SHA256SUMS`, the signer verifies it before signing, 16 KB
-  zipalignment is checked, and the signed/published set must match `SHA256SUMS` exactly.
-  None of this has run.
-- Lint now covers release variants in the release build job; unverified.
-- A release publish now requires `run_instrumented == true`.
+- Release has no recorded run. Its build, artifact verification, isolated signing,
+  and publication therefore remain unverified.
+- GitHub's read-only environment API lists `android-anon-release`,
+  `android-nero-release` and the publication-only `release` environment. Each
+  requires reviewers and restricts deployments to `main`. The signing
+  environments expose the expected certificate variable names, with the workflow
+  rejecting missing or mismatched values. This audit did not retrieve secret values.
+- The release build checks APK counts, version, package IDs, ABI/ELF alignment and
+  debuggability. The signers verify aligned inputs, pin independently by flavor,
+  and verify each signed APK. Both flavor sets and their checksums are required
+  before publication. The APK check expects six distinct APKs and two canonical
+  universal copies. See [Android release signing](../android-release-signing.md).
+- Release lint and mandatory instrumentation before publication are defined in
+  source. Neither has been exercised by the Release workflow.
+- The read-only repository API reports `main` unprotected and permits all Actions
+  without enforcing full SHA pinning. The workflow files themselves use pinned
+  actions. The reviewed tree has no `CODEOWNERS`.
 
 ## Preventive fixes from the post-format audit
 
@@ -155,7 +191,7 @@ of its own.
 2. Kotlin import/static scan for the CI-004/CI-006/CI-008/CI-009 patterns (prepared in the
    audit; CI compilation is authoritative).
 3. Android Lint job with HTML/XML report uploads and no `continue-on-error` (0 errors and
-   0 warnings on `43521054641`; the W-004 dependency advisories are cleared).
+   0 warnings on historical run `43521054641`; see W-009 for latest counts).
 4. Project-owned C++ warning flags (`-Wall -Wextra -Wpedantic -Werror`) with system include
    trees. Native archives build and `43521054641` has no adapter warning under `-Werror`.
 5. JNI exact class/method symbol parity (implemented); signature and constructor
@@ -166,7 +202,7 @@ of its own.
 9. Release tags are resolved through `refs/tags/` with an existence check (implemented).
 10. Sanitizer/fuzz jobs after the native build is reproducible; platform limits must be
     documented.
-11. Pin the release certificate fingerprint and verify all six APKs (pending).
+11. Verify both configured flavor pins with an authorized Release build (pending runtime).
 12. `BackupVersionTest` fixes the accepted version encodings and rejects malformed ones
     (JVM unit test; CI authoritative).
 13. `NodeDataStoreTest` fixes the empty-store default and the fail-closed
@@ -176,22 +212,17 @@ of its own.
 
 ## Repository configuration still required
 
-These are settings, not workflow code, and cannot be supplied by this audit:
-
-1. Create the `release` environment with the owner as required reviewer and the four signing
-   secrets.
-2. Protect `main` and `.github/workflows/` with rulesets and `CODEOWNERS`.
-3. Restrict allowed actions and require full-length commit SHA pinning.
-4. Store the expected release certificate SHA-256 in the repository and compare it in the
-   `sign` and `publish` jobs.
+Protect `main` and workflow changes with rulesets and appropriate review ownership.
+Restrict allowed actions and enforce full-length SHA pinning in repository settings.
+These are distinct from the configured signing and publication environments.
 
 ## Evidence levels
 
 - **Verified static:** resource scan, import scan, handle/string/object-factory scans,
   workflow syntax/shell/security checks, `git diff --check`.
-- **Validated in CI:** JVM unit tests, Android Lint (0/0), Kotlin compilation (0 warnings),
-  JNI symbol parity, localization, architecture policy, native archives, and debug APK
-  assembly/link on the pre-formatting commits.
+- **Validated in CI:** JVM unit tests, lint with zero errors, JNI symbol parity,
+  localization, architecture policy, native archives and debug APK linking. The
+  latest successful job logs and XML include Kotlin/lint warnings above.
 - **Validated in `43528256395`:** all jobs, including `-Werror`, the
   serialization/BouncyCastle update, lint 0/0, exact JNI parity, localization, native
   archives, assemble/link, 62 JVM tests per flavor, and one instrumented smoke test per
@@ -201,5 +232,5 @@ These are settings, not workflow code, and cannot be supplied by this audit:
   `system_server` or the post-boot adb services.
 - **Unverified:** sanitizers, release signing and publication, broader wallet/Tor/LWS
   instrumented coverage.
-- **Blocked:** release environment, branch protection, certificate pinning, deterministic
-  instrumented execution without KVM/device farm.
+- **Pending:** authorized Release execution, branch protection, and reproducible
+  instrumented runs with usable KVM or a device farm.

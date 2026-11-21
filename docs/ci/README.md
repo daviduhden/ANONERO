@@ -7,7 +7,7 @@ validation.
 ## Scope and evidence
 
 - Repository: `daviduhden/ANONERO`, default branch `main`.
-- Workflows: `Tests` (`test.yml`) and `Build and publish APKs` (`release.yml`); both are
+- Workflows: `Tests`, `Build and publish APKs` and `Agent Knowledge Validation`. All are
   manual-only and owner-gated.
 - Current evidence:
   - `43528256395` (`0cf9db0`) — all jobs pass, including instrumented; anon and nero each
@@ -59,11 +59,31 @@ Broken pipe (32)/adb 224 and no reports. Do not interpret it as executed/passing
 or evidence for the uncommitted working tree. Current CI source uses only workflow_dispatch;
 release embeds synchronized required jobs. See [iteration](../development-iteration-2026-11.md).
 
-## Latest accessible Tests result
+## Latest evidence
 
-[43640612517](https://github.com/daviduhden/ANONERO/actions/runs/43640612517) on
-`dff2ecb` passed the nine jobs, including the API 35 smoke test. It predates Android
-signing isolation and this Kotlin/JNI iteration. The JNI diagnostic guard now also
-checks that input conversion remains inside exception handling and unreadable
-message arrays abort before signing or verifying. Compile and exercise the native
-boundary in CI before treating the regression as dynamically verified.
+- [Tests 44927810332](https://github.com/daviduhden/ANONERO/actions/runs/44927810332)
+  on `75939ea` passed eight jobs before the API 35 job was cancelled. Archived
+  XML shows 110 JVM tests per flavor with zero failures, errors or skips. Android
+  Lint recorded 24 warnings and zero errors per flavor, and Kotlin emitted five
+  distinct project-owned warnings. Native ARM archives and debug APK assembly
+  passed. No instrumented reports were produced.
+- [Tests 43640612517](https://github.com/daviduhden/ANONERO/actions/runs/43640612517)
+  on `dff2ecb` is the latest fully green run. Archived XML records four API 35
+  tests per flavor with no failures, errors or skips. The tests cover package
+  context, diagnostics isolation, LWS profile isolation and transport persistence
+  failure. This predates signing isolation and the current wallet hardening.
+- [Agent Knowledge Validation 44927810481](https://github.com/daviduhden/ANONERO/actions/runs/44927810481)
+  on `75939ea` passed the Python regression and knowledge checks. It did not
+  execute Android tests.
+- The [historical inventory](historical-failures.md) covers all 39 API records,
+  including successful runs with warnings, incomplete logs and artifact evidence.
+  No production signing, sanitizer, fuzz or device-farm execution was found.
+
+## Preventive source regressions in this audit
+
+- [Coin selection preflight](coin-selection-preflight.md) records the wallet2
+  input-selection threat review, JVM regressions and compatibility scope.
+- [JNI conversion guards](../../app/src/main/cpp/AGENTS.md) prevent additional JNI
+  string acquisition or result allocation while a JVM exception remains pending.
+  The native source guard checks the corrected paths. A future authorized CI run
+  still needs native compilation and a CheckJNI fixture for conversion failures.

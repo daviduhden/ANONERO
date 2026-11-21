@@ -241,7 +241,11 @@ threat models, regression requirements and remaining boundaries.
     isolated ANON/NERO signing with pinned certificates, checksum/signature verification,
     and separately approved GitHub Release publishing.
 - **Every diagnosis requires a root-cause pass.** A compile error, compiler warning, test
-  failure, crash, JNI diagnostic, or sanitizer report must trigger:
+  failure, crash, JNI diagnostic, or sanitizer report requires the same process
+  even when its job succeeds. Review available logs and artifacts from historical,
+  successful, failed, and cancelled runs. Attribute warnings to project code,
+  project build configuration, dependencies, or runner tools. Expired evidence
+  must be marked unavailable. For each confirmed diagnosis:
   1. root-cause analysis;
   2. a repository-wide search for the same pattern and related variants;
   3. a fail-closed fix;

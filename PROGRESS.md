@@ -348,3 +348,13 @@ and node-chain checks, stale LWS request rejection, JNI input containment, and s
 single-send selection. New JVM fixtures and stronger static diagnostics are prepared.
 Native/JVM builds and real-device regressions for the working tree are pending. See
 [the iteration record](docs/development-iteration-modernization.md).
+
+
+## Retrospective CI diagnostics
+
+The latest Tests run on `75939ea` passed the eight non-instrumented jobs. Its API 35
+emulator accepted TCG opt-in and was cancelled before boot completed. Source changes
+prepare runner-user KVM access when available, preserve instrumented failures independently
+for both flavors, and add coverage for malformed or mixed retry reports. Compiler, JNI and
+coin-selection corrections are pending a new authorized CI run. See
+[CI diagnostics](docs/ci/README.md).

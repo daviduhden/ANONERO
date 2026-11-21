@@ -142,3 +142,13 @@ the rationale to `ROADMAP.md`.
 - [ ] Validate the dispatch-only embedded release suite and Python checker regressions.
 - [ ] Resolve hosted-emulator system-service instability; optional animation writes were
       removed, but no passing instrumented result is claimed for this change.
+
+
+## Current CI audit
+
+- [ ] Validate the KVM permission preparation and the retained software path in a
+      manual API 35 run. Check a passing XML and exit-code report for each flavor.
+- [ ] Validate the JNI exception guards under CheckJNI and run the coin selection
+      regressions in CI.
+- [ ] Review remaining build-tool/dependency advisories and commit-result lint findings
+      individually. Preserve API 29 and explicit persistence failure handling.
