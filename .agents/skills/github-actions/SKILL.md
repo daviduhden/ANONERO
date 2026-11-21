@@ -36,6 +36,8 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
   the gate before transferring, because it fails closed.
 - Default `permissions: contents: read`. Only `publish` gets `contents: write`.
 - The owner dispatches from `main`. The tag must resolve to the dispatched SHA.
+- Require the instrumented job before using either production signing key. An unsigned
+  diagnostic run may omit instrumentation.
 - Sign ANON in `android-anon-release` and NERO in `android-nero-release`. Each job
   downloads just its unsigned APKs, without checking out or executing project code.
   The separate `release` environment approves publication and carries no signing keys.
@@ -189,3 +191,8 @@ then validates committed changes when its optional `base` input is supplied. Kee
 user inputs in quoted environment variables, full-history checkout at the dispatched
 SHA, and the owner dependency. A clean checkout alone does not enforce AK001 against
 previously committed changes; use `base` for that review.
+
+Both signing jobs must depend directly on the instrumented job and require
+its success, in addition to the owner and build jobs. The release suite source
+validator checks those dependencies, the condition and the distinct environments.
+Keep the corresponding regression cases in the manual workflow's Python suite.

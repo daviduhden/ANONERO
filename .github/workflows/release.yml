@@ -1181,7 +1181,8 @@ jobs:
 
   sign-anon:
     name: Sign ANON
-    needs: [authorize, build]
+    needs: [authorize, build, instrumented]
+    if: inputs.run_instrumented == true && needs.instrumented.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions: {}
@@ -1349,7 +1350,8 @@ jobs:
 
   sign-nero:
     name: Sign NERO
-    needs: [authorize, build]
+    needs: [authorize, build, instrumented]
+    if: inputs.run_instrumented == true && needs.instrumented.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions: {}

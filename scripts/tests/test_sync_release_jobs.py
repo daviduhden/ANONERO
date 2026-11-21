@@ -72,3 +72,24 @@ class ReleaseSuiteSynchronizationTest(unittest.TestCase):
         release = self.release.replace(SYNC.END, "")
         with self.assertRaisesRegex(ValueError, "exactly one generated block"):
             SYNC.synchronize(self.source, release)
+
+
+    def test_signing_rejects_missing_instrumented_dependency(self):
+        release = self.release.replace("[authorize, build, instrumented]", "[authorize, build]", 1)
+        with self.assertRaisesRegex(ValueError, "sign-anon.*needs"):
+            SYNC.synchronize(self.source, release)
+
+    def test_signing_rejects_conditions_that_bypass_instrumentation(self):
+        release = self.release.replace(
+            "inputs.run_instrumented == true && needs.instrumented.result == 'success'",
+            "always()",
+        )
+        with self.assertRaisesRegex(ValueError, "sign-anon.*if"):
+            SYNC.synchronize(self.source, release)
+
+    def test_signing_rejects_a_shared_production_environment(self):
+        release = self.release.replace(
+            "environment: android-nero-release", "environment: android-anon-release"
+        )
+        with self.assertRaisesRegex(ValueError, "sign-nero.*environment"):
+            SYNC.synchronize(self.source, release)

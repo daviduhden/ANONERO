@@ -30,7 +30,8 @@ authoritative for anonymity, privacy, security, language, build, and Git policy.
   - `build`: verifies version/tag, enforces the Kotlin/C++ policy, installs native
     archives, builds unsigned release APKs, verifies package ID, version, minSdk,
     ABI splits, debuggability, and artifact count.
-  - `sign-anon` and `sign-nero`: independent environments approve and sign only
+  - `sign-anon` and `sign-nero`: require successful instrumentation. Independent
+    environments approve and sign only
     their own three APKs. Each signs with v2/v3 after the ZIP and unsigned-input
     checks, verifies the pinned certificate and package, and uploads checksums.
   - `prepare`: verifies distinct signer certificates and public keys, all checksums,

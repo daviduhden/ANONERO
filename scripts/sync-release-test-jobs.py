@@ -124,6 +124,27 @@ def check_env(source: str, release: str) -> None:
         raise ValueError("Shared test/release workflow environment values differ")
 
 
+def require_signing_gate(release_tail: str) -> None:
+    jobs = dict(
+        re.findall(
+            r"^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)",
+            release_tail,
+            re.MULTILINE | re.DOTALL,
+        )
+    )
+    for flavor in ("anon", "nero"):
+        name = f"sign-{flavor}"
+        job = jobs.get(name, "")
+        expected = {
+            "needs": "[authorize, build, instrumented]",
+            "if": "inputs.run_instrumented == true && needs.instrumented.result == 'success'",
+            "environment": f"android-{flavor}-release",
+        }
+        for field, value in expected.items():
+            if re.findall(rf"^    {field}: (.+)$", job, re.MULTILINE) != [value]:
+                raise ValueError(f"release.yml: {name} must preserve its signing gate ({field})")
+
+
 def synchronize(source: str, release: str) -> str:
     require_manual_dispatch(source, "test.yml")
     require_manual_dispatch(release, "release.yml")
@@ -132,6 +153,7 @@ def synchronize(source: str, release: str) -> str:
         raise ValueError("release.yml: expected exactly one generated block")
     before, remaining = release.split(START, 1)
     _, after = remaining.split(END, 1)
+    require_signing_gate(after)
     return before + generated_block(source) + after
 
 
