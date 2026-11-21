@@ -72,6 +72,19 @@ class TorService(
         )
 
     private val _socksState = MutableStateFlow<IPSocketAddress?>(null)
+    private val socksLock = Any()
+    private var socksGeneration = 0L
+
+    internal fun socksSnapshot(): Pair<IPSocketAddress?, Long> = synchronized(socksLock) { _socksState.value to socksGeneration }
+
+    private fun setSocks(endpoint: IPSocketAddress?) {
+        synchronized(socksLock) {
+            if (_socksState.value != endpoint) {
+                socksGeneration++
+                _socksState.value = endpoint
+            }
+        }
+    }
 
     private val _torLogs =
         MutableSharedFlow<String>(
@@ -106,7 +119,7 @@ class TorService(
                 // the daemon went down without stop() -- killed, or a start that failed: drop the
                 // dead port and start again; the new port reaches the wallet through socksFlow
                 if (state.daemon.isOff && wanted) {
-                    _socksState.value = null
+                    setSocks(null)
                     scope.launch {
                         delay(10_000)
                         if (wanted) runtime.startDaemonAsync()
@@ -115,7 +128,7 @@ class TorService(
             }
             observerStatic(RuntimeEvent.LISTENERS) {
                 val socketAddr = it.socks.firstOrNull()
-                _socksState.value = socketAddr.takeIf { wanted }
+                setSocks(socketAddr.takeIf { wanted })
             }
             config { _ ->
                 TorOption.SocksPort.configure { auto() }
@@ -135,7 +148,7 @@ class TorService(
 
     fun stop() {
         wanted = false
-        _socksState.value = null
+        setSocks(null)
         scope.launch {
             runtime.stopDaemonAsync()
         }
@@ -143,7 +156,7 @@ class TorService(
 
     fun restart() {
         wanted = true
-        _socksState.value = null
+        setSocks(null)
         scope.launch {
             runtime.restartDaemonAsync()
         }
@@ -151,7 +164,7 @@ class TorService(
 
     fun dispose() {
         wanted = false
-        _socksState.value = null
+        setSocks(null)
         scope.launch {
             runCatching { runtime.stopDaemonAsync() }
                 .onFailure { Timber.tag(TAG).i("Tor dispose failed (%s)", it.javaClass.simpleName) }

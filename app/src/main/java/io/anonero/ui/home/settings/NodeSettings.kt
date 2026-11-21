@@ -82,7 +82,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
-import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -249,40 +248,7 @@ class NodeSettingsViewModel(
                 return@withContext
             }
             try {
-                checkNotNull(wallet) { "Wallet unavailable" }
-                walletHandler.applyProxy()
-                if (WalletManager.instance !== manager || manager.wallet !== wallet) {
-                    return@withContext
-                }
-                // Waiting for Tor can suspend while the user changes LWS settings.
-                if (io.anonero.util.LwsConfig
-                        .load(prefs)
-                        .enabled || wallet.isLightWallet
-                ) {
-                    uriValidationError.postValue(NodeValidationError.LWS_ACTIVE)
-                    return@withContext
-                }
-                wallet.pauseRefresh()
-                prefs.edit(commit = true) {
-                    putString(NodeFields.RPC_HOST.value, node.host)
-                    putBoolean(NodeFields.NODE_TLS.value, node.useTls)
-                    putInt(NodeFields.RPC_PORT.value, node.rpcPort)
-                    putString(NodeFields.RPC_USERNAME.value, node.username)
-                    putString(NodeFields.RPC_PASSWORD.value, node.password)
-                }
-                walletHandler.updateDaemon(node, lightWallet = false)
-                check(wallet.init(0, lightWallet = false)) { "Node initialization failed" }
-                if (io.anonero.util.LwsConfig
-                        .load(prefs)
-                        .enabled || wallet.isLightWallet
-                ) {
-                    wallet.setTrustedDaemon(false)
-                    wallet.pauseRefresh()
-                    uriValidationError.postValue(NodeValidationError.LWS_ACTIVE)
-                    return@withContext
-                }
-                wallet.setTrustedDaemon(true)
-                wallet.startRefresh()
+                walletHandler.connectRpcNode(node, checkNotNull(wallet) { "Wallet unavailable" })
                 walletState.setLoading(false)
                 walletState.update()
                 uriValidationError.postValue(null)
@@ -293,6 +259,8 @@ class NodeSettingsViewModel(
                     return@withContext
                 }
                 wallet?.pauseRefresh()
+                wallet?.setOffline(true)
+                walletState.setOffline(true)
                 if (io.anonero.util.LwsConfig
                         .load(prefs)
                         .enabled || wallet?.isLightWallet == true

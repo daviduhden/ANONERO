@@ -506,12 +506,6 @@ private fun createDecoy(
                 Timber.tag(TAG).e("decoy creation status is not OK")
                 throw DecoyException(DecoyError.CREATION_FAILED)
             }
-            // A brand-new decoy has no history. Start scanning near the current tip so it
-            // is usable quickly; the user can restore from the seed at an earlier height.
-            val chainHeight =
-                runCatching { WalletManager.instance?.getBlockchainHeight() }
-                    .getOrNull() ?: 0L
-            if (chainHeight > 1L) wallet.setRestoreHeight(chainHeight)
             if (!wallet.store()) {
                 Timber.tag(TAG).e("decoy store failed")
                 throw DecoyException(DecoyError.WRITE_FAILED)

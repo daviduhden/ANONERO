@@ -189,3 +189,9 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+Publish the lock overlay for an open wallet even before native initialization.
+If native background sync cannot start, keep the faulted session locked and
+offline. Proxy and node setup must check the fault after asynchronous acquisition
+and before enabling network activity. Require fresh authenticated wallet opening
+to clear the fault.

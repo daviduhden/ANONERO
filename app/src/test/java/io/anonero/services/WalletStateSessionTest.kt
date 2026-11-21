@@ -18,6 +18,8 @@
 
 package io.anonero.services
 
+import io.anonero.model.Wallet
+import io.anonero.model.node.DaemonInfo
 import io.anonero.ui.home.LockScreenShortCut
 import io.anonero.util.WalletProfile
 import kotlinx.coroutines.flow.first
@@ -26,9 +28,49 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WalletStateSessionTest {
+    @Test
+    fun `lock fault rejects unlock profile changes and online state until session reset`() =
+        runBlocking {
+            val state = WalletState()
+            state.resetSession(WalletProfile.MAIN)
+            state.recordBackgroundSyncFault()
+
+            state.setOffline(false)
+            state.setProfile(WalletProfile.DECOY)
+
+            assertTrue(state.backgroundSync)
+            assertTrue(state.backgroundSyncFaulted)
+            assertTrue(state.offline)
+            assertFalse(state.backgroundSyncRunning)
+            assertEquals(WalletProfile.MAIN, state.profile.first())
+            assertFalse(state.exitBackgroundSync(""))
+
+            state.resetSession(WalletProfile.MAIN)
+
+            assertFalse(state.backgroundSync)
+            assertFalse(state.backgroundSyncFaulted)
+        }
+
+    @Test
+    fun `connection changes update only the cached daemon and reset discards it`() =
+        runBlocking {
+            val state = WalletState()
+            val connected = Wallet.ConnectionStatus.ConnectionStatus_Connected
+            val disconnected = Wallet.ConnectionStatus.ConnectionStatus_Disconnected
+            state.updateDaemon(DaemonInfo("node.example", connected, 500L))
+
+            state.setConnectionStatus(disconnected)
+
+            assertEquals(disconnected, state.walletConnectionStatus.first())
+            assertEquals(DaemonInfo("node.example", disconnected, 500L), state.daemonInfo.first())
+            state.resetSession(WalletProfile.DECOY)
+            assertNull(state.daemonInfo.first())
+        }
+
     @Test
     fun `reopening the same profile clears residual sync and queued actions`() =
         runBlocking {
@@ -36,7 +78,6 @@ class WalletStateSessionTest {
             state.resetSession(WalletProfile.MAIN)
             state.setOffline(true)
             state.setLoading(true)
-            state.setBackGroundSync(true)
             state.setConnectionStatus(io.anonero.model.Wallet.ConnectionStatus.ConnectionStatus_Connected)
             state.syncUpdate(SyncProgress(0.5f, 100L))
             state.emitUnlockShortcut(LockScreenShortCut.HOME)

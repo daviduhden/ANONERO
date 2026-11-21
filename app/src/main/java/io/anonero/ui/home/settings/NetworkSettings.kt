@@ -57,7 +57,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -132,7 +131,12 @@ class NetworkSettingsViewModel(
     val activeNode: StateFlow<Node?> =
         combine(_nodes, daemonInfo) { nodes, daemon ->
             val address = daemon?.daemon ?: return@combine null
-            nodes.firstOrNull { it.hostPort == address || "${it.host}:${it.rpcPort}" == address }
+            val useTls = prefs.getBoolean(NodeFields.NODE_TLS.value, false)
+            val username = prefs.getString(NodeFields.RPC_USERNAME.value, "").orEmpty()
+            val password = prefs.getString(NodeFields.RPC_PASSWORD.value, "").orEmpty()
+            nodes.firstOrNull {
+                it.hostPort == address && it.useTls == useTls && it.username == username && it.password == password
+            }
         }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     private val _error = MutableLiveData<NetworkSettingsError?>()
@@ -192,23 +196,18 @@ class NetworkSettingsViewModel(
                         if (lwsActive) {
                             walletHandler.reapplyLightWallet()
                         } else {
-                            walletHandler.applyProxy()
-                            check(WalletManager.instance === manager && manager.wallet === wallet) {
-                                "Wallet session changed"
-                            }
+                            val walletNetwork = io.anonero.AnonConfig.getNetworkType()
+                            val active = activeNode.value
                             val selected =
-                                NodeSelectionPolicy.select(
-                                    _nodes.value,
-                                    config,
-                                    io.anonero.AnonConfig.getNetworkType(),
-                                    activeNode.value,
-                                )
+                                if (config.autoSelectNode) {
+                                    NodeSelectionPolicy.select(_nodes.value, config, walletNetwork, active)
+                                } else {
+                                    active?.takeIf { NodeSelectionPolicy.accepts(config, it, walletNetwork) }
+                                }
                             if (selected == null) {
                                 throw IllegalStateException("No compatible node")
                             }
-                            walletHandler.updateDaemon(selected, lightWallet = false)
-                            wallet.setOffline(false)
-                            if (wallet.isInitialized) wallet.startRefresh()
+                            walletHandler.connectRpcNode(selected, wallet)
                         }
                     }
                     walletState.setLoading(false)
@@ -234,10 +233,11 @@ class NetworkSettingsViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             mutation.withLock {
                 _busy.postValue(true)
+                val wallet = WalletManager.instance?.wallet
                 try {
                     // An active light wallet must not be pointed at a full node. The LWS toggle takes
                     // effect on restart, so refuse instead of changing trust or the backend.
-                    if (LwsConfig.load(prefs).enabled && WalletManager.instance?.wallet?.isLightWallet == true) {
+                    if (LwsConfig.load(prefs).enabled || wallet?.isLightWallet == true) {
                         _error.postValue(NetworkSettingsError.LWS_ACTIVE)
                         return@withLock
                     }
@@ -246,26 +246,18 @@ class NetworkSettingsViewModel(
                         return@withLock
                     }
 
-                    walletHandler.updateDaemon(node, lightWallet = false)
-                    prefs.edit(commit = true) {
-                        putString(NodeFields.RPC_HOST.value, node.host)
-                        putBoolean(NodeFields.NODE_TLS.value, node.useTls)
-                        putInt(NodeFields.RPC_PORT.value, node.rpcPort)
-                        putString(NodeFields.RPC_USERNAME.value, node.username)
-                        putString(NodeFields.RPC_PASSWORD.value, node.password)
-                        putString(
-                            NodeFields.RPC_NETWORK.value,
-                            io.anonero.AnonConfig
-                                .getNetworkType()
-                                .toString(),
-                        )
-                        putString(NodeFields.NODE_NAME.value, node.name)
-                    }
-                    WalletManager.instance?.wallet?.startRefresh()
+                    walletHandler.connectRpcNode(node, wallet)
                     _error.postValue(null)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (wallet != null && WalletManager.instance?.wallet === wallet) {
+                        wallet.pauseRefresh()
+                        wallet.setOffline(true)
+                        walletState.setOffline(true)
+                        walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+                        walletState.setLoading(false)
+                    }
                     Timber.tag("NetworkSettings").w("Node selection failed")
                     _error.postValue(NetworkSettingsError.APPLY_FAILED)
                 } finally {

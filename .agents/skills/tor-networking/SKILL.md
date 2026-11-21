@@ -156,3 +156,8 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+Require the current wallet's applied transport authorization immediately before
+networked transaction construction or broadcast. Settings validity alone does
+not establish that wallet2 uses the selected provider. Treat that check as an
+entry guard and validate in-flight shutdown and DNS routing on a device.

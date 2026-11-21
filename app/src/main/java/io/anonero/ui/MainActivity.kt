@@ -61,6 +61,7 @@ import io.anonero.util.LocaleController
 import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WalletProfileStore
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -230,11 +231,7 @@ class MainActivity : ComponentActivity() {
                                     // The lock screen stays up until wallet2 has actually left
                                     // background sync; hiding it first showed a wallet that
                                     // looked unlocked but had no spend key.
-                                    // A shortcut navigates behind the lock screen first, as
-                                    // before, so the screen is ready when the lock lifts.
-                                    if (shortCut != LockScreenShortCut.HOME) {
-                                        walletState.emitUnlockShortcut(shortCut)
-                                    }
+                                    val profile = WalletSession.profile
                                     scope.launch(Dispatchers.IO) {
                                         val exited = walletState.exitBackgroundSync(pin)
                                         withContext(Dispatchers.Main) {
@@ -245,6 +242,8 @@ class MainActivity : ComponentActivity() {
                                                         getString(R.string.could_not_unlock_wallet),
                                                         android.widget.Toast.LENGTH_LONG,
                                                     ).show()
+                                            } else if (WalletSession.profile == profile && shortCut != LockScreenShortCut.HOME) {
+                                                walletState.emitUnlockShortcut(shortCut)
                                             }
                                         }
                                     }

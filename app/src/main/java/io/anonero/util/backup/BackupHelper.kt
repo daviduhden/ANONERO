@@ -35,6 +35,7 @@ import io.anonero.model.WalletBackup
 import io.anonero.model.WalletManager
 import io.anonero.model.node.Node
 import io.anonero.model.node.NodeFields
+import io.anonero.services.WalletState
 import io.anonero.store.NodesRepository
 import io.anonero.util.KeyStoreHelper
 import io.anonero.util.MAX_RESTORE_HEIGHT
@@ -93,6 +94,7 @@ object BackupHelper {
         named(WALLET_PREFERENCES),
     )
     val nodeRepository: NodesRepository by inject(NodesRepository::class.java)
+    private val walletState: WalletState by inject(WalletState::class.java)
 
     /**
      * Creates a v3 encrypted backup of the active MAIN wallet.
@@ -252,7 +254,12 @@ object BackupHelper {
                     }
                 }
             } finally {
-                if (wallet.isInitialized) wallet.startRefresh()
+                if (manager.wallet === wallet && WalletSession.profile == WalletProfile.MAIN &&
+                    !walletState.offline && !walletState.backgroundSync &&
+                    walletState.isTransportApplied(wallet) && wallet.isInitialized
+                ) {
+                    wallet.startRefresh()
+                }
             }
             if (!testBackUp(tmpBackupDir)) {
                 throw java.io.IOException("Backup is missing required wallet files")

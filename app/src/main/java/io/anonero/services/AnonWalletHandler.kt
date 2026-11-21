@@ -27,11 +27,9 @@ import io.anonero.model.node.DaemonInfo
 import io.anonero.model.node.Node
 import io.anonero.model.node.NodeFields
 import io.anonero.network.NodeSelectionPolicy
-import io.anonero.network.ProxyEndpoint
+import io.anonero.network.TransportAuthorization
 import io.anonero.network.TransportController
 import io.anonero.network.TransportEndpoint
-import io.anonero.network.TransportMode
-import io.anonero.network.TransportStatus
 import io.anonero.store.NodesRepository
 import io.anonero.util.LwsConfig
 import io.anonero.util.PREFS_PIN_HASH
@@ -46,6 +44,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.File
@@ -83,61 +83,68 @@ class AnonWalletHandler(
     private val _scope = CoroutineScope(Dispatchers.IO) + SupervisorJob()
 
     private var handler: MoneroHandlerThread? = null
+    private val transportApplyMutex = Mutex()
+    private val walletNetworkMutex = Mutex()
+
+    private data class AppliedTransport(
+        val wallet: Wallet,
+        val profile: WalletProfile,
+        val authorization: TransportAuthorization,
+    )
+
+    @Volatile
+    private var appliedTransport: AppliedTransport? = null
 
     val scope get() = _scope
 
     init {
+        walletState.isTransportApplied = ::hasAppliedTransport
         scope.launch {
-            torService.socksFlow.collect { socket ->
-                if (!transportController.config.value.mode.usesEmbeddedTor) return@collect
-                val wallet = WalletManager.instance?.wallet
-                if (socket == null) {
-                    // Tor restarted or stopped. Never reuse the old port; pause until a
-                    // fresh endpoint is published.
-                    if (wallet?.isInitialized == true) {
-                        wallet.pauseRefresh()
-                        walletState.setConnectionStatus(
-                            Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
-                        )
-                        walletState.setLoading(false)
-                    }
-                } else if (wallet?.isInitialized == true) {
-                    try {
-                        applyEndpoint(
-                            TransportEndpoint.Socks5(
-                                ProxyEndpoint(socket.address.value, socket.port.value),
-                            ),
-                        )
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        wallet.pauseRefresh()
-                        walletState.setConnectionStatus(
-                            Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
-                        )
-                        walletState.setLoading(false)
-                        Timber.tag(TAG).e("Could not update Tor proxy; refresh paused")
-                    }
-                }
+            torService.socksFlow.collect {
+                if (transportController.config.value.mode.usesEmbeddedTor) pauseAfterTransportLoss()
             }
         }
         scope.launch {
-            transportController.state.collect { state ->
-                if (state.mode != TransportMode.SYSTEM_VPN) return@collect
-                if (state.status != TransportStatus.UNAVAILABLE) return@collect
-                val wallet = WalletManager.instance?.wallet ?: return@collect
-                wallet.pauseRefresh()
-                wallet.setOffline(true)
-                // Drop the live HTTP client connection so an in-flight request cannot
-                // finish over the default network after the VPN is gone.
-                runCatching { wallet.setProxy("") }
-                walletState.setOffline(true)
-                walletState.setConnectionStatus(
-                    Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
-                )
-                walletState.setLoading(false)
-            }
+            transportController.state.collect { pauseAfterTransportLoss() }
         }
+    }
+
+    private suspend fun pauseAfterTransportLoss() {
+        transportApplyMutex.withLock {
+            val applied = appliedTransport ?: return
+            if (transportController.isCurrent(applied.authorization)) return
+            appliedTransport = null
+            val wallet = applied.wallet
+            if (WalletManager.instance?.wallet !== wallet || WalletSession.profile != applied.profile) return
+            wallet.pauseRefresh()
+            wallet.setOffline(true)
+            walletState.setOffline(true)
+            walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
+            walletState.setLoading(false)
+        }
+    }
+
+    private fun hasAppliedTransport(wallet: Wallet): Boolean {
+        if (walletState.backgroundSyncFaulted) return false
+        val applied = appliedTransport ?: return false
+        return applied.wallet === wallet && WalletManager.instance?.wallet === wallet &&
+            WalletSession.profile == applied.profile && transportController.isCurrent(applied.authorization)
+    }
+
+    /** Reject new network operations when the wallet has no current applied endpoint. */
+    fun requireAppliedTransport(wallet: Wallet) {
+        check(!walletState.offline) { "Wallet transport is unavailable" }
+        requireAppliedProxy(wallet)
+    }
+
+    private fun requireAppliedProxy(wallet: Wallet) {
+        check(hasAppliedTransport(wallet)) { "Wallet transport is unavailable" }
+    }
+
+    private fun activateAppliedTransport(wallet: Wallet) {
+        requireAppliedProxy(wallet)
+        walletState.setOffline(false)
+        requireAppliedTransport(wallet)
     }
 
     @Synchronized
@@ -167,6 +174,7 @@ class AnonWalletHandler(
         }
 
         handler = null
+        appliedTransport = null
         walletState.resetSession(profile)
 
         val anonWallet =
@@ -273,7 +281,9 @@ class AnonWalletHandler(
         }
     }
 
-    suspend fun startService() {
+    suspend fun startService() = walletNetworkMutex.withLock { startCurrentWalletService() }
+
+    private suspend fun startCurrentWalletService() {
         val manager = WalletManager.instance ?: return
         val wallet = manager.wallet ?: return
         handler =
@@ -281,16 +291,7 @@ class AnonWalletHandler(
                 wallet,
                 walletState,
             ) {
-                // Never reconnect directly after losing the only clearnet transport, and
-                // never re-init through a stale embedded-Tor port.
-                val mode = transportController.config.value.mode
-                val state = transportController.state.value
-                state.mode == mode && state.status == TransportStatus.READY &&
-                    when (mode) {
-                        TransportMode.SYSTEM_VPN -> transportController.isVpnActive()
-                        TransportMode.EMBEDDED_TOR -> torService.socks != null
-                        else -> state.endpoint is TransportEndpoint.Socks5
-                    }
+                hasAppliedTransport(wallet)
             }
 
         wallet.setListener(handler)
@@ -308,9 +309,8 @@ class AnonWalletHandler(
             (if (lwsActive) "" else prefs.getString(NodeFields.RPC_USERNAME.value, "")).orEmpty()
         val rpcPassphrase =
             (if (lwsActive) "" else prefs.getString(NodeFields.RPC_PASSWORD.value, "")).orEmpty()
-        val offline = host.isEmpty()
-        walletState.setOffline(offline)
-        wallet.setOffline(offline)
+        walletState.setOffline(true)
+        wallet.setOffline(true)
         // nothing to load without a node/LWS
         if (host.isNotEmpty()) walletState.setLoading(true)
         walletState.update()
@@ -374,6 +374,7 @@ class AnonWalletHandler(
             if (wallet.isSynchronized) {
                 wallet.refreshHistory()
             }
+            if (host.isNotEmpty()) requireAppliedProxy(wallet)
             check(wallet.init(0, lightWallet = lwsActive)) { "Wallet initialization failed" }
             if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) return
             check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
@@ -389,6 +390,7 @@ class AnonWalletHandler(
                 )
             }
             if (wallet.isInitialized) {
+                if (host.isNotEmpty()) requireAppliedProxy(wallet)
                 if (lwsActive) {
                     // Keep the remote index untrusted even when login fails or throws.
                     wallet.setTrustedDaemon(false)
@@ -403,7 +405,10 @@ class AnonWalletHandler(
                     wallet.setTrustedDaemon(true)
                 }
                 wallet.refreshHistory()
-                wallet.startRefresh()
+                if (host.isNotEmpty()) {
+                    activateAppliedTransport(wallet)
+                    wallet.startRefresh()
+                }
                 walletState.update()
             }
         } catch (e: CancellationException) {
@@ -425,14 +430,30 @@ class AnonWalletHandler(
      * Call it before the wallet first talks to a node/LWS, or that traffic goes out
      * unproxied.
      */
-    suspend fun applyProxy() {
-        val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-        val wallet = manager.wallet
-        val endpoint = transportController.authorize()
-        if (WalletManager.instance !== manager || manager.wallet !== wallet) {
-            throw CancellationException("Wallet session changed while acquiring transport")
+    private suspend fun applyProxy() {
+        transportApplyMutex.withLock {
+            check(!walletState.backgroundSyncFaulted) { "Wallet session requires reopening" }
+            val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
+            val wallet = checkNotNull(manager.wallet) { "Wallet unavailable" }
+            appliedTransport = null
+            val profile = WalletSession.profile
+            wallet.pauseRefresh()
+            wallet.setOffline(true)
+            walletState.setOffline(true)
+            val authorization = transportController.authorize()
+            if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
+                throw CancellationException("Wallet session changed while acquiring transport")
+            }
+            check(!walletState.backgroundSyncFaulted && transportController.isCurrent(authorization)) {
+                "Wallet transport changed before applying the proxy"
+            }
+            applyEndpoint(manager, wallet, authorization.endpoint)
+            if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
+                throw CancellationException("Wallet session changed while applying transport")
+            }
+            check(transportController.isCurrent(authorization)) { "Wallet transport changed while applying the proxy" }
+            appliedTransport = AppliedTransport(wallet, profile, authorization)
         }
-        applyEndpoint(endpoint)
     }
 
     /**
@@ -440,7 +461,9 @@ class AnonWalletHandler(
      * a transport change: the old HTTP client must not keep using the previous proxy.
      * The caller marks the wallet offline if this throws.
      */
-    suspend fun reapplyLightWallet() {
+    suspend fun reapplyLightWallet() = walletNetworkMutex.withLock { reapplyCurrentLightWallet() }
+
+    private suspend fun reapplyCurrentLightWallet() {
         val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
         val wallet = manager.wallet ?: return
         val profile = WalletSession.profile
@@ -472,6 +495,7 @@ class AnonWalletHandler(
                 useTls = lws.useTls,
             ) ?: throw IllegalStateException("Invalid LWS endpoint")
         updateDaemon(node, lightWallet = true)
+        requireAppliedProxy(wallet)
         check(wallet.init(0, lightWallet = true)) { "LWS initialization failed" }
         if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
             throw CancellationException("Wallet session changed during LWS initialization")
@@ -479,30 +503,78 @@ class AnonWalletHandler(
         check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
             "Wallet network settings changed during LWS initialization"
         }
+        requireAppliedProxy(wallet)
         wallet.setTrustedDaemon(false)
         check(wallet.lightWalletLogin()) { "LWS login failed" }
         wallet.setTrustedDaemon(false)
         wallet.setOffline(false)
+        activateAppliedTransport(wallet)
         wallet.startRefresh()
     }
 
-    private fun applyEndpoint(endpoint: TransportEndpoint) {
-        val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-        val wallet = manager.wallet
+    internal suspend fun connectRpcNode(
+        node: Node,
+        wallet: Wallet?,
+    ) = walletNetworkMutex.withLock { connectCurrentRpcNode(node, wallet) }
+
+    private suspend fun connectCurrentRpcNode(
+        node: Node,
+        wallet: Wallet?,
+    ) {
+        val profile = WalletSession.profile
+        val transport = transportController.config.value
+        check(!LwsConfig.load(prefs, profile).enabled) { "LWS settings require a wallet restart" }
+        require(NodeSelectionPolicy.accepts(transport, node, AnonConfig.getNetworkType())) {
+            "Node network does not match the selected transport"
+        }
+        if (wallet != null) {
+            check(WalletManager.instance?.wallet === wallet && !wallet.isLightWallet) {
+                "Current wallet cannot change RPC node"
+            }
+            applyProxy()
+            check(
+                WalletManager.instance?.wallet === wallet && WalletSession.profile == profile &&
+                    transportController.config.value == transport && !wallet.isLightWallet &&
+                    !LwsConfig.load(prefs, profile).enabled,
+            ) { "Wallet session changed while preparing RPC" }
+            updateDaemon(node, lightWallet = false)
+            requireAppliedProxy(wallet)
+            check(wallet.init(0, lightWallet = false)) { "Node initialization failed" }
+            requireAppliedProxy(wallet)
+            wallet.setTrustedDaemon(true)
+        }
+        check(
+            WalletManager.instance?.wallet === wallet && WalletSession.profile == profile &&
+                transportController.config.value == transport && !LwsConfig.load(prefs, profile).enabled,
+        ) {
+            "Wallet session changed before saving RPC"
+        }
+        check(persistNode(node)) { "Cannot persist selected node" }
+        if (wallet != null) {
+            activateAppliedTransport(wallet)
+            wallet.startRefresh()
+        }
+    }
+
+    private fun applyEndpoint(
+        manager: WalletManager,
+        wallet: Wallet,
+        endpoint: TransportEndpoint,
+    ) {
         val previous = manager.proxy
         try {
             when (endpoint) {
                 is TransportEndpoint.Socks5 -> {
                     val address = endpoint.endpoint.formatted
                     check(manager.setProxy(address)) { "Transport proxy was rejected" }
-                    if (wallet != null && !wallet.setProxy(address)) {
+                    if (!wallet.setProxy(address)) {
                         throw IllegalStateException("Wallet proxy was rejected")
                     }
                 }
 
                 TransportEndpoint.Direct -> {
                     check(manager.clearProxy()) { "Clearing the proxy was rejected" }
-                    if (wallet != null && !wallet.clearProxy()) {
+                    if (!wallet.clearProxy()) {
                         throw IllegalStateException("Clearing the wallet proxy was rejected")
                     }
                 }
@@ -547,14 +619,15 @@ class AnonWalletHandler(
             .putString(NodeFields.NODE_NAME.value, node.name)
             .commit()
 
-    fun updateDaemon(
+    private fun updateDaemon(
         node: Node?,
-        lightWallet: Boolean = WalletManager.instance?.wallet?.isLightWallet == true,
+        lightWallet: Boolean,
     ) {
         walletState.setLoading(true)
         val wallet = WalletManager.instance?.wallet
         val walletManager = WalletManager.instance
         wallet?.pauseRefresh()
+        walletState.setOffline(true)
         // Callers state the backend explicitly: startup applies the pending mode before
         // wallet.init(), and a pending enable/disable must not change trust or skip the
         // node-network check for the current RPC wallet.
@@ -565,14 +638,12 @@ class AnonWalletHandler(
                     "Node network does not match the selected transport"
                 }
             }
-            if (transportController.config.value.mode == TransportMode.SYSTEM_VPN &&
-                !transportController.isVpnActive()
-            ) {
-                throw IllegalStateException("System VPN is not active")
-            }
+            if (node != null && wallet != null) check(hasAppliedTransport(wallet)) { "Wallet transport is unavailable" }
             if (lwsActive) wallet?.setTrustedDaemon(false)
+            val manager = checkNotNull(walletManager) { "Wallet manager unavailable" }
+            manager.setDaemon(node)
             if (node != null) {
-                walletState.setOffline(false)
+                if (wallet != null) check(hasAppliedTransport(wallet)) { "Wallet transport is unavailable" }
                 wallet?.setOffline(false)
                 walletState.updateDaemon(
                     DaemonInfo(
@@ -590,7 +661,6 @@ class AnonWalletHandler(
                     ),
                 )
             }
-            checkNotNull(walletManager) { "Wallet manager unavailable" }.setDaemon(node)
             wallet?.setTrustedDaemon(!lwsActive)
             walletState.setLoading(false)
         } catch (e: Exception) {

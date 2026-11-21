@@ -29,6 +29,20 @@ import java.io.ByteArrayOutputStream
 
 class TransportPolicyTest {
     @Test
+    fun `an applied transport rejects a replaced route denied state or reused Tor port`() {
+        val endpoint = TransportEndpoint.Socks5(ProxyEndpoint("127.0.0.1", 9050))
+        val ready = TransportState(TransportMode.EMBEDDED_TOR, TransportStatus.READY, endpoint)
+        val authorization = TransportAuthorization(7L, endpoint, torGeneration = 3L)
+
+        assertTrue(authorization.matchesState(ready, 7L))
+        assertFalse(authorization.matchesState(ready, 8L))
+        assertFalse(authorization.matchesState(ready.copy(status = TransportStatus.UNAVAILABLE), 7L))
+        assertFalse(authorization.matchesState(ready.copy(endpoint = null), 7L))
+        assertTrue(authorization.matchesTor(endpoint, 3L))
+        assertFalse(authorization.matchesTor(endpoint, 4L))
+    }
+
+    @Test
     fun `proxy probe offers only SOCKS5 no authentication and sends no destination`() {
         val request = ByteArrayOutputStream()
         assertTrue(acceptsSocks5WithoutAuthentication(ByteArrayInputStream(byteArrayOf(5, 0)), request))

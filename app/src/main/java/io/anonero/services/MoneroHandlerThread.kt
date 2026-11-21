@@ -22,12 +22,18 @@ import timber.log.Timber
 class MoneroHandlerThread(
     private val wallet: Wallet,
     private val walletState: WalletState,
-    private val transportReady: () -> Boolean = { true },
+    private val transportReady: () -> Boolean,
 ) : Thread(null, null, "MoneroHandler", THREAD_STACK_SIZE),
     WalletListener {
     // A listener belongs to one native wallet, never to whichever wallet replaced it.
     private val isCurrentSession: Boolean
         get() = WalletManager.instance?.wallet === wallet
+
+    private val canUseTransport: Boolean
+        get() = isCurrentSession && !walletState.offline && transportReady()
+
+    @Volatile
+    private var lastDaemonHeight: Long? = null
 
     @Synchronized
     override fun start() {
@@ -58,76 +64,58 @@ class MoneroHandlerThread(
     ) {}
 
     override fun newBlock(height: Long) {
-        if (!isCurrentSession) return
-        updateSyncProgress(height)
-    }
-
-    private fun updateSyncProgress(height: Long) {
-        val syncHeight = wallet.getBlockChainHeight()
-        val deamonHeight = wallet.getDaemonBlockChainHeight()
-        val left = deamonHeight - syncHeight
-        if (syncHeight < 0 || left < 0) {
-            return
+        if (!canUseTransport || wallet.isLightWallet) return
+        val target = lastDaemonHeight ?: wallet.getDaemonBlockChainHeight().also { lastDaemonHeight = it }
+        if (height >= 0 && target > 0 && canUseTransport) {
+            val left = (target - height).coerceAtLeast(0)
+            val progress = (height.toDouble() / target).toFloat().coerceIn(0f, 1f)
+            walletState.syncUpdate(SyncProgress(progress, left))
         }
-        val progress =
-            if (wallet.getDaemonBlockChainTargetHeight().toDouble() == 0.0) {
-                1f
-            } else {
-                (height.toDouble() / wallet.getDaemonBlockChainTargetHeight().toDouble()).toFloat()
-            }
-        walletState.syncUpdate(SyncProgress(progress, left))
     }
 
     override fun updated() {
         if (!isCurrentSession) return
         refresh(false)
-        walletState.update()
     }
 
     override fun refreshed() {
         if (!isCurrentSession) return
-        if (walletState.offline) {
+        if (!canUseTransport) {
             walletState.setLoading(false)
             return
         }
-        val status = wallet.fullStatus.connectionStatus
-        val daemonHeight = wallet.getDaemonBlockChainHeight()
-        val chainHeight = wallet.getBlockChainHeight()
-        if (wallet.isLightWallet) {
-            // LWS scan height legitimately trails the chain; the normal height-difference
-            // reconnect would re-login on every refresh.
-            if (status === Wallet.ConnectionStatus.ConnectionStatus_Disconnected || status == null) {
-                tryRestartConnection()
-            } else {
-                wallet.setSynchronized()
-                if (!wallet.store()) {
-                    Timber.tag(name).w("could not persist refreshed wallet state")
-                }
-                refresh(true)
-                walletState.setLoading(false)
-            }
+        val status = wallet.fullStatus.connectionStatus ?: Wallet.ConnectionStatus.ConnectionStatus_Disconnected
+        if (!canUseTransport) return
+        if (status != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
+            walletState.recordDaemonStatus(wallet, status, -1L)
+            if (status == Wallet.ConnectionStatus.ConnectionStatus_Disconnected) tryRestartConnection()
+            walletState.setLoading(false)
             walletState.update()
             return
         }
-        if (status === Wallet.ConnectionStatus.ConnectionStatus_Disconnected || status == null) {
-            tryRestartConnection()
-        } else {
-            val heightDiff = daemonHeight - chainHeight
-            if (heightDiff >= 2) {
+
+        val daemonHeight = wallet.getDaemonBlockChainHeight()
+        if (!canUseTransport) return
+        lastDaemonHeight = daemonHeight
+        walletState.recordDaemonStatus(wallet, status, daemonHeight)
+        // LWS scan height may trail the chain without requiring reconnect.
+        if (!wallet.isLightWallet) {
+            val height = wallet.getBlockChainHeight()
+            if (daemonHeight - height >= 2) {
                 tryRestartConnection()
-            } else {
-                if (!wallet.isSynchronized) {
-                    updateSyncProgress(wallet.getBlockChainHeight())
-                }
-                wallet.setSynchronized()
-                if (!wallet.store()) {
-                    Timber.tag(name).w("could not persist refreshed wallet state")
-                }
-                refresh(true)
-                walletState.setLoading(false)
+                return
+            }
+            if (!wallet.isSynchronized && height >= 0 && daemonHeight >= height) {
+                val progress = if (daemonHeight == 0L) 1f else (height.toDouble() / daemonHeight).toFloat()
+                walletState.syncUpdate(SyncProgress(progress, daemonHeight - height))
             }
         }
-        walletState.update()
+        wallet.setSynchronized()
+        if (!wallet.store()) {
+            Timber.tag(name).w("could not persist refreshed wallet state")
+        }
+        refresh(true)
+        walletState.setLoading(false)
     }
 
     private fun tryRestartConnection() {
@@ -149,6 +137,7 @@ class MoneroHandlerThread(
         try {
             if (lightWallet) wallet.setTrustedDaemon(false)
             check(wallet.init(0, lightWallet = lightWallet)) { "Wallet initialization failed" }
+            check(canUseTransport) { "Wallet transport changed during reconnect" }
             if (lightWallet) {
                 // Login must succeed after every init before refresh is restarted.
                 wallet.setTrustedDaemon(false)
@@ -159,12 +148,15 @@ class MoneroHandlerThread(
                 // Preserve the existing full-node trust policy after init.
                 wallet.setTrustedDaemon(true)
             }
+            check(canUseTransport) { "Wallet transport changed before restarting refresh" }
             wallet.startRefresh()
             walletState.update()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             wallet.pauseRefresh()
+            wallet.setOffline(true)
+            walletState.setOffline(true)
             if (lightWallet) wallet.setTrustedDaemon(false)
             walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
             walletState.setLoading(false)
