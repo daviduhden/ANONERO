@@ -44,13 +44,6 @@
     <string name="optional">（可选）</string>
     <string name="password">密码</string>
     <string name="wallet_loading">钱包正在加载\n请稍候…</string>
-    <string name="manual_proxy">手动代理</string>
-    <string name="on">开</string>
-    <string name="off">关</string>
-    <string name="proxy_address">代理地址</string>
-    <string name="proxy_port">端口</string>
-    <string name="update_external_proxy">更新外部代理</string>
-    <string name="using_built_in_tor">正在使用内置 Tor</string>
     <string name="tor_logs">Tor 日志</string>
     <string name="node_disconnected">节点已断开\n请连接节点以查看代币</string>
     <string name="no_coins_available">暂无可用代币\n收到交易后，代币将显示在此处</string>
@@ -121,10 +114,6 @@
     <string name="export_to_file">导出到文件</string>
     <string name="back">返回</string>
     <string name="connect">连接</string>
-    <string name="proxy_updated">代理已更新</string>
-    <string name="invalid_proxy_address">代理地址无效</string>
-    <string name="invalid_port">端口无效</string>
-    <string name="proxy_update_failed">无法更新代理</string>
     <string name="securely_wipe_title">安全擦除</string>
     <string name="securely_wipe_warning">此操作将使用安全删除方法永久擦除当前钱包的数据和加密密钥。其他钱包配置文件及其密钥不会受到影响。此过程无法撤销。</string>
     <string name="securely_wipe_passphrase_prompt">输入钱包口令以继续</string>
@@ -138,7 +127,6 @@
     <string name="export_nero_keys">导出 [ИΞR0] 密钥</string>
     <string name="settings_connection">连接</string>
     <string name="settings_node_settings">节点设置</string>
-    <string name="settings_proxy_settings">代理设置</string>
     <string name="settings_security">安全</string>
     <string name="settings_seed">助记词</string>
     <string name="settings_change_pin">更改 PIN</string>

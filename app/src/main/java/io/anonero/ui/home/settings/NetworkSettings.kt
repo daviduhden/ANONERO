@@ -21,7 +21,6 @@ package io.anonero.ui.home.settings
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.SharedPreferences
-import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -169,8 +169,8 @@ class NetworkSettingsViewModel(
                     // different network, keep the wallet offline instead of reusing the old
                     // transport or connecting directly.
                     if (lwsActive && LwsConfig.validateTransport(lws, config) != null) {
-                        wallet?.pauseRefresh()
-                        wallet?.setOffline(true)
+                        wallet.pauseRefresh()
+                        wallet.setOffline(true)
                         walletState.setOffline(true)
                         walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
                         walletState.setLoading(false)
@@ -180,8 +180,8 @@ class NetworkSettingsViewModel(
                     // Do not switch an active light wallet back to RPC implicitly. The LWS
                     // toggle takes effect on the next wallet start.
                     if (lwsPendingDisable) {
-                        wallet?.pauseRefresh()
-                        wallet?.setOffline(true)
+                        wallet.pauseRefresh()
+                        wallet.setOffline(true)
                         walletState.setOffline(true)
                         walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
                         walletState.setLoading(false)
@@ -193,7 +193,7 @@ class NetworkSettingsViewModel(
                             walletHandler.reapplyLightWallet()
                         } else {
                             walletHandler.applyProxy()
-                            check(WalletManager.instance === manager && manager?.wallet === wallet) {
+                            check(WalletManager.instance === manager && manager.wallet === wallet) {
                                 "Wallet session changed"
                             }
                             val selected =
@@ -555,7 +555,7 @@ fun NetworkSettings(
                             )
                             TextButton(
                                 onClick = {
-                                    val uri = Uri.parse("https://geti2p.net/en/download")
+                                    val uri = "https://geti2p.net/en/download".toUri()
                                     runCatching {
                                         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                                     }.onFailure { e ->

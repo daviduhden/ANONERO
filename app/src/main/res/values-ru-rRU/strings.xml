@@ -44,13 +44,6 @@
     <string name="optional">(Необязательно)</string>
     <string name="password">ПАРОЛЬ</string>
     <string name="wallet_loading">Кошелёк загружается\nподождите…</string>
-    <string name="manual_proxy">Ручной прокси</string>
-    <string name="on">ВКЛ</string>
-    <string name="off">ВЫКЛ</string>
-    <string name="proxy_address">адрес прокси</string>
-    <string name="proxy_port">порт</string>
-    <string name="update_external_proxy">Обновить внешний прокси</string>
-    <string name="using_built_in_tor">Используется встроенный Tor</string>
     <string name="tor_logs">Журналы Tor</string>
     <string name="node_disconnected">Узел отключён\nподключитесь к узлу, чтобы увидеть монеты</string>
     <string name="no_coins_available">Монеты недоступны\nони появятся здесь после получения транзакций</string>
@@ -121,10 +114,6 @@
     <string name="export_to_file">Экспортировать в файл</string>
     <string name="back">Назад</string>
     <string name="connect">Подключиться</string>
-    <string name="proxy_updated">Прокси обновлён</string>
-    <string name="invalid_proxy_address">Неверный адрес прокси</string>
-    <string name="invalid_port">Неверный порт</string>
-    <string name="proxy_update_failed">Не удалось обновить прокси</string>
     <string name="securely_wipe_title">Безопасное удаление</string>
     <string name="securely_wipe_warning">Это действие безвозвратно удалит данные и ключи шифрования активного кошелька методами безопасного удаления. Другие профили кошелька и их ключи не затрагиваются. Отменить это действие невозможно.</string>
     <string name="securely_wipe_passphrase_prompt">Введите парольную фразу кошелька, чтобы продолжить</string>
@@ -138,7 +127,6 @@
     <string name="export_nero_keys">Экспортировать ключи [ИΞR0]</string>
     <string name="settings_connection">Подключение</string>
     <string name="settings_node_settings">Настройки узла</string>
-    <string name="settings_proxy_settings">Настройки прокси</string>
     <string name="settings_security">Безопасность</string>
     <string name="settings_seed">Seed-фраза</string>
     <string name="settings_change_pin">Изменить PIN</string>

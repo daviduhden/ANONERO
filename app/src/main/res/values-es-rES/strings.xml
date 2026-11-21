@@ -45,13 +45,6 @@
     <string name="optional">(Opcional)</string>
     <string name="password">CONTRASEÑA</string>
     <string name="wallet_loading">El monedero se está cargando\nespere, por favor…</string>
-    <string name="manual_proxy">Configuración manual del proxy</string>
-    <string name="on">ACTIVADO</string>
-    <string name="off">DESACTIVADO</string>
-    <string name="proxy_address">dirección del servidor proxy</string>
-    <string name="proxy_port">puerto</string>
-    <string name="update_external_proxy">Actualizar servidor proxy externo</string>
-    <string name="using_built_in_tor">Usando Tor integrado</string>
     <string name="tor_logs">Registros de Tor</string>
     <string name="node_disconnected">Nodo desconectado\nconéctese a un nodo para ver sus monedas</string>
     <string name="no_coins_available">No hay monedas disponibles\nSus monedas aparecerán aquí cuando reciba transacciones</string>
@@ -122,10 +115,6 @@
     <string name="export_to_file">Exportar a archivo</string>
     <string name="back">Atrás</string>
     <string name="connect">Conectar</string>
-    <string name="proxy_updated">Servidor proxy actualizado</string>
-    <string name="invalid_proxy_address">Dirección de proxy no válida</string>
-    <string name="invalid_port">Puerto no válido</string>
-    <string name="proxy_update_failed">No se pudo actualizar el proxy</string>
     <string name="securely_wipe_title">Borrado seguro</string>
     <string name="securely_wipe_warning">Esta acción borrará de forma permanente los datos y las claves de cifrado del monedero activo mediante métodos de eliminación segura. Los demás perfiles de monedero y sus claves no se modifican. Este proceso no se puede deshacer.</string>
     <string name="securely_wipe_passphrase_prompt">Introduzca la frase de paso del monedero para continuar</string>
@@ -139,7 +128,6 @@
     <string name="export_nero_keys">Exportar [ИΞR0] claves</string>
     <string name="settings_connection">Conexión</string>
     <string name="settings_node_settings">Ajustes del nodo</string>
-    <string name="settings_proxy_settings">Ajustes del servidor proxy</string>
     <string name="settings_security">Seguridad</string>
     <string name="settings_seed">Semilla</string>
     <string name="settings_change_pin">Cambiar PIN</string>

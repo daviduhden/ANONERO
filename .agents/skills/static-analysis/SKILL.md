@@ -48,7 +48,9 @@ Do not use to claim runtime success, fund safety, or cryptographic proof.
    secrets, CI.
 3. **Inventory every diagnosis.** For each compile error, warning, test failure, crash,
    JNI/sanitizer diagnostic, or historical CI failure, record the run/commit, root cause,
-   related files, equivalent patterns, fix, and regression check in `docs/ci/`.
+   related files, equivalent patterns, fix, and regression check in `docs/ci/`. Read logs
+   and retained reports from successful and cancelled runs as well. Separate build warnings
+   from external tool diagnostics, and mark evidence gaps explicitly when artifacts expire.
 4. **Search for the pattern, not only the line.** Review declarations, definitions,
    consumers, tests, and the same design in other components. A single fixed warning does
    not close the audit. For Kotlin type/import failures, inspect every call site of the
