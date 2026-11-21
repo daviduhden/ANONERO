@@ -214,3 +214,10 @@ serialization and Bouncy Castle updates. Release signing remains unverified.
 
 Static analysis cannot prove runtime APK behavior. Treat release signing and broader
 device behavior as pending CI verification.
+
+### OpenSSL Android compilation
+
+The build applies a narrow Configure patch on Android to select the exact
+API 29 NDK wrapper without passing a second definition of `__ANDROID_API__`.
+The generated configuration is checked before building. OpenSSL and NDK pins
+are unchanged. See [W-008](../ci/openssl-android-api.md).

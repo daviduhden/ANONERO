@@ -132,3 +132,9 @@ artifact locally.
 - [ ] No local build artifact or patched submodule change is committed.
 - [ ] No alternate native runtime, no unpinned source, no unverified download.
 - [ ] Native success is not claimed without a CI artifact.
+
+The OpenSSL Android API selector patch is separate from the Monero series.
+The container builds it from the checksum-pinned OpenSSL release and checks the
+generated NDK compiler and macro flags before compiling. Keep API 29 for both
+Android targets and validate application of the patch against the pinned source
+after any OpenSSL update. See [W-008](../docs/ci/openssl-android-api.md).

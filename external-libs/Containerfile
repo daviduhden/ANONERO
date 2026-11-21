@@ -68,6 +68,7 @@ RUN ./build.sh toolchain
 RUN ./build.sh iconv
 RUN ./build.sh boost
 RUN ./build.sh zlib
+COPY openssl-android-api.patch /external-libs/
 RUN ./build.sh openssl
 RUN ./build.sh zmq
 RUN ./build.sh sodium

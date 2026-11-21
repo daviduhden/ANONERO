@@ -45,7 +45,7 @@ arm64-v8a:    ; @$(MAKE) --no-print-directory image TARGET=android64 ABI=$@
 armeabi-v7a:  ; @$(MAKE) --no-print-directory image TARGET=android32 ABI=$@
 linux-x86_64: ; @$(MAKE) --no-print-directory image TARGET=linux     ABI=$@
 
-arm64-v8a armeabi-v7a linux-x86_64: patches build.sh Containerfile
+arm64-v8a armeabi-v7a linux-x86_64: patches build.sh Containerfile openssl-android-api.patch
 
 image: patches
 	@command -v $(CONTAINER) >/dev/null || { echo "$(CONTAINER) not found"; exit 1; }

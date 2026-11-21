@@ -93,6 +93,7 @@ case "$TARGET" in
         ;;
 esac
 
+BUILD_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WORK=${WORK:-/opt/build}
 NDK=${NDK:-/opt/android-ndk-$NDK_REVISION}
 TC_DIR=$NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -242,9 +243,18 @@ dep_openssl() {
     get "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz" "openssl-$OPENSSL_VERSION.tar.gz" "$OPENSSL_SHA256"
     cd "$WORK/openssl-$OPENSSL_VERSION"
     if android; then
-        ANDROID_NDK_ROOT=$NDK ./Configure "$OPENSSL_TARGET" "-D__ANDROID_API__=$API" -fPIC -static \
+        git apply "$BUILD_SCRIPT_DIR/openssl-android-api.patch"
+        ANDROID_NDK_ROOT=$NDK OPENSSL_ANDROID_API_LEVEL=$API ./Configure "$OPENSSL_TARGET" -fPIC -static \
             no-shared no-tests --with-zlib-include="$WORK/zlib/include" --with-zlib-lib="$WORK/zlib/lib" \
             --prefix="$PREFIX" --openssldir="$PREFIX"
+        # Verify the generated build settings before compiling any OpenSSL source.
+        perl -I. -Mconfigdata -e '
+            die "Unexpected OpenSSL Android compiler\n" unless $config{CC} eq $ARGV[0];
+            for my $key (qw(CPPDEFINES CPPFLAGS defines cppflags CFLAGS cflags)) {
+                die "OpenSSL overrides the NDK Android API macro\n"
+                    if grep { /\b__ANDROID_API__\b/ } @{$config{$key} // []};
+            }
+        ' "$CC"
     else
         # --libdir=lib: openssl 3.x defaults to lib64 on x86_64, which step_collect misses.
         ./Configure "$OPENSSL_TARGET" -fPIC no-shared no-tests \

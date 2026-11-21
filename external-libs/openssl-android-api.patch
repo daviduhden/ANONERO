@@ -1,0 +1,30 @@
+--- a/Configurations/15-android.conf
++++ b/Configurations/15-android.conf
+@@ -63,16 +63,19 @@
+             } elsif ($is_standalone_toolchain) {
+                 $sysroot = "$ndk/sysroot";
+             } else {
+-                $api = "*";
+-
+-                # see if user passed -D__ANDROID_API__=N
+-                foreach (@{$useradd{CPPDEFINES}}, @{$user{CPPFLAGS}}) {
+-                    if (m|__ANDROID_API__=([0-9]+)|) {
+-                        $api = $1;
+-                        last;
++                if (defined $ENV{OPENSSL_ANDROID_API_LEVEL}) {
++                    $api = $ENV{OPENSSL_ANDROID_API_LEVEL};
++                    die "Invalid OPENSSL_ANDROID_API_LEVEL" unless $api =~ /\A[1-9][0-9]*\z/;
++                } else {
++                    $api = "*";
++                    # Legacy callers can still specify the preprocessor define.
++                    foreach (@{$useradd{CPPDEFINES}}, @{$user{CPPFLAGS}}) {
++                        if (m|__ANDROID_API__=([0-9]+)|) {
++                            $api = $1;
++                            last;
++                        }
+                     }
+                 }
+-
+                 if (-d "$ndk/platforms") {
+                     # list available platforms (numerically)
+                     my @platforms = sort { $a =~ m/-([0-9]+)$/; my $aa = $1;

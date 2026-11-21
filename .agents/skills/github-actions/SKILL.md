@@ -148,6 +148,10 @@ from dependency and hosted-runner advisories, and use reported artifact counts w
 their exact run and commit. A cancelled boot before the deadline cannot establish a
 timeout.
 
+When changing a compiler or API selector to resolve a warning, validate the
+effective compiler and platform in the build before accepting artifacts. For
+OpenSSL use its generated config and keep both API 29 Android targets.
+
 ## Completion criteria
 
 - [ ] Least privilege, pinned actions, no PR secret exposure.
