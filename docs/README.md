@@ -72,3 +72,5 @@ still requires the manual CI `native` job or local submodule initialization. See
 
 - [Continued-development iteration](development-iteration-2026-11.md): core/auxiliary/native/
   network/CI changes, feature status, regression sources and read-only CI evidence.
+
+- [Kotlin, JNI and transport hardening](development-iteration-modernization.md) records the source changes and pending device evidence.

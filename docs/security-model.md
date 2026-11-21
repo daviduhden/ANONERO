@@ -381,3 +381,8 @@ locked mutation guards and visible errors reduce stale-state decisions. Signing/
 results are withheld after input/session changes. None of these establishes native lifetime,
 cryptographic correctness, memory zeroization or fund safety. Retained tmp_backup files are
 purged at process startup; failed password transitions and flash erasure remain unproven.
+
+Saved-node diagnostics omit hosts and credentials. LWS startup and transport reapply
+check that proxy acquisition did not outlive the wallet profile and operator settings
+used to authorize login. A full lifecycle lease is still required to serialize changes
+during native calls. See [Kotlin, JNI and transport hardening](development-iteration-modernization.md).

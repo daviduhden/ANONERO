@@ -107,3 +107,11 @@ static-checker mutation tests. Native listener lifetime/global lifecycle seriali
 RPC trust consent, signed-file binding, backup-passphrase policy and hosted emulator
 reliability remain higher-risk work. The current toolchain built in existing baseline CI;
 no unvalidated dependency upgrade is introduced by this iteration.
+
+## Evidence after Kotlin, JNI and transport hardening
+
+Prioritize listener lifetime and session serialization, then verify stale proxy/LWS
+requests and explicit-coin sends on devices. Preserve the fail-closed decisions and
+establish exact signed-transaction binding before claiming safe NERO broadcasts.
+The [iteration record](docs/development-iteration-modernization.md) lists the
+regressions and remaining evidence.

@@ -339,3 +339,12 @@ not executed locally. See [iteration report](docs/development-iteration-2026-11.
 Read-only gh review: 43633496677 on a2c9cfb passed JVM/lint/native/assemble/static jobs;
 instrumentation failed during an optional emulator settings write before tests. Its source
 baseline does not include these changes. No workflow was started/retried/cancelled here.
+
+## Kotlin, JNI and transport hardening
+
+The read-only Actions review confirmed a green Tests run at `dff2ecb` (43640612517),
+including API 35 smoke tests on both flavors. The current work adds SOCKS5 negotiation
+and node-chain checks, stale LWS request rejection, JNI input containment, and safer
+single-send selection. New JVM fixtures and stronger static diagnostics are prepared.
+Native/JVM builds and real-device regressions for the working tree are pending. See
+[the iteration record](docs/development-iteration-modernization.md).

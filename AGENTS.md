@@ -482,6 +482,12 @@ native lifetime still require CI/device review. Legacy proxy onboarding uses the
 transport editor. See `docs/architecture/anonymity-audit-2026-11.md` and the
 `docs/development-iteration-*.md` records for scope and limitations.
 
+For outbound wallet activity, reject stale profile or transport snapshots after
+proxy acquisition. Refresh callbacks must keep an offline wallet offline and must
+have a current ready transport before reconnecting. See
+[Kotlin, JNI and transport hardening](docs/development-iteration-modernization.md)
+for the remaining lifecycle and device checks.
+
 ## Continuous Agent & Skills Maintenance
 
 Run `python3 scripts/validate-agent-knowledge.py --scope worktree` before review.

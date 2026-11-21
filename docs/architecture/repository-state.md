@@ -214,3 +214,8 @@ validator regressions and instruction structure, with an optional base ref for
 committed knowledge synchronization. It requires the owner gate, read-only repository
 access and full history; it performs no Android builds or artifact publishing.
 Workflow execution remains unverified until an authorized manual CI run.
+
+The current source includes SOCKS5 negotiation before external proxy readiness,
+wallet-chain-aware node selection, and stale LWS startup/reapply guards. The native
+adapter rejects unreadable message input and contains exceptions during transaction
+input conversion. See [iteration and evidence](../development-iteration-modernization.md).

@@ -41,6 +41,7 @@ correlation, or user behavior can still deanonymize activity. See
 | [`docs/features.md`](docs/features.md) | Implemented wallet features, anonymity/privacy/security contribution, and limitations |
 | [`docs/development.md`](docs/development.md) | Repository layout, conventions, static checks, extension recipes |
 | [`docs/build-and-release.md`](docs/build-and-release.md) | Gradle, native build, CI, signing, release |
+| [Kotlin, JNI and transport hardening](docs/development-iteration-modernization.md) | Recent changes and pending CI and device checks |
 | [`docs/architecture/repository-state.md`](docs/architecture/repository-state.md) | Audited state, evidence, decisions, blockers |
 | [`docs/architecture/dependencies.md`](docs/architecture/dependencies.md) | Dependency inventory and update record |
 | [`PROGRESS.md`](PROGRESS.md), [`ROADMAP.md`](ROADMAP.md), [`TODO.md`](TODO.md) | Current progress, priorities, and actionable work |

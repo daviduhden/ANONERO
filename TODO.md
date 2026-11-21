@@ -18,10 +18,10 @@ the rationale to `ROADMAP.md`.
 - [ ] Validate the restored wallet-API patch series in the manual `native` CI job once the
       Debian snapshot backend recovers; the series applies to `85f036ba` but the native
       archives build in CI.
-- [ ] Create the protected `release` environment with required reviewers and the four
-      signing secrets; confirm no other collaborator can run workflows from a modified ref.
+- [x] Configure separate signing environments and certificate pins for ANON and NERO.
+      Signed release execution remains unverified.
 - [ ] Protect `.github/workflows/` and `main` with branch protection/CODEOWNERS.
-- [ ] Pin the expected release certificate SHA-256 and verify every signed APK against it.
+- [ ] Document and test native full-node trust separately from saved node ranking.
 - [ ] Verify every archive imported by `app/CMakeLists.txt`, not only `libwallet_api.a`;
       the native archives and adapter link now build in CI.
 - [ ] Validate the Android toolchain (AGP 9.5.1, Gradle 9.9.0, API 37.2, NDK 30, CMake 4.1.2).
