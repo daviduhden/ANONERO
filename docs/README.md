@@ -19,6 +19,7 @@ replace them.
 | [`features.md`](features.md) | Product and QA | Implemented wallet features, anonymity/privacy/security contribution, limitations |
 | [`development.md`](development.md) | Contributors | Repository layout, conventions, static checks, extension recipes |
 | [`build-and-release.md`](build-and-release.md) | Build and release engineers | Gradle, native archives, CI, signing, releases |
+| [`android-release-signing.md`](android-release-signing.md) | Release owners | Android signing custody, recovery and developer registration |
 | [`ci/README.md`](ci/README.md) | CI owners and maintainers | Historical failures, warnings, root causes, regression checks |
 | [`architecture/repository-state.md`](architecture/repository-state.md) | Maintainers | Audited state, evidence, decisions, known gaps |
 | [`architecture/dependencies.md`](architecture/dependencies.md) | Maintainers | Dependency inventory, update record, blocked upgrades |

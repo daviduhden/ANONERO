@@ -12,6 +12,7 @@ description: "Use when reviewing or changing ANONERO key handling, PIN verificat
 - Wallet secret generation and storage.
 - Backup encryption/decryption and archive validation.
 - Seed/passphrase/secret serialization or zeroization.
+- Auditing custody and recovery for production APK signing keys alongside `github-actions`.
 - Reviewing a change for secret leakage, weak parameters, or side channels.
 
 Do not use to design a new cipher, KDF, or protocol. Use the platform and the formats
@@ -108,6 +109,14 @@ files/Keystore wrapping after false/throwing close. Use retained ownership and c
 closure before success; no KDF/backup-format change is implied. Backup export rejects NERO
 and DECOY before inspecting MAIN scratch state. Retained scratch password transitions are
 not independently proven atomic; do not claim stronger at-rest/zeroization guarantees.
+
+## Production signing keys
+
+The release runbook defines certificate pinning, two independent PKCS#12 stores,
+GnuPG recovery verification, and per-app GitHub Environments. Base64 is only the
+encoding used to stream a PKCS#12 store to GitHub. Never expose passwords via
+process arguments or plaintext files. Before provisioning, verify identity
+continuity against previously distributed APKs, including independent channels.
 
 ## Maintenance & Continuous Learning
 
