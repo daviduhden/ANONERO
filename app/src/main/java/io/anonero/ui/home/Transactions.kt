@@ -121,6 +121,7 @@ import io.anonero.ui.home.graph.routes.SendScreenRoute
 import io.anonero.ui.home.graph.routes.SettingsNodeRoute
 import io.anonero.ui.home.graph.routes.SignVerifyRoute
 import io.anonero.ui.home.graph.routes.TransactionsRoute
+import io.anonero.ui.home.spend.completeAcceptedBroadcast
 import io.anonero.ui.home.spend.qr.ExportType
 import io.anonero.ui.home.spend.qr.ImportEvents
 import io.anonero.ui.home.spend.qr.QRExchangeScreen
@@ -296,16 +297,20 @@ fun TransactionScreen(
                                             throw IllegalStateException("system VPN is not active")
                                         }
                                         val error = wallet.submitTransaction(path)
-                                        if (error != "Transaction submitted!") {
-                                            throw IllegalStateException(error ?: "broadcast failed")
-                                        }
-                                        wallet.refreshHistory()
-                                        wallet.store()
-                                        success = true
+                                        check(error == "Transaction submitted!") { "Signed transaction submission failed" }
+                                        val recovered =
+                                            completeAcceptedBroadcast(
+                                                publishAcceptance = { success = true },
+                                                refreshAndStore = {
+                                                    wallet.refreshHistory()
+                                                    wallet.store()
+                                                },
+                                            )
+                                        if (!recovered) Timber.tag(TAG).w("Post-broadcast wallet recovery failed")
                                     } catch (ex: CancellationException) {
                                         throw ex
-                                    } catch (ex: Exception) {
-                                        Timber.tag(TAG).e(ex, "signed transaction broadcast failed")
+                                    } catch (_: Exception) {
+                                        Timber.tag(TAG).e("Signed transaction submission failed")
                                     } finally {
                                         withContext(NonCancellable + Dispatchers.Main) {
                                             broadcastProgree = false

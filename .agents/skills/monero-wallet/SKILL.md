@@ -70,6 +70,8 @@ These are linkability-reduction measures, not guarantees:
   user reviewed that object. Do not silently reload and sign a different file.
 - Persist after mutation: `store()` after account/subaddress/label/note/freeze changes
   and after transaction broadcast. Pause refresh before a backup copy and resume after.
+- Publish confirmed native broadcast acceptance before local refresh and storage.
+  Treat any subsequent recovery failure as a diagnostic, so it cannot invite resubmission.
 - View-only `nero` has no spend key. Use `viewOnlyBalance` paths and do not add spend,
   decoy, or backup-export behavior.
 - Never log seeds, passphrases, wallet passwords, private keys, or full transaction

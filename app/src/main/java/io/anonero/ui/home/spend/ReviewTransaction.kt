@@ -236,7 +236,6 @@ class ReviewTransactionViewModel : ViewModel() {
                     if (!wallet.send(tx)) {
                         throw Exception("Failed to send transaction")
                     }
-                    submitted = true
                 } else {
                     if (!signedTxFile.exists()) {
                         throw Exception("Signed transaction file not found")
@@ -247,26 +246,24 @@ class ReviewTransactionViewModel : ViewModel() {
                     // different transaction. Do not treat this as verified fund safety
                     // until the native signed-file binding API exists and is tested.
                     val error = wallet.submitTransaction(signedTxFile.absolutePath)
-                    if (error != "Transaction submitted!") {
-                        throw Exception(error)
-                    }
-                    signedTxFile.delete()
-                    submitted = true
-                    Timber.tag(TAG).d("Transaction broadcasted...")
+                    check(error == "Transaction submitted!") { "Signed transaction submission failed" }
                 }
-                // The transaction is already broadcast at this point. A later refresh/store
-                // failure must not turn the UI into an error state that invites a retry and a
-                // second payment.
-                broadcastingTx.postValue(BroadcastState.SUCCESS)
-                try {
-                    wallet.startRefresh()
-                    wallet.refreshHistory()
-                    wallet.store()
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (e: Exception) {
-                    Timber.tag(TAG).w(e, "post-broadcast refresh failed")
-                }
+                val recovered =
+                    completeAcceptedBroadcast(
+                        publishAcceptance = {
+                            submitted = true
+                            broadcastingTx.postValue(BroadcastState.SUCCESS)
+                        },
+                        refreshAndStore = {
+                            if (AnonConfig.viewOnly && !signedTxFile.delete()) {
+                                Timber.tag(TAG).w("Could not remove submitted transaction file")
+                            }
+                            wallet.startRefresh()
+                            wallet.refreshHistory()
+                            wallet.store()
+                        },
+                    )
+                if (!recovered) Timber.tag(TAG).w("Post-broadcast wallet recovery failed")
             } catch (cancelled: CancellationException) {
                 // If nothing was submitted, do not leave the screen stuck in IN_PROGRESS:
                 // STAGING is the only state that allows a deliberate retry.
