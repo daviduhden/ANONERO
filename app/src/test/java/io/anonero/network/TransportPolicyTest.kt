@@ -18,13 +18,31 @@
 
 package io.anonero.network
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 
 class TransportPolicyTest {
+    @Test
+    fun `proxy probe offers only SOCKS5 no authentication and sends no destination`() {
+        val request = ByteArrayOutputStream()
+        assertTrue(acceptsSocks5WithoutAuthentication(ByteArrayInputStream(byteArrayOf(5, 0)), request))
+        assertArrayEquals(byteArrayOf(5, 1, 0), request.toByteArray())
+    }
+
+    @Test
+    fun `proxy probe rejects other protocol versions authentication and incomplete replies`() {
+        listOf(byteArrayOf(4, 0), byteArrayOf(5, 2), byteArrayOf(5, -1), byteArrayOf(5), byteArrayOf())
+            .forEach { reply ->
+                assertFalse(acceptsSocks5WithoutAuthentication(ByteArrayInputStream(reply), ByteArrayOutputStream()))
+            }
+    }
+
     @Test
     fun `maps hosts to destination networks`() {
         assertEquals(NodeNetwork.ONION, NodeNetwork.fromHost("abc.onion"))

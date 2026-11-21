@@ -147,6 +147,8 @@ network-only restoration and drops authorization. VPN loss invalidates generatio
 reappearance alone does not authorize traffic. Preference-only changes preserve the current
 provider. These guards do not prove old native sockets have closed or per-app VPN routing.
 
+Probe external SOCKS5 endpoints with a bounded no-auth greeting and no destination request. A matching reply proves protocol readiness at that instant only, not provider identity or DNS safety.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

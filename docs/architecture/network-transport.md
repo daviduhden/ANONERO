@@ -210,9 +210,10 @@ to onion/I2P routing.
 selects a candidate (current compatible node, trusted preference, name/host order).
 There is no separate HTTP health probe: a probe would create a second network client and
 could bypass the proxy. Availability is learned from the real wallet2 RPC connection.
-External proxy availability is checked with a TCP connect to the configured numeric/loopback
-proxy endpoint only; it never resolves or contacts a Monero node and does not use the
-wallet connection. It is not an HTTP/DNS client. External proxy availability is checked
+External proxy availability is checked on a bounded socket to the configured
+numeric or loopback endpoint. The probe sends a SOCKS5 no-auth greeting and closes
+without sending a destination or making a DNS request. A positive reply does not establish
+provider identity, ongoing availability or wallet2 DNS behavior. The check runs
 when a transport is applied. If Orbot, InviZible,
 i2pd, or a custom proxy is unavailable at startup, the wallet stays offline and the user
 must apply the transport again after the provider returns; automatic external-provider

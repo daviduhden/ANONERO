@@ -33,8 +33,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+
+private const val SOCKS_PROBE_TIMEOUT_MS = 3_000
 
 private val I2P_JAVA_PACKAGES =
     listOf(
@@ -110,14 +114,32 @@ private class ExternalSocksProvider(
 
     private suspend fun canConnect(endpoint: ProxyEndpoint): Boolean =
         withContext(Dispatchers.IO) {
-            runCatching {
+            try {
                 Socket().use { socket ->
                     // The endpoint is validated as numeric/loopback, so this opens no DNS
                     // path and never contacts a Monero node directly.
-                    socket.connect(InetSocketAddress(endpoint.host, endpoint.port), 3_000)
+                    socket.connect(InetSocketAddress(endpoint.host, endpoint.port), SOCKS_PROBE_TIMEOUT_MS)
+                    socket.soTimeout = SOCKS_PROBE_TIMEOUT_MS
+                    acceptsSocks5WithoutAuthentication(socket.getInputStream(), socket.getOutputStream())
                 }
-            }.isSuccess
+            } catch (_: IOException) {
+                false
+            }
         }
+}
+
+/**
+ * The probe sends only the SOCKS5 method greeting. The caller closes the socket without
+ * sending CONNECT, BIND, a destination, or wallet metadata.
+ */
+internal fun acceptsSocks5WithoutAuthentication(
+    input: InputStream,
+    output: OutputStream,
+): Boolean {
+    // RFC 1928: version 5, one offered method, no authentication.
+    output.write(byteArrayOf(0x05, 0x01, 0x00))
+    output.flush()
+    return input.read() == 0x05 && input.read() == 0x00
 }
 
 /**
