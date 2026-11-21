@@ -168,7 +168,7 @@ path.
   fallback.
 - `UnsignedTransaction.sign` signs the reviewed object. `Wallet.signAndExportJ` reloads the
   file from disk and is a different operation.
-- A broadcast must come from a real pending/unsigned transaction and must only report
+- ANON broadcasts a reviewed pending transaction and reports
   success after wallet2 succeeds.
 
 ### Anonymity properties and limits

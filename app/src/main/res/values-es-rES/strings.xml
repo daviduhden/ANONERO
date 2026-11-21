@@ -148,4 +148,5 @@
     <string name="import_key_images_failed">No se pudieron importar las imágenes de clave</string>
     <string name="import_unsigned_failed">No se pudo importar la transacción sin firmar</string>
     <string name="unsigned_tx_count_invalid">Conjunto de transacciones sin firmar no válido: se encontraron %1$d; se requiere exactamente 1</string>
+    <string name="signed_broadcast_unavailable">NERO no puede difundir esta transacción hasta verificar que el archivo firmado coincide con el pago revisado.</string>
 </resources>

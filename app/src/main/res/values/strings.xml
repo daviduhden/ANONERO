@@ -148,4 +148,5 @@
     <string name="import_key_images_failed">Failed to import key images</string>
     <string name="import_unsigned_failed">Failed to import unsigned transaction</string>
     <string name="unsigned_tx_count_invalid">Invalid unsigned transaction set: found %1$d; exactly 1 is required</string>
+    <string name="signed_broadcast_unavailable">NERO cannot broadcast this transaction until it can verify that the signed file matches the reviewed payment.</string>
 </resources>

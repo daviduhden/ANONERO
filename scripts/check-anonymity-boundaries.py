@@ -44,7 +44,10 @@ if service.count(".setVisibility(NotificationCompat.VISIBILITY_SECRET)") != 2:
 for source in JAVA.rglob("*.kt"):
     if source.name in {"Prefs.kt", "PrivacySettings.kt"}:
         continue
-    if "PREFS_LWS_" in source.read_text(encoding="utf-8"):
+    content = source.read_text(encoding="utf-8")
+    if ".submitTransaction(" in content:
+        failures.append(f"Unverified signed-file submission is disabled: {source.relative_to(ROOT)}")
+    if "PREFS_LWS_" in content:
         failures.append(f"Raw MAIN LWS preference access outside profile boundary: {source.relative_to(ROOT)}")
 
 # Void JNI freeze/thaw calls cannot establish success on their own. The Kotlin

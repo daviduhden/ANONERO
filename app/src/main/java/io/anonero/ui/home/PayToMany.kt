@@ -70,13 +70,15 @@ import io.anonero.R
 import io.anonero.model.PendingTransaction
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
-import io.anonero.network.TransportController
+import io.anonero.services.AnonWalletHandler
 import io.anonero.services.WalletState
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
+import io.anonero.ui.home.spend.prepareUnsignedExport
 import io.anonero.util.AddressValidationSnapshot
 import io.anonero.util.Formats
 import io.anonero.util.MoneroAmount
 import io.anonero.util.MultiPaymentPolicy
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,7 +88,6 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.koin.java.KoinJavaComponent.inject
 import timber.log.Timber
-import java.io.File
 
 private const val TAG = "PayToMany"
 
@@ -116,7 +117,7 @@ data class RecipientInput(
 fun parseExactAmount(text: String): Long? = MoneroAmount.parseExact(text)
 
 class PayToManyViewModel : ViewModel() {
-    private val transportController: TransportController by inject(TransportController::class.java)
+    private val walletHandler: AnonWalletHandler by inject(AnonWalletHandler::class.java)
     private val walletState: WalletState by inject(WalletState::class.java)
     private val _error = MutableStateFlow<PayToManyError?>(null)
     val error: StateFlow<PayToManyError?> = _error
@@ -137,31 +138,31 @@ class PayToManyViewModel : ViewModel() {
                     _error.value = PayToManyError.CONSTRUCTION_FAILED
                     return@withContext null
                 }
-                val transport = transportController.config.value
-                if (transport.validationError() != null) {
-                    _error.value = PayToManyError.NOT_CONNECTED
-                    return@withContext null
-                }
-                if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
-                    !transportController.isVpnActive()
-                ) {
-                    _error.value = PayToManyError.NOT_CONNECTED
-                    return@withContext null
-                }
+                val profile = WalletSession.profile
                 val wallet =
                     WalletManager.instance?.wallet
                         ?: run {
                             _error.value = PayToManyError.WALLET_NOT_OPEN
                             return@withContext null
                         }
-                if (wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
+
+                fun isCurrentSession() =
+                    WalletManager.instance?.wallet === wallet && WalletSession.profile == profile &&
+                        !walletState.backgroundSync && !walletState.backgroundSyncRunning
+                if (!hasAppliedTransport(wallet) ||
+                    wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected
+                ) {
                     _error.value = PayToManyError.NOT_CONNECTED
                     return@withContext null
                 }
-                if ((walletState.backgroundSync || walletState.backgroundSyncRunning) ||
+                if (!isCurrentSession() ||
                     request.any { !wallet.validateAddress(it.first) }
                 ) {
                     _error.value = PayToManyError.CONSTRUCTION_FAILED
+                    return@withContext null
+                }
+                if (!isCurrentSession() || !hasAppliedTransport(wallet)) {
+                    _error.value = PayToManyError.NOT_CONNECTED
                     return@withContext null
                 }
                 val pending =
@@ -169,33 +170,44 @@ class PayToManyViewModel : ViewModel() {
                         destinations = request.map { it.first },
                         amounts = request.map { it.second },
                     )
-                if (!pending.getErrorString().isNullOrEmpty()) {
-                    throw Exception(pending.getErrorString())
+                check(pending.getErrorString().isNullOrEmpty()) { "Multi-destination construction failed" }
+                if (!isCurrentSession()) {
+                    _error.value = PayToManyError.WALLET_NOT_OPEN
+                    return@withContext null
                 }
-                val unsignedFile =
-                    File(
-                        AnonConfig.context?.cacheDir,
-                        AnonConfig.EXPORT_UNSIGNED_TX_FILE,
-                    )
-                if (!pending.commit(unsignedFile.path, true)) {
-                    Timber.tag(TAG).e("unsigned export failed: %s", pending.getErrorString())
+                val cacheDir = AnonConfig.context?.cacheDir
+                val exported =
+                    cacheDir != null &&
+                        prepareUnsignedExport(cacheDir) {
+                            pending.commit(it.path, true) && isCurrentSession()
+                        }
+                if (!exported) {
+                    Timber.tag(TAG).e("Unsigned export failed")
                     _error.value = PayToManyError.EXPORT_FAILED
                     return@withContext null
                 }
-                if (WalletManager.instance?.wallet !== wallet || (walletState.backgroundSync || walletState.backgroundSyncRunning)) {
+                if (!isCurrentSession()) {
                     _error.value = PayToManyError.WALLET_NOT_OPEN
                     return@withContext null
                 }
                 pending
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e)
+            } catch (_: Exception) {
+                Timber.tag(TAG).e("Multi-destination transaction preparation failed")
                 _error.value = PayToManyError.CONSTRUCTION_FAILED
                 null
             } finally {
                 _preparing.value = false
             }
+        }
+
+    private fun hasAppliedTransport(wallet: Wallet): Boolean =
+        try {
+            walletHandler.requireAppliedTransport(wallet)
+            true
+        } catch (_: IllegalStateException) {
+            false
         }
 }
 

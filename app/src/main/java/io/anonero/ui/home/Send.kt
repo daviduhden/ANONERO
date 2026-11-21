@@ -84,21 +84,20 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import com.sparrowwallet.hummingbird.ResultType
-import com.sparrowwallet.hummingbird.URDecoder
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.icons.AnonIcons
-import io.anonero.model.AnonUrRegistryTypes
 import io.anonero.model.CoinsInfo
 import io.anonero.model.PendingTransaction
 import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
 import io.anonero.network.TransportController
+import io.anonero.services.AnonWalletHandler
 import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.ui.home.graph.routes.SendScreenRoute
+import io.anonero.ui.home.spend.prepareUnsignedExport
 import io.anonero.ui.home.spend.qr.ExportType
 import io.anonero.ui.home.spend.qr.ImportEvents
 import io.anonero.ui.home.spend.qr.QRExchangeScreen
@@ -116,7 +115,6 @@ import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import org.koin.java.KoinJavaComponent.inject
 import timber.log.Timber
-import java.io.File
 
 private const val TAG = "Send"
 
@@ -146,6 +144,7 @@ enum class SendError(
  */
 class SendViewModel : ViewModel() {
     private val walletState: WalletState by inject(WalletState::class.java)
+    private val walletHandler: AnonWalletHandler by inject(AnonWalletHandler::class.java)
     private val transportController: TransportController by inject(TransportController::class.java)
     private val _balance = walletState.unLockedBalance.asLiveData()
     private val _paymentUri = MutableLiveData<SendScreenRoute?>(null)
@@ -162,15 +161,8 @@ class SendViewModel : ViewModel() {
         val cacheDir =
             AnonConfig.context?.cacheDir
                 ?: throw IllegalStateException("cache directory unavailable")
-        val unsignedTxFile = File(cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE)
-        // A fixed cache name means a failed write could leave the previous transaction
-        // in place and a later QR export would sign a different payment. Clear it first
-        // and fail closed if the write does not succeed.
-        if (unsignedTxFile.exists() && !unsignedTxFile.delete()) {
-            throw IllegalStateException("stale unsigned transaction could not be removed")
-        }
-        if (!pendingTx.commit(unsignedTxFile.path, true)) {
-            throw IllegalStateException("unsigned transaction could not be written")
+        check(prepareUnsignedExport(cacheDir) { pendingTx.commit(it.path, true) }) {
+            "unsigned transaction could not be written"
         }
     }
 
@@ -214,11 +206,13 @@ class SendViewModel : ViewModel() {
                             ?: throw IllegalArgumentException("invalid amount")
                     }
                 _txComposeError.postValue(null)
+                walletHandler.requireAppliedTransport(wallet)
                 if (isSweep && selectedCoins.isEmpty()) {
                     if (wallet.fullStatus.connectionStatus != Wallet.ConnectionStatus.ConnectionStatus_Connected) {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
                     }
+                    walletHandler.requireAppliedTransport(wallet)
                     val pendingTx =
                         wallet.createSweepTransaction(
                             dstAddr = addressField,
@@ -237,6 +231,7 @@ class SendViewModel : ViewModel() {
                         _txComposeError.postValue(SendError.NOT_CONNECTED)
                         return@withContext null
                     }
+                    walletHandler.requireAppliedTransport(wallet)
                     val pendingTx =
                         wallet.createTransaction(
                             dst_addr = addressField,
@@ -266,47 +261,6 @@ class SendViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.Default) {
             SendScreenRoute.parse(data)?.let {
                 _paymentUri.postValue(it)
-            }
-        }
-    }
-
-    fun processUrCode(
-        urResult: URDecoder.Result,
-        onSuccess: (path: String) -> Unit,
-    ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (urResult.type == ResultType.SUCCESS) {
-                var destinationFile: File? = null
-                val ur = urResult.ur
-                when (ur.type) {
-                    AnonUrRegistryTypes.XMR_TX_UNSIGNED.type -> {
-                        destinationFile =
-                            File(AnonConfig.context?.cacheDir, AnonConfig.IMPORT_UNSIGNED_TX_FILE)
-                    }
-
-                    AnonUrRegistryTypes.XMR_TX_SIGNED.type -> {
-                        destinationFile =
-                            File(AnonConfig.context?.cacheDir, AnonConfig.IMPORT_SIGNED_TX_FILE)
-                    }
-
-                    AnonUrRegistryTypes.XMR_OUTPUT.type -> {
-                        destinationFile =
-                            File(AnonConfig.context?.cacheDir, AnonConfig.IMPORT_OUTPUT_FILE)
-                    }
-
-                    AnonUrRegistryTypes.XMR_KEY_IMAGE.type -> {
-                        destinationFile =
-                            File(AnonConfig.context?.cacheDir, AnonConfig.IMPORT_KEY_IMAGE_FILE)
-                    }
-
-                    else -> {
-                        Timber.tag(TAG).e("Unknown UR type")
-                    }
-                }
-                destinationFile?.writeBytes(ur.toBytes())
-                if (destinationFile != null) {
-                    onSuccess(destinationFile.path)
-                }
             }
         }
     }
@@ -819,16 +773,6 @@ fun SendScreen(
 
                     ImportEvents.IMPORT_UNSIGNED_TX -> {
                         if (!AnonConfig.viewOnly) {
-                            navigateToReview.invoke(
-                                ReviewTransactionRoute(
-                                    addressField,
-                                ),
-                            )
-                        }
-                    }
-
-                    ImportEvents.IMPORT_SIGNED_TX -> {
-                        if (AnonConfig.viewOnly) {
                             navigateToReview.invoke(
                                 ReviewTransactionRoute(
                                     addressField,

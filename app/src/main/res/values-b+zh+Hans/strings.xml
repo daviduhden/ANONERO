@@ -418,4 +418,5 @@
     <string name="network_lws_disabled">已禁用</string>
     <string name="network_lws_status">LWS：%1$s</string>
     <string name="network_lws_restart_required">LWS 仍在本次会话中运行。请重启钱包以应用新的传输。</string>
+    <string name="signed_broadcast_unavailable">NERO 必须确认签名文件与已核对的付款一致，才能广播此交易。</string>
 </resources>

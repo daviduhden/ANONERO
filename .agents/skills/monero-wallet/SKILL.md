@@ -135,6 +135,11 @@ missing, duplicate, or unavailable outputs and overflowing totals before JNI. A 
 lookup must never turn into an unrestricted sweep. Snapshot validation does not replace
 wallet2 selection or native lifecycle synchronization.
 
+Normalize only the payment URI scheme boundary. Reject duplicate recognized fields and
+keep wallet2 address validation. Before publishing a spend export, remove stale artifacts
+and verify the new file is nonempty and regular. Bound QR reads independently from the
+document-export option, and check that the requesting wallet and profile are still current.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and
@@ -142,3 +147,9 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+Keep signed-file broadcast disabled until wallet2 validates the same object that
+will be submitted against reviewed recipients, amounts, fees and change. For
+pending transactions, verify the reviewed wallet, account, profile and object
+are still current before starting an operation. A point-in-time check does not
+prevent a concurrent close.

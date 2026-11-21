@@ -75,17 +75,19 @@ import io.anonero.R
 import io.anonero.model.PendingTransaction
 import io.anonero.model.SigningSummary
 import io.anonero.model.UnsignedTransaction
+import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
-import io.anonero.network.TransportController
+import io.anonero.services.AnonWalletHandler
+import io.anonero.services.WalletState
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.ui.home.spend.qr.ExportType
-import io.anonero.ui.home.spend.qr.ImportEvents
 import io.anonero.ui.home.spend.qr.QRExchangeScreen
 import io.anonero.ui.home.spend.qr.SpendQRExchangeParam
-import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.ui.theme.DangerColor
 import io.anonero.ui.theme.SuccessColor
 import io.anonero.util.Formats
+import io.anonero.util.WalletProfile
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -130,7 +132,47 @@ private const val TAG = "ReviewTransaction"
  * not navigate back to a prefilled send form after a broadcast.
  */
 class ReviewTransactionViewModel : ViewModel() {
-    private val transportController: TransportController by inject(TransportController::class.java)
+    private val walletHandler: AnonWalletHandler by inject(AnonWalletHandler::class.java)
+    private val walletState: WalletState by inject(WalletState::class.java)
+
+    private data class ReviewOwner(
+        val wallet: Wallet,
+        val profile: WalletProfile,
+        val account: Int,
+    )
+
+    @Volatile
+    private var owner: ReviewOwner? = null
+
+    private fun currentReviewWallet(): Wallet {
+        val reviewOwner = checkNotNull(owner) { "No reviewed wallet session" }
+        val wallet = reviewOwner.wallet
+        check(
+            WalletManager.instance?.wallet === wallet &&
+                WalletSession.profile == reviewOwner.profile &&
+                wallet.getAccountIndex() == reviewOwner.account &&
+                !walletState.backgroundSync,
+        ) { "Reviewed wallet session changed" }
+        return wallet
+    }
+
+    fun signReviewedTransaction(destination: File): Boolean {
+        signingNeedsMoreOutputs = false
+        if (AnonConfig.viewOnly) return false
+        val wallet = currentReviewWallet()
+        val tx = checkNotNull(unsignedTransaction)
+        check(wallet.getUnsginedTx() === tx) { "Reviewed transaction changed" }
+        return prepareSpendExport(destination) {
+            if (!tx.sign(it.absolutePath)) {
+                currentReviewWallet()
+                signingNeedsMoreOutputs = tx.errorString?.contains("omit more outputs") == true
+                return@prepareSpendExport false
+            }
+            currentReviewWallet().store()
+            true
+        }
+    }
+
     private val broadcastInProgress =
         java.util.concurrent.atomic
             .AtomicBoolean(false)
@@ -145,16 +187,21 @@ class ReviewTransactionViewModel : ViewModel() {
     var pendingTransaction: PendingTransaction? = null
     var unsignedTransaction: UnsignedTransaction? = null
 
-    public fun isUnsignedTransaction(): Boolean = unsignedTransaction != null
+    fun isUnsignedTransaction(): Boolean = unsignedTransaction != null
+
+    var signingNeedsMoreOutputs: Boolean = false
+        private set
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            val wallet = WalletManager.instance?.wallet
-            val pendingTransaction = wallet?.getPendingTx()
-            val unsignedTransaction = wallet?.getUnsginedTx()
+            val wallet = WalletManager.instance?.wallet ?: return@launch
+            val session = ReviewOwner(wallet, WalletSession.profile, wallet.getAccountIndex())
+            val pendingTransaction = wallet.getPendingTx()
+            val unsignedTransaction = wallet.getUnsginedTx()
 
             if (unsignedTransaction != null) {
                 this@ReviewTransactionViewModel.unsignedTransaction = unsignedTransaction
+                owner = session
                 // Rows come from wallet2's own summary of the outputs sign() will construct,
                 // never from the set's advisory destination list. If the sentence cannot be
                 // parsed it is shown raw; the advisory getters are not a fallback.
@@ -178,6 +225,7 @@ class ReviewTransactionViewModel : ViewModel() {
                 // from the navigation route. Do not blank the review screen in that case.
                 if (txId != null || pendingTransaction.getAmount() > 0L) {
                     this@ReviewTransactionViewModel.pendingTransaction = pendingTransaction
+                    owner = session
                     reviewModel.postValue(
                         ReviewModel(
                             address = null,
@@ -195,6 +243,7 @@ class ReviewTransactionViewModel : ViewModel() {
     }
 
     fun broadCast(): Job? {
+        if (AnonConfig.viewOnly) return null
         if (broadcastingTx.value == BroadcastState.SUCCESS ||
             broadcastingTx.value == BroadcastState.IN_PROGRESS
         ) {
@@ -205,49 +254,19 @@ class ReviewTransactionViewModel : ViewModel() {
         if (!broadcastInProgress.compareAndSet(false, true)) {
             return null
         }
-        val signedTxFile =
-            File(
-                AnonConfig.context?.cacheDir,
-                AnonConfig.IMPORT_SIGNED_TX_FILE,
-            )
         _broadcastError = null
         broadcastingTx.postValue(BroadcastState.IN_PROGRESS)
 
         return viewModelScope.launch(Dispatchers.IO) {
             var submitted = false
             try {
-                val wallet = WalletManager.instance?.wallet
-                if (wallet == null) {
-                    throw Exception("Wallet is unavailable")
-                }
-                val transport = transportController.config.value
-                if (transport.validationError() != null) {
-                    throw IllegalStateException("Transport configuration is invalid")
-                }
-                if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
-                    !transportController.isVpnActive()
-                ) {
-                    throw IllegalStateException("System VPN is not active")
-                }
-                if (!AnonConfig.viewOnly) {
-                    val tx =
-                        pendingTransaction
-                            ?: throw IllegalStateException("No pending transaction to broadcast")
-                    if (!wallet.send(tx)) {
-                        throw Exception("Failed to send transaction")
-                    }
-                } else {
-                    if (!signedTxFile.exists()) {
-                        throw Exception("Signed transaction file not found")
-                    }
-                    // LIMITATION: wallet2 exposes no parser for the signed file here, so
-                    // this path cannot yet compare its txids/outputs with the unsigned
-                    // object the user reviewed. A compromised external signer can return a
-                    // different transaction. Do not treat this as verified fund safety
-                    // until the native signed-file binding API exists and is tested.
-                    val error = wallet.submitTransaction(signedTxFile.absolutePath)
-                    check(error == "Transaction submitted!") { "Signed transaction submission failed" }
-                }
+                val wallet = currentReviewWallet()
+                val tx =
+                    pendingTransaction
+                        ?: throw IllegalStateException("No pending transaction to broadcast")
+                check(wallet.getPendingTx() === tx) { "Reviewed transaction changed" }
+                walletHandler.requireAppliedTransport(wallet)
+                check(wallet.send(tx)) { "Failed to send transaction" }
                 val recovered =
                     completeAcceptedBroadcast(
                         publishAcceptance = {
@@ -255,12 +274,14 @@ class ReviewTransactionViewModel : ViewModel() {
                             broadcastingTx.postValue(BroadcastState.SUCCESS)
                         },
                         refreshAndStore = {
-                            if (AnonConfig.viewOnly && !signedTxFile.delete()) {
-                                Timber.tag(TAG).w("Could not remove submitted transaction file")
+                            val reviewedWallet = currentReviewWallet()
+                            val stored = reviewedWallet.store()
+                            reviewedWallet.refreshHistory()
+                            if (!walletState.offline) {
+                                walletHandler.requireAppliedTransport(reviewedWallet)
+                                reviewedWallet.startRefresh()
                             }
-                            wallet.startRefresh()
-                            wallet.refreshHistory()
-                            wallet.store()
+                            stored
                         },
                     )
                 if (!recovered) Timber.tag(TAG).w("Post-broadcast wallet recovery failed")
@@ -296,9 +317,7 @@ fun ReviewTransactionScreen(
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val broadcastState by viewModel.getBroadcastingTxState.observeAsState(BroadcastState.STAGING)
-    var showScanner by remember { mutableStateOf(false) }
     var signing by remember { mutableStateOf(false) }
-    var readyToBroadcast by remember { mutableStateOf(!AnonConfig.viewOnly) }
 
     val titleStyle =
         MaterialTheme.typography.bodyLarge.copy(
@@ -334,7 +353,6 @@ fun ReviewTransactionScreen(
             onCtaCalled = {
                 val wasSignedTx = qrScannerParam?.exportType == ExportType.SIGNED_TX
                 qrScannerParam = null
-                showScanner = true
                 if (wasSignedTx) {
                     navigateToHome.invoke()
                 }
@@ -343,53 +361,13 @@ fun ReviewTransactionScreen(
         )
     }
 
-    if (showScanner) {
-        URQRScanner(
-            onQRCodeScanned = {
-            },
-            onDismiss = {
-                showScanner = false
-            },
-            onURResult = {
-                when (it.getOrNull()) {
-                    ImportEvents.IMPORT_OUTPUTS -> {
-                    }
-
-                    ImportEvents.IMPORT_KEY_IMAGES -> {
-                    }
-
-                    ImportEvents.IMPORT_UNSIGNED_TX -> {
-                    }
-
-                    ImportEvents.IMPORT_SIGNED_TX -> {
-                        qrScannerParam = null
-                        readyToBroadcast = true
-                    }
-
-                    null -> {
-                    }
-                }
-                showScanner = false
-            },
-            showScanner = showScanner,
-        )
-    }
-
     val context = LocalContext.current
     val resources = LocalResources.current
     val ctaText =
-        if (AnonConfig.viewOnly) {
-            if (!viewModel.isUnsignedTransaction() && !readyToBroadcast) {
-                stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
-            } else {
-                stringResource(R.string.broadcast_tx)
-            }
-        } else {
-            if (viewModel.isUnsignedTransaction()) {
-                stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
-            } else {
-                stringResource(R.string.broadcast_tx)
-            }
+        when {
+            viewModel.isUnsignedTransaction() -> stringResource(R.string.confirm).replaceFirstChar { it.titlecase() }
+            AnonConfig.viewOnly -> stringResource(R.string.unsigned_tx)
+            else -> stringResource(R.string.broadcast_tx)
         }
 
     Scaffold(
@@ -634,8 +612,13 @@ fun ReviewTransactionScreen(
                                 }
                             }
                         }
+                        if (AnonConfig.viewOnly) {
+                            Text(stringResource(R.string.signed_broadcast_unavailable))
+                        }
                         AnonOutlineButton(
+                            enabled = reviewModel != null && !signing,
                             onClick = {
+                                if (reviewModel == null) return@AnonOutlineButton
                                 if (viewModel.isUnsignedTransaction()) {
                                     if (signing) return@AnonOutlineButton
                                     signing = true
@@ -643,36 +626,26 @@ fun ReviewTransactionScreen(
                                         .launch {
                                             val signedTransaction =
                                                 File(
-                                                    AnonConfig.context?.cacheDir,
+                                                    context.cacheDir,
                                                     AnonConfig.EXPORT_SIGNED_TX_FILE,
                                                 )
-                                            Timber
-                                                .tag(TAG)
-                                                .i("Signing reviewed transaction set to ${signedTransaction.path}")
                                             // sign the object that was reviewed, not a re-read of the
                                             // file; ring signatures are CPU-heavy, so off the main thread
-                                            val tx = viewModel.unsignedTransaction
                                             val signed =
                                                 try {
                                                     withContext(Dispatchers.Default) {
-                                                        val ok = tx?.sign(signedTransaction.absolutePath) == true
-                                                        // save the wallet after signing
-                                                        if (ok) WalletManager.instance?.wallet?.store()
-                                                        ok
+                                                        viewModel.signReviewedTransaction(signedTransaction)
                                                     }
+                                                } catch (cancelled: CancellationException) {
+                                                    throw cancelled
+                                                } catch (_: Exception) {
+                                                    false
                                                 } finally {
                                                     // always release the button, or a failed sign leaves
                                                     // it disabled with no way to retry
                                                     signing = false
                                                 }
                                             if (signed) {
-                                                readyToBroadcast = true
-                                                Timber
-                                                    .tag(TAG)
-                                                    .i(
-                                                        "Signed transaction written: exists ? ${signedTransaction.exists()} | " +
-                                                            " size: ${signedTransaction.length()}",
-                                                    )
                                                 qrScannerParam =
                                                     SpendQRExchangeParam(
                                                         exportType = ExportType.SIGNED_TX,
@@ -680,14 +653,9 @@ fun ReviewTransactionScreen(
                                                         ctaText = resources.getString(R.string.finish),
                                                     )
                                             } else {
-                                                readyToBroadcast = false
-                                                val reason =
-                                                    tx?.errorString?.takeIf { it.isNotBlank() }
-                                                        ?: "unknown error"
-                                                Timber.tag(TAG).e("Signing failed: %s", reason)
-                                                // tell the user how to resync outputs
+                                                Timber.tag(TAG).e("Signing failed")
                                                 val hint =
-                                                    if (reason.contains("omit more outputs")) {
+                                                    if (viewModel.signingNeedsMoreOutputs) {
                                                         "\n" + resources.getString(R.string.signing_hint_omit_outputs)
                                                     } else {
                                                         ""
@@ -703,16 +671,16 @@ fun ReviewTransactionScreen(
                                             if (error != null) {
                                                 Timber
                                                     .tag(TAG)
-                                                    .i("Signing Unsigned Transaction failed: $error")
+                                                    .w("Unsigned transaction signing failed")
                                             }
                                         }
                                 } else {
-                                    if (AnonConfig.viewOnly && !readyToBroadcast) {
+                                    if (AnonConfig.viewOnly) {
                                         qrScannerParam =
                                             SpendQRExchangeParam(
                                                 exportType = ExportType.UN_SIGNED_TX,
                                                 title = resources.getString(R.string.unsigned_tx),
-                                                ctaText = resources.getString(R.string.scan_signed_tx),
+                                                ctaText = resources.getString(R.string.close),
                                             )
                                     } else {
                                         viewModel.broadCast()?.invokeOnCompletion { error ->

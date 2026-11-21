@@ -71,7 +71,6 @@ enum class ImportEvents {
     IMPORT_OUTPUTS,
     IMPORT_KEY_IMAGES,
     IMPORT_UNSIGNED_TX,
-    IMPORT_SIGNED_TX,
 }
 
 class QRScannerVM : ViewModel() {
@@ -86,8 +85,9 @@ class QRScannerVM : ViewModel() {
                 }
 
                 AnonUrRegistryTypes.XMR_TX_SIGNED.type -> {
-                    destinationFile =
-                        File(AnonConfig.context?.cacheDir, AnonConfig.IMPORT_SIGNED_TX_FILE)
+                    return Result.failure(
+                        IllegalArgumentException(AnonConfig.context?.getString(R.string.signed_broadcast_unavailable)),
+                    )
                 }
 
                 AnonUrRegistryTypes.XMR_OUTPUT.type -> {
@@ -200,8 +200,7 @@ class QRScannerVM : ViewModel() {
                     }
 
                     AnonUrRegistryTypes.XMR_TX_SIGNED -> {
-                        _currentImportState.postValue(null)
-                        return Result.success(ImportEvents.IMPORT_SIGNED_TX)
+                        error("Signed transaction imports are disabled")
                     }
 
                     null -> {

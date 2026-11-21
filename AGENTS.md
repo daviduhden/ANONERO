@@ -467,11 +467,11 @@ Rules for documentation:
 - Seven patches of the series are adapted from the `monero_c` lineage and are licensed
   under LGPL-3.0; `0008-enforce-tls-for-https-daemon-address.patch` is project-original
   and Apache-2.0. See `external-libs/patches/README.md` and `LICENSE-LGPL-3.0`.
-- NERO signed-transaction import cannot yet be bound to the reviewed unsigned object:
-  wallet2 exposes no signed-file parser in this checkout. A compromised external signer
-  can return a different payment; the UI warning/comment is not a substitute for native
-  binding. Do not claim airgapped broadcast fund safety until the native getter and CI
-  fixture exist.
+- NERO signed-file broadcast is disabled. Resume it only when wallet2 can validate
+  actual outputs, fees and change against the reviewed payment and submit the same
+  validated object. Include substituted and multi-transaction fixtures in CI. The Kotlin
+  native declaration stays private and the static boundary check rejects application
+  call sites.
 - Encrypted backup strength is tied to the seed passphrase used to re-key the copy. A
   short or empty seed passphrase yields a weakly keyed backup; a separate backup
   passphrase policy is still pending.

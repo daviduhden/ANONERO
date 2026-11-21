@@ -55,8 +55,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,25 +69,34 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sparrowwallet.hummingbird.UR
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.AnonUrRegistryTypes
+import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
+import io.anonero.services.WalletState
 import io.anonero.ui.components.AnimatedQrCode
 import io.anonero.ui.home.graph.routes.ReviewTransactionRoute
 import io.anonero.ui.home.spend.ReviewTransactionScreen
+import io.anonero.ui.home.spend.isRegularNonEmptyExport
+import io.anonero.ui.home.spend.prepareSpendExport
+import io.anonero.ui.home.spend.readQrExport
+import io.anonero.util.WalletProfile
+import io.anonero.util.WalletSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 import timber.log.Timber
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.util.Date
 import java.util.Locale
 
@@ -105,61 +116,64 @@ enum class ExportType {
 
 private const val TAG = "SpendQRExchange"
 
+internal data class SpendQrArtifact(
+    val file: File,
+    val wallet: Wallet,
+    val profile: WalletProfile,
+    val ur: UR?,
+)
+
 class QRExchangeScreenViewModel : ViewModel() {
-    private val _ur = MutableLiveData<UR?>()
-    private val _exportFile = MutableLiveData<File?>()
-    val ur: LiveData<UR?> = _ur
-    val exportFile: LiveData<File?> = _exportFile
+    internal suspend fun prepareExport(
+        exportType: ExportType,
+        wallet: Wallet,
+        profile: WalletProfile,
+    ): SpendQrArtifact? =
+        withContext(Dispatchers.IO) {
+            val cacheDir = AnonConfig.context?.cacheDir ?: return@withContext null
 
-    fun processExportType(exportType: ExportType) {
-        viewModelScope.launch(Dispatchers.IO) {
-            when (exportType) {
-                ExportType.OUTPUT -> {
-                    val file = File(AnonConfig.context?.cacheDir, AnonConfig.EXPORT_OUTPUT_FILE)
-                    file.createNewFile()
-                    val eo = WalletManager.instance?.wallet?.exportOutputs(file.absolutePath, true)
-                    if (eo == true) {
-                        setUR(file, AnonUrRegistryTypes.XMR_OUTPUT.type)
-                    }
+            fun isCurrent() = WalletManager.instance?.wallet === wallet && WalletSession.profile == profile
+            if (!isCurrent()) return@withContext null
+            val filename =
+                when (exportType) {
+                    ExportType.OUTPUT -> AnonConfig.EXPORT_OUTPUT_FILE
+                    ExportType.IMAGE -> AnonConfig.EXPORT_KEY_IMAGE_FILE
+                    ExportType.SIGNED_TX -> AnonConfig.EXPORT_SIGNED_TX_FILE
+                    ExportType.UN_SIGNED_TX -> AnonConfig.EXPORT_UNSIGNED_TX_FILE
                 }
+            val file = File(cacheDir, filename)
+            try {
+                val registryType =
+                    when (exportType) {
+                        ExportType.OUTPUT -> {
+                            if (!prepareSpendExport(file) { wallet.exportOutputs(it.absolutePath, true) }) return@withContext null
+                            AnonUrRegistryTypes.XMR_OUTPUT
+                        }
 
-                ExportType.IMAGE -> {
-                    val file = File(AnonConfig.context?.cacheDir, AnonConfig.EXPORT_KEY_IMAGE_FILE)
-                    file.createNewFile()
-                    val eo =
-                        WalletManager.instance?.wallet?.exportKeyImages(file.absolutePath, true)
-                    if (eo == true) {
-                        setUR(file, AnonUrRegistryTypes.XMR_KEY_IMAGE.type)
-                    }
-                }
+                        ExportType.IMAGE -> {
+                            if (!prepareSpendExport(file) { wallet.exportKeyImages(it.absolutePath, true) }) return@withContext null
+                            AnonUrRegistryTypes.XMR_KEY_IMAGE
+                        }
 
-                ExportType.SIGNED_TX -> {
-                    val file = File(AnonConfig.context?.cacheDir, AnonConfig.EXPORT_SIGNED_TX_FILE)
-                    if (file.exists()) {
-                        setUR(file, AnonUrRegistryTypes.XMR_TX_SIGNED.type)
-                    }
-                }
+                        ExportType.SIGNED_TX -> {
+                            AnonUrRegistryTypes.XMR_TX_SIGNED
+                        }
 
-                ExportType.UN_SIGNED_TX -> {
-                    val file =
-                        File(AnonConfig.context?.cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE)
-                    if (file.exists()) {
-                        setUR(file, AnonUrRegistryTypes.XMR_TX_UNSIGNED.type)
+                        ExportType.UN_SIGNED_TX -> {
+                            AnonUrRegistryTypes.XMR_TX_UNSIGNED
+                        }
                     }
-                }
+                if (!file.isRegularNonEmptyExport() || !isCurrent()) return@withContext null
+                val ur = file.readQrExport()?.let { UR.fromBytes(registryType.type, it) }
+                if (!file.isRegularNonEmptyExport() || !isCurrent()) return@withContext null
+                SpendQrArtifact(file, wallet, profile, ur)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Timber.tag(TAG).w("Could not prepare spend export")
+                null
             }
         }
-    }
-
-    fun setUR(
-        file: File,
-        type: String,
-    ) {
-        val content = file.readBytes()
-        val ur = UR.fromBytes(type, content)
-        _ur.postValue(ur)
-        _exportFile.postValue(file)
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,8 +186,14 @@ fun QRExchangeScreen(
     onNavigateToHome: () -> Unit,
 ) {
     val viewModel = viewModel<QRExchangeScreenViewModel>()
-    val ur by viewModel.ur.observeAsState(null)
-    val exportFile by viewModel.exportFile.observeAsState(null)
+    val walletState = koinInject<WalletState>()
+    val profile by walletState.profile.collectAsStateWithLifecycle(initialValue = WalletSession.profile)
+    val initialWallet = remember(params.exportType) { WalletManager.instance?.wallet }
+    val initialProfile = remember(params.exportType) { WalletSession.profile }
+    var prepared by remember(params.exportType) { mutableStateOf<SpendQrArtifact?>(null) }
+    var loading by remember(params.exportType) { mutableStateOf(true) }
+    val artifact = prepared?.takeIf { it.profile == profile && it.wallet === WalletManager.instance?.wallet }
+    val ur = artifact?.ur
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
@@ -184,8 +204,9 @@ fun QRExchangeScreen(
             fontSize = 20.sp,
         )
 
-    LaunchedEffect(true) {
-        viewModel.processExportType(params.exportType)
+    LaunchedEffect(params.exportType) {
+        prepared = initialWallet?.let { viewModel.prepareExport(params.exportType, it, initialProfile) }
+        loading = false
     }
 
     // write the export to the place picked in the system save dialog
@@ -193,16 +214,24 @@ fun QRExchangeScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument("application/octet-stream"),
         ) { uri ->
-            val file = exportFile
-            if (uri != null && file != null) {
+            val export = artifact
+            if (uri != null && export != null) {
                 scope.launch(Dispatchers.IO) {
                     val saved =
                         try {
-                            context.contentResolver.openOutputStream(uri)?.use { out ->
-                                file.inputStream().use { it.copyTo(out) }
-                            } != null
-                        } catch (e: Exception) {
-                            Timber.tag(TAG).e(e)
+                            if (WalletManager.instance?.wallet !== export.wallet ||
+                                WalletSession.profile != export.profile || !export.file.isRegularNonEmptyExport()
+                            ) {
+                                false
+                            } else {
+                                Files.newInputStream(export.file.toPath(), LinkOption.NOFOLLOW_LINKS).use { input ->
+                                    context.contentResolver.openOutputStream(uri)?.use { input.copyTo(it) } != null
+                                }
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            Timber.tag(TAG).w("Could not save spend export")
                             false
                         }
                     withContext(Dispatchers.Main) {
@@ -295,7 +324,7 @@ fun QRExchangeScreen(
                         )
                         if (ur != null) {
                             AnimatedQrCode(
-                                Ur = ur!!,
+                                Ur = ur,
                                 modifier =
                                     Modifier
                                         .size(300.dp)
@@ -303,7 +332,7 @@ fun QRExchangeScreen(
                                         .padding(8.dp),
                                 fps = 15,
                             )
-                        } else {
+                        } else if (loading) {
                             CircularProgressIndicator(
                                 modifier =
                                     Modifier
@@ -311,10 +340,13 @@ fun QRExchangeScreen(
                                         .padding(16.dp),
                                 color = MaterialTheme.colorScheme.primary,
                             )
+                        } else if (artifact == null) {
+                            Text(stringResource(R.string.could_not_save_file))
                         }
                         TextButton(
+                            enabled = artifact != null,
                             onClick = {
-                                exportFile?.let {
+                                artifact?.file?.let {
                                     val sdf =
                                         SimpleDateFormat(
                                             "dd_MM_yyyy' 'HH_mm_a",
@@ -348,6 +380,7 @@ fun QRExchangeScreen(
                                     all = 12.dp,
                                 ),
                             modifier = Modifier.fillMaxWidth(0.85f),
+                            enabled = artifact != null,
                             onClick = {
                                 if (params.exportType == ExportType.SIGNED_TX) {
                                     onNavigateToHome()

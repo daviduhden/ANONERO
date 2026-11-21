@@ -107,9 +107,7 @@ import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.icons.AnonIcons
 import io.anonero.model.TransactionInfo
-import io.anonero.model.WalletManager
 import io.anonero.network.TransportConfig
-import io.anonero.network.TransportController
 import io.anonero.services.TorService
 import io.anonero.services.WalletState
 import io.anonero.ui.components.WalletProgressIndicator
@@ -121,7 +119,6 @@ import io.anonero.ui.home.graph.routes.SendScreenRoute
 import io.anonero.ui.home.graph.routes.SettingsNodeRoute
 import io.anonero.ui.home.graph.routes.SignVerifyRoute
 import io.anonero.ui.home.graph.routes.TransactionsRoute
-import io.anonero.ui.home.spend.completeAcceptedBroadcast
 import io.anonero.ui.home.spend.qr.ExportType
 import io.anonero.ui.home.spend.qr.ImportEvents
 import io.anonero.ui.home.spend.qr.QRExchangeScreen
@@ -130,9 +127,7 @@ import io.anonero.ui.home.spend.qr.URQRScanner
 import io.anonero.util.Formats
 import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -180,15 +175,12 @@ fun TransactionScreen(
     var showExitDialog by remember { mutableStateOf(false) }
     var scanFailure by remember { mutableStateOf<String?>(null) }
     var spendDialog by remember { mutableStateOf<String?>(null) }
-    var broadcastSignedTxPath by remember { mutableStateOf<String?>(null) }
-    var broadcastProgree by remember { mutableStateOf(false) }
     var settingBSync by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
     var qrScannerParam by remember { mutableStateOf<SpendQRExchangeParam?>(null) }
     var showMenu by remember { mutableStateOf(false) }
     val walletState = koinInject<WalletState>()
     val torService = koinInject<TorService>()
-    val transportController = koinInject<TransportController>()
     val anonPrefs = koinInject<android.content.SharedPreferences>(named(WALLET_PREFERENCES))
     val showLockScreen by walletState.backgroundSyncFlow.asLiveData().observeAsState(walletState.backgroundSync)
     val streetMode by walletState.hideAmountsFlow.asLiveData().observeAsState(false)
@@ -201,137 +193,6 @@ fun TransactionScreen(
     val context = LocalContext.current
     val resources = LocalResources.current
 
-    if (broadcastSignedTxPath != null) {
-        AlertDialog(
-            modifier =
-                Modifier
-                    .border(
-                        1.dp,
-                        color =
-                            MaterialTheme.colorScheme.onBackground.copy(
-                                alpha = .2f,
-                            ),
-                        shape = MaterialTheme.shapes.medium,
-                    ),
-            containerColor = MaterialTheme.colorScheme.background,
-            properties =
-                DialogProperties(
-                    securePolicy = SecureFlagPolicy.SecureOn,
-                    dismissOnBackPress = false,
-                ),
-            title = {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    textAlign = TextAlign.Center,
-                    style =
-                        MaterialTheme.typography.titleSmall.copy(
-                            fontSize = 18.sp,
-                        ),
-                )
-            },
-            text = {
-                Text(stringResource(R.string.broadcast_question))
-            },
-            onDismissRequest = {
-                scanFailure = null
-                broadcastSignedTxPath = null
-            },
-            dismissButton = {
-                Button(
-                    onClick = {
-                        broadcastSignedTxPath = null
-                    },
-                    shape = MaterialTheme.shapes.small,
-                    border =
-                        BorderStroke(
-                            1.dp,
-                            color = MaterialTheme.colorScheme.onSecondary,
-                        ),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.background,
-                        ),
-                ) {
-                    Text(
-                        stringResource(R.string.cancel),
-                        style =
-                            MaterialTheme.typography.bodyMedium.copy(
-                                color =
-                                    MaterialTheme.colorScheme.onBackground.copy(
-                                        alpha = 0.8f,
-                                    ),
-                            ),
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    shape = MaterialTheme.shapes.small,
-                    border =
-                        BorderStroke(
-                            1.dp,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        ),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.onBackground,
-                        ),
-                    onClick = {
-                        if (!broadcastProgree) {
-                            val path = broadcastSignedTxPath
-                            if (path != null) {
-                                broadcastProgree = true
-                                scope.launch(Dispatchers.IO) {
-                                    var success = false
-                                    try {
-                                        val wallet =
-                                            WalletManager.instance?.wallet
-                                                ?: throw IllegalStateException("wallet unavailable")
-                                        val transport = transportController.config.value
-                                        if (transport.validationError() != null) {
-                                            throw IllegalStateException("transport configuration is invalid")
-                                        }
-                                        if (transport.mode == io.anonero.network.TransportMode.SYSTEM_VPN &&
-                                            !transportController.isVpnActive()
-                                        ) {
-                                            throw IllegalStateException("system VPN is not active")
-                                        }
-                                        val error = wallet.submitTransaction(path)
-                                        check(error == "Transaction submitted!") { "Signed transaction submission failed" }
-                                        val recovered =
-                                            completeAcceptedBroadcast(
-                                                publishAcceptance = { success = true },
-                                                refreshAndStore = {
-                                                    wallet.refreshHistory()
-                                                    wallet.store()
-                                                },
-                                            )
-                                        if (!recovered) Timber.tag(TAG).w("Post-broadcast wallet recovery failed")
-                                    } catch (ex: CancellationException) {
-                                        throw ex
-                                    } catch (_: Exception) {
-                                        Timber.tag(TAG).e("Signed transaction submission failed")
-                                    } finally {
-                                        withContext(NonCancellable + Dispatchers.Main) {
-                                            broadcastProgree = false
-                                            broadcastSignedTxPath = null
-                                            if (!success) {
-                                                toastState.show(
-                                                    resources.getString(R.string.broadcast_failed_generic),
-                                                    type = ToastType.Warning,
-                                                    duration = 6.seconds,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                ) { Text(stringResource(R.string.yes)) }
-            },
-        )
-    }
     if (showExitDialog) {
         AlertDialog(
             modifier =
@@ -483,8 +344,6 @@ fun TransactionScreen(
                             )
                         }
                     }
-
-                    ImportEvents.IMPORT_SIGNED_TX -> {}
                 }
                 showScanner = false
             },

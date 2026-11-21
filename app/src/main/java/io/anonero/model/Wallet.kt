@@ -592,7 +592,7 @@ class Wallet {
         return loaded
     }
 
-    external fun submitTransaction(filename: String?): String?
+    private external fun submitTransaction(filename: String?): String?
 
     private external fun loadUnsignedTx(inputFile: String?): Long
 

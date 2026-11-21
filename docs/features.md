@@ -11,7 +11,7 @@ required pillars. For design rationale and threat boundaries, see
 | Flavor | Application ID | Capability |
 | --- | --- | --- |
 | `anon` | `dev.uhden.anon` | Full wallet: spend, accounts, decoy provisioning, encrypted backup |
-| `nero` | `dev.uhden.nero` | View-only: watch balances/history, build/handle unsigned and signed transactions; no spend key, seed view, or decoy provisioning |
+| `nero` | `dev.uhden.nero` | View-only: watch balances/history, build and export unsigned transactions; no spend key, seed view, or decoy provisioning |
 
 The `stageNet` build type adds a `.stagenet` suffix and is debuggable. It is not a release
 artifact. Network selection is derived from the application ID
@@ -66,14 +66,14 @@ overwriting them.
   imported unsigned transactions, rows come from wallet2's `confirmationMessage`; if it
   cannot be parsed, the raw sentence is shown. The advisory destination/amount getters are
   not used as a review source.
-- **Broadcast** commits a pending transaction or submits a signed file. The UI does not
+- **Broadcast** commits a pending transaction in ANON. The UI does not
   return to the filled send form after a successful broadcast.
 
 ### View-only sending
 
 NERO has no spend key. Its flow can build an unsigned transaction (importing key images
-when needed), export it over QR/UR, import a signed transaction, and submit the signed file.
-It cannot sign with the wallet spend key.
+when needed) and export it over QR/UR. Signed-file broadcast is disabled until
+wallet2 can bind the signed payload to the reviewed payment.
 
 ## 5. Airgapped QR/UR exchange
 
@@ -84,7 +84,7 @@ The airgapped flow uses the UR registry types in `AnonUrRegistryTypes`:
 | `xmr-output` | Export/import outputs |
 | `xmr-keyimage` | Export/import key images |
 | `xmr-txunsigned` | Export/import an unsigned transaction |
-| `xmr-txsigned` | Export/import a signed transaction |
+| `xmr-txsigned` | Export a signed transaction from ANON |
 
 `QRExchangeScreen` renders animated UR QR codes; `QRScanner`/`URQRScanner` assemble
 fragments. Imported files are written to cache under the fixed names in `AnonConfig` and
