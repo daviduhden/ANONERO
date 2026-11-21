@@ -637,6 +637,25 @@ jobs:
             }
           done
 
+      - name: Prepare emulator acceleration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -c /dev/kvm ]]; then
+            echo "KVM device is unavailable; the emulator will use its bounded software mode."
+            exit 0
+          fi
+          if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+            # This device belongs to the ephemeral GitHub-hosted VM. Grant access
+            # to the current job user without opening the device to all users.
+            sudo chown "$(id -u)" /dev/kvm
+            sudo chmod u+rw /dev/kvm
+          fi
+          if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+            echo "::error::The instrumented runner cannot access the KVM device"
+            exit 1
+          fi
+
       - name: Run instrumented tests on API ${{ matrix.api-level }}
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         env:

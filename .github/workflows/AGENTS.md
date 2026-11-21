@@ -183,5 +183,8 @@ then runs Python static-checker regression tests in CI only. Do not run those te
 Keep the explicit `ANDROID_I_WANT_MY_TCG=yes` environment opt-in scoped to the
 instrumented runner action so its software mode can start when KVM is unavailable.
 Regenerate the shared release job and keep boot and test-result gates intact.
+On ephemeral GitHub-hosted Linux jobs, check whether `/dev/kvm` is a character
+device and grant the job user read/write permission if needed. Preserve bounded
+software emulation when the device is absent.
 Optional emulator animation settings are disabled after run 43633496677 failed before the
 repository test script; readiness, instrumentation, report and nonzero-test gates remain.
