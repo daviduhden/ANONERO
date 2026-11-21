@@ -131,3 +131,7 @@ and rejection of native failures after the current patch. Validate accepted
 broadcast recovery independently from transaction authorization. Track the
 remaining Lint persistence advisories, signed release execution and sanitizer
 coverage separately from the green API 35 baseline.
+
+The [approved safety proposals](docs/development-iteration-approved-safety.md)
+track the remaining work on signed-file binding, native lifetime, backup
+credentials, dependency verification and device coverage.

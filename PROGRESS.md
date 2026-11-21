@@ -367,3 +367,11 @@ The logs contain no recurrence of the five Kotlin compiler warnings. Lint
 reported 11 warnings per flavor and no errors. The OpenSSL selector,
 broadcast post-processing and JNI failure boundaries changed after this
 baseline. Their CI evidence is pending.
+
+## Approved safety proposals
+
+Local changes gate release signing on instrumentation, disable unbound signed-file
+broadcast in NERO, validate applied transport at live payment entry points and
+retain native listener ownership through close. See
+[approved safety proposals](docs/development-iteration-approved-safety.md) for
+static evidence, compatibility and the remaining CI/device checks.

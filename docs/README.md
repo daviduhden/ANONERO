@@ -21,6 +21,7 @@ replace them.
 | [`build-and-release.md`](build-and-release.md) | Build and release engineers | Gradle, native archives, CI, signing, releases |
 | [`android-release-signing.md`](android-release-signing.md) | Release owners | Android signing custody, recovery and developer registration |
 | [`ci/README.md`](ci/README.md) | CI owners and maintainers | Historical failures, warnings, root causes, regression checks |
+| [`development-iteration-approved-safety.md`](development-iteration-approved-safety.md) | Maintainers | Approved safety proposals, source changes and validation still required |
 | [`architecture/repository-state.md`](architecture/repository-state.md) | Maintainers | Audited state, evidence, decisions, known gaps |
 | [`architecture/dependencies.md`](architecture/dependencies.md) | Maintainers | Dependency inventory, update record, blocked upgrades |
 | [`../PROGRESS.md`](../PROGRESS.md) | Maintainers | Current cycle progress, fixed issues, pending validation |

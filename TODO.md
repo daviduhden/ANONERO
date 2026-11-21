@@ -160,3 +160,7 @@ the rationale to `ROADMAP.md`.
 - [ ] Verify W-008 is absent on both native ABI builds after the OpenSSL patch.
 - [ ] Exercise wallet2 JNI failures and accepted broadcast with failed local
       refresh or persistence in CI or on a device.
+
+- [ ] Validate the [approved safety changes](docs/development-iteration-approved-safety.md)
+      on CI for their own revision. Exercise stale payment review, transport loss,
+      listener replacement/close and the release instrumentation gate.

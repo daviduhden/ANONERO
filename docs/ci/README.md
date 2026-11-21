@@ -107,3 +107,19 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
   existing failure result. The static guard checks the new catch boundaries and
   rejection of negative initialization size. Native CI and fault-injection
   evidence are pending.
+
+## Approved safety changes awaiting CI
+
+The [safety iteration](../development-iteration-approved-safety.md) records the
+source changes and evidence required for release signing, transport transitions,
+the native listener, lock faults and review ownership. The [payment URI](payment-uri-parsing.md)
+and [spend export](spend-export-files.md) records describe the JVM regressions.
+Use reports from the exact candidate SHA. Prior green jobs do not validate this
+worktree.
+
+The signing gate now requires a direct successful instrumentation result for
+each flavor. The release source checker rejects a removed dependency, a
+condition that bypasses instrumentation, and an incorrect signing environment.
+The Python regression cases run in the existing manual workflow. A real
+instrumented run and the signing-gate behavior on GitHub remain to be verified
+for the candidate SHA.
