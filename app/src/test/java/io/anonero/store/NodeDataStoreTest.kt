@@ -28,6 +28,19 @@ import java.io.ByteArrayInputStream
 
 class NodeDataStoreTest {
     @Test
+    fun `node diagnostics omit endpoint and authentication metadata`() {
+        val node =
+            Node().apply {
+                host = "rpc.example"
+                rpcPort = 18081
+                username = "test-user"
+                password = "test-password"
+            }
+
+        assertEquals("Node", node.toString())
+    }
+
+    @Test
     fun `empty and blank stores read as an empty list`() =
         runBlocking {
             assertEquals(

@@ -305,7 +305,7 @@ fun SetupNodeComposable(
                                         }
                                 val node = Node.fromJson(nodeJson)
                                 if (node == null ||
-                                    !NodeSelectionPolicy.accepts(transportController.config.value, node)
+                                    !NodeSelectionPolicy.accepts(transportController.config.value, node, AnonConfig.getNetworkType())
                                 ) {
                                     error = resources.getString(R.string.node_network_mismatch)
                                     return@launch

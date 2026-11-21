@@ -36,13 +36,9 @@ object NodeSelectionPolicy {
         walletNetwork: NetworkType?,
     ): List<Node> =
         nodes
-            .filter { node ->
-                node.rpcPort in 1..65535 &&
-                    validHost(node.host) &&
-                    (walletNetwork == null || node.networkType == walletNetwork) &&
-                    node.network == config.nodeNetwork
-            }.sortedWith(
-                compareBy<Node> { !it.trusted }
+            .filter { accepts(config, it, walletNetwork) }
+            .sortedWith(
+                compareBy<Node> { config.preferTrustedNode && !it.trusted }
                     .thenBy { it.name.orEmpty().lowercase() }
                     .thenBy { it.host.orEmpty().lowercase() }
                     .thenBy { it.rpcPort },
@@ -55,24 +51,18 @@ object NodeSelectionPolicy {
         current: Node? = null,
     ): Node? {
         val candidates = compatibleNodes(nodes, config, walletNetwork)
-        if (candidates.isEmpty()) return null
-        if (current != null && candidates.any { it.address == current.address }) {
-            return candidates.first { it.address == current.address }
-        }
-        return if (config.preferTrustedNode) {
-            candidates.firstOrNull { it.trusted } ?: candidates.first()
-        } else {
-            candidates.first()
-        }
+        return candidates.firstOrNull { it == current } ?: candidates.firstOrNull()
     }
 
     fun accepts(
         config: TransportConfig,
         node: Node?,
+        walletNetwork: NetworkType? = null,
     ): Boolean =
         node != null &&
             validHost(node.host) &&
             node.network == config.nodeNetwork &&
+            (walletNetwork == null || node.networkType == walletNetwork) &&
             node.rpcPort in 1..65535
 
     /** A host is an authority component, never a URL, path or credential container. */

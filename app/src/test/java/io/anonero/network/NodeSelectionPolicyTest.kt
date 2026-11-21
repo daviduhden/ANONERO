@@ -20,6 +20,7 @@ package io.anonero.network
 
 import io.anonero.model.NetworkType
 import io.anonero.model.node.Node
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -106,6 +107,38 @@ class NodeSelectionPolicyTest {
                 NetworkType.NetworkType_Mainnet,
             ),
         )
+    }
+
+    @Test
+    fun `trust ranks first only when the preference is enabled`() {
+        val untrusted =
+            Json
+                .decodeFromString(Node.serializer(), """{"host":"a.onion","rpcPort":18081,"trusted":false}""")
+                .apply { networkType = NetworkType.NetworkType_Mainnet }
+        val trusted = node("z.onion")
+        val nodes = listOf(trusted, untrusted)
+        val chain = NetworkType.NetworkType_Mainnet
+
+        assertEquals(untrusted, NodeSelectionPolicy.select(nodes, TransportConfig(preferTrustedNode = false), chain))
+        assertEquals(trusted, NodeSelectionPolicy.select(nodes, TransportConfig(preferTrustedNode = true), chain))
+    }
+
+    @Test
+    fun `same host and port cannot replace the active authentication settings`() {
+        val current = node("route.onion").apply { username = "fixture-user" }
+        val unrelated = node("route.onion")
+        assertEquals(
+            current,
+            NodeSelectionPolicy.select(listOf(unrelated, current), TransportConfig(), NetworkType.NetworkType_Mainnet, current),
+        )
+    }
+
+    @Test
+    fun `manual and automatic validation reject a mismatched wallet chain`() {
+        val config = TransportConfig()
+        val wrongChain = node("route.onion").apply { networkType = NetworkType.NetworkType_Stagenet }
+        assertFalse(NodeSelectionPolicy.accepts(config, wrongChain, NetworkType.NetworkType_Mainnet))
+        assertNull(NodeSelectionPolicy.select(listOf(wrongChain), config, NetworkType.NetworkType_Mainnet))
     }
 
     @Test

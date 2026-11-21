@@ -106,6 +106,8 @@ Use immutable snapshots across IO dispatch, bind asynchronous validation to chec
 and discard results after wallet/input changes. `scripts/check-kotlin-cancellation.py`
 guards unqualified catch imports; it is not Kotlin compilation.
 
+Bind send and startup inputs to the captured wallet/profile before suspending. Recheck eligibility before using snapshots for a native operation. Parse saved node configuration using the build network without initializing JNI.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

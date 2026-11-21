@@ -241,7 +241,7 @@ class NetworkSettingsViewModel(
                         _error.postValue(NetworkSettingsError.LWS_ACTIVE)
                         return@withLock
                     }
-                    if (!NodeSelectionPolicy.accepts(config.value, node)) {
+                    if (!NodeSelectionPolicy.accepts(config.value, node, io.anonero.AnonConfig.getNetworkType())) {
                         _error.postValue(NetworkSettingsError.NO_COMPATIBLE_NODE)
                         return@withLock
                     }

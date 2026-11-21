@@ -85,7 +85,7 @@ private val Context.nodeDataStore: DataStore<List<Node>> by dataStore(
  *
  * Node records include RPC credentials, so the DataStore file is app-private but not
  * Keystore-encrypted. Treat the Android app sandbox as the protection boundary. Entries are
- * de-duplicated by their serialized node string, and [clearAll] is part of secure wipe.
+ * de-duplicated by their RPC URL, and [clearAll] is part of secure wipe.
  */
 class NodesRepository(
     private val context: Context,
@@ -132,8 +132,8 @@ class NodesRepository(
         } catch (e: CorruptionException) {
             Timber.tag(TAG).e("Cannot add node: saved node list is corrupt")
             false
-        } catch (e: IOException) {
-            Timber.tag(TAG).w(e, "Cannot add node")
+        } catch (_: IOException) {
+            Timber.tag(TAG).w("Cannot add node")
             false
         }
 
@@ -160,8 +160,8 @@ class NodesRepository(
         } catch (e: CorruptionException) {
             Timber.tag(TAG).e("Cannot remove node: saved node list is corrupt")
             false
-        } catch (e: IOException) {
-            Timber.tag(TAG).w(e, "Cannot remove node")
+        } catch (_: IOException) {
+            Timber.tag(TAG).w("Cannot remove node")
             false
         }
 
