@@ -5,7 +5,7 @@ anonymity, privacy, security, language, build, and Git policy. Read it first.
 
 ## 1. Module facts
 
-- Single module: `:app`. Namespace and application ID root: `io.anonero`.
+- Single module: `:app`. Namespace: `io.anonero`. Application ID root: `dev.uhden`.
 - `minSdk = 29`, `compileSdk = 37` + `compileSdkMinor = 2` (API 37.2),
   `targetSdk = 37`.
 - Flavors: `anon` (full wallet) and `nero` (view-only, `BuildConfig.VIEW_ONLY = true`).
@@ -17,8 +17,8 @@ anonymity, privacy, security, language, build, and Git policy. Read it first.
   external archives are built with CMake 4.4.5 and NDK r30; keep them coordinated.
 - Dependencies are declared in `gradle/libs.versions.toml`. Do not add a dependency
   directly in `app/build.gradle.kts` without a catalog entry.
-- Release builds are unsigned by design; signing happens only in the protected
-  `.github/workflows/release.yml` environment. Never configure a debug signing key for
+- Release builds are unsigned by design. `.github/workflows/release.yml` signs
+  `dev.uhden.anon` and `dev.uhden.nero` in separate protected environments. Never configure a debug signing key for
   release.
 
 ## 2. Source layout

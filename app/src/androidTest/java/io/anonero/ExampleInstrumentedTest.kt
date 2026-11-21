@@ -33,19 +33,9 @@ import org.junit.runner.RunWith
 class ExampleInstrumentedTest {
     @Test
     fun useAppContext() {
-        // Context of the app under test. The debug builds carry the anon/nero
-        // applicationId suffix, so the base package alone is not a valid assertion.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
         assertTrue(
-            appContext.packageName in
-                setOf(
-                    "io.anonero",
-                    "io.anonero.debug",
-                    "io.anonero.anon",
-                    "io.anonero.anon.debug",
-                    "io.anonero.nero",
-                    "io.anonero.nero.debug",
-                ),
+            appContext.packageName in setOf("dev.uhden.anon.debug", "dev.uhden.nero.debug"),
         )
     }
 }

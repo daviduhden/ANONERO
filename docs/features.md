@@ -10,8 +10,8 @@ required pillars. For design rationale and threat boundaries, see
 
 | Flavor | Application ID | Capability |
 | --- | --- | --- |
-| `anon` | `io.anonero.anon` | Full wallet: spend, accounts, decoy provisioning, encrypted backup |
-| `nero` | `io.anonero.nero` | View-only: watch balances/history, build/handle unsigned and signed transactions; no spend key, seed view, or decoy provisioning |
+| `anon` | `dev.uhden.anon` | Full wallet: spend, accounts, decoy provisioning, encrypted backup |
+| `nero` | `dev.uhden.nero` | View-only: watch balances/history, build/handle unsigned and signed transactions; no spend key, seed view, or decoy provisioning |
 
 The `stageNet` build type adds a `.stagenet` suffix and is debuggable. It is not a release
 artifact. Network selection is derived from the application ID

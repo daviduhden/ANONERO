@@ -19,7 +19,7 @@ with an anonymity, privacy, or security invariant in `AGENTS.md`, the invariant 
 | `tor-networking` | Embedded Tor, SOCKS/manual proxy, fail-closed networking, network anonymity hierarchy | `.agents/skills/tor-networking/SKILL.md` | Changing connectivity, proxy application, Tor lifecycle, or network anonymity |
 | `monero-lws` | Optional LWS configuration, login, trust, sync, UI | `.agents/skills/monero-lws/SKILL.md` | Changing LWS behavior or reviewing view-key/transport/trust rules |
 | `wallet-privacy` | Local anonymity, stealth mode, decoy wallet, duress PIN, lock, wipe, notifications | `.agents/skills/wallet-privacy/SKILL.md` | Changing local-exposure or coercion controls and profile isolation |
-| `github-actions` | CI/CD, build gates, signing, artifacts, releases | `.agents/skills/github-actions/SKILL.md` | Editing workflows or auditing build/sign/publish behavior |
+| `github-actions` | CI/CD, build gates, per-app signing and certificate pins, artifacts, releases | `.agents/skills/github-actions/SKILL.md` | Editing workflows or auditing build/sign/publish behavior |
 | `static-analysis` | Audits without building or running tests | `.agents/skills/static-analysis/SKILL.md` | Reviewing references, JNI parity, i18n, manifest, dependencies, or diffs |
 | `compatibility-migrations` | Persisted formats, legacy paths, Monero/toolchain upgrades | `.agents/skills/compatibility-migrations/SKILL.md` | Changing backups, PIN/Keystore migration, preferences, pins, SDK/AGP/Gradle |
 

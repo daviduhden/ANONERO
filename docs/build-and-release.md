@@ -27,12 +27,11 @@ Polyseed, utf8proc, the Debian base image, and the Debian snapshot. See
 
 - Module: `:app`, namespace `io.anonero`.
 - Flavors: `anon` (full) and `nero` (view-only). Application IDs are
-  `io.anonero.anon` and `io.anonero.nero`.
+  `dev.uhden.anon` and `dev.uhden.nero`.
 - Build types: `debug`, `release`, `stageNet` (debuggable, stagenet suffix).
 - ABI splits: `arm64-v8a`, `armeabi-v7a`, plus a universal APK. `x86_64` is absent because
   there is no native build target for it.
-- Release builds are deliberately unsigned in Gradle. The protected `sign` job in
-  `.github/workflows/release.yml` signs them with the release keystore.
+- Release builds are deliberately unsigned in Gradle. The protected `sign-anon` and `sign-nero` jobs use independent keystores.
 - Release minification is currently disabled (`isMinifyEnabled = false`). Enabling it
   requires reviewing JNI/reflection/kotlinx.serialization keep rules and instrumented
   validation.
@@ -124,21 +123,23 @@ gh workflow run test.yml \
 
 ## 5. GitHub Actions: release pipeline
 
-`.github/workflows/release.yml` is manual-dispatch only. A release is built from an existing
-`v*` tag passed as `tag`; publishing is a separate opt-in `publish` input.
+`.github/workflows/release.yml` is manual-dispatch only. Dispatch from `main` with an existing
+`v*` tag that resolves to the dispatched commit. Publishing requires `publish=true`
+and approval of the publication environment.
 
 | Stage | What it does |
 | --- | --- |
 | `authorize` | Owner gate; every other job needs it |
-| `test` | Calls `test.yml` with the requested tag and instrumented-test flag |
+| `test` | Aggregates the embedded Tests jobs for the dispatched SHA |
 | `build` | Verifies version/tag, enforces Kotlin/C++ policy, installs native archives, builds unsigned release APKs, verifies package ID, version, minSdk, ABI splits, non-debuggability, and six artifacts |
-| `sign` | Uses the protected `release` environment to sign six APKs and write `SHA256SUMS` |
+| `sign-anon`, `sign-nero` | Use separate protected environments, validate alignment, sign with v2/v3 and verify the package and pinned certificate |
+| `prepare` | Checks both identities, verifies the artifact inventory and consolidates the APKs and `SHA256SUMS` |
 | `publish` | Runs only when `publish == true`; re-checks the tag/commit, verifies checksums, and publishes without overwriting existing assets |
 
 Manual build without publishing:
 
 ```sh
-gh workflow run release.yml \
+gh workflow run release.yml --ref main \
   -f tag=v1.2.3 \
   -f publish=false \
   -f run_instrumented=true
@@ -147,7 +148,7 @@ gh workflow run release.yml \
 Manual build and publish:
 
 ```sh
-gh workflow run release.yml \
+gh workflow run release.yml --ref main \
   -f tag=v1.2.3 \
   -f publish=true \
   -f run_instrumented=true
@@ -157,23 +158,23 @@ Release invariants:
 
 - The `tag` input is required; its core must match `versionName`, and it must point at the
   checked-out commit.
-- Six APKs: `ANONERO` and `NERO`, each arm64-v8a, armeabi-v7a, and universal.
-- Application IDs must be `io.anonero.anon` / `io.anonero.nero`.
+- Six versioned APKs, with arm64-v8a, armeabi-v7a and universal builds per app.
+  `anon-release.apk` and `nero-release.apk` are byte-identical copies of the universal APKs.
+- Application IDs must be `dev.uhden.anon` / `dev.uhden.nero`.
 - `minSdk` must be 29; release APKs must not be debuggable.
 - Only arm64-v8a and armeabi-v7a are accepted; every APK contains
   `lib/<abi>/libanonero.so`.
-- Signing secrets live in the `release` environment:
-  `ANONERO_KEYSTORE_BASE64`, `ANONERO_KEYSTORE_PASSWORD`, `ANONERO_KEY_ALIAS`,
-  `ANONERO_KEY_PASSWORD`.
+- `android-anon-release` holds `ANON_KEYSTORE_BASE64`, `ANON_KEYSTORE_PASSWORD`
+  and public variable `ANON_CERT_SHA256`. `android-nero-release` holds the
+  corresponding `NERO_*` values. The aliases default to `anon` and `nero`.
+- The build checks 16 KiB ELF LOAD alignment of packaged arm64-v8a libraries,
+  and signing checks ZIP alignment before and after signing.
 - The publish job refuses to overwrite an existing release’s assets.
 - Gradle caches are disabled in the publishing workflow to avoid cache poisoning before
   signing.
 
-The repository currently has no configured environments (`gh api
-repos/daviduhden/ANONERO/environments` returned zero) and `main` is not protected. The
-owner must create the `release` environment with required reviewers and the four signing
-secrets, and should protect `.github/workflows/` with branch protection/CODEOWNERS. The
-`authorize` job is a workflow-level guard, not a substitute for repository permissions.
+The signing and publication environments allow only `main` and require owner approval.
+See [Android signing and registration](android-release-signing.md) for custody and recovery.
 
 ## 6. Human build path
 
@@ -211,7 +212,7 @@ Agent work must not execute these commands; use CI.
 | Link failure in app CMake | NDK/CMake or archive set mismatch | `app/CMakeLists.txt`, `external-libs/<abi>/monero/` |
 | Release APK count wrong | ABI split or flavor output missing | Build log and `app/build/outputs/apk/` |
 | minSdk verification fails | Manifest/AGP change | `app/build.gradle.kts` and `aapt2 dump badging` |
-| Signing fails | Missing/invalid release environment secrets | `release` environment configuration |
+| Signing fails | Missing/invalid release environment secrets | app-specific signing environment |
 | Localization check fails | Missing locale key or hardcoded text | `python3 scripts/check-i18n.py` |
 | Workflow YAML invalid | Syntax/permissions/action pin error | Parse the YAML statically; do not run `act` |
 
@@ -225,7 +226,7 @@ release publication remain unverified; treat those claims as pending CI.
 
 After editing shared Tests jobs, regenerate only the marked block with
 `python3 scripts/sync-release-test-jobs.py --write` and verify with `--check` plus actionlint.
-Release test checkouts use the explicit release tag namespace and caches are disabled.
+Release test checkouts use the immutable dispatched SHA and caches are disabled.
 Its aggregate requires all mandatory checks and the native artifact from that run; the
 existing publication condition still requires instrumentation. No workflow run is
 implicitly authorized by preparing these files.

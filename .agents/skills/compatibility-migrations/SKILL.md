@@ -55,6 +55,15 @@ description: "Use when changing persisted formats, legacy compatibility paths, b
 
 ## Current compatibility surface
 
+### Android application identity
+
+- `dev.uhden.anon` and `dev.uhden.nero` have independent signing identities;
+  keep the IDs and certificates stable for future updates.
+- Historical `io.anonero.*` builds have separate app data and Android Keystore
+  storage from `dev.uhden.*` builds. Never require uninstalling a historical
+  build to recover or verify wallet access in the new installation. The
+  Kotlin and JNI namespace stays `io.anonero`.
+
 ### Backups
 
 - v1: `Salted__` prefix, PBKDF2-HMAC-SHA256 11,000 iterations, AES-CBC. Read-only

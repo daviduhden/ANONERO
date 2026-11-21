@@ -74,7 +74,7 @@ for another.
 | Correlation adversary | Repeated destinations, timing, amounts, sync patterns, reuse | Tor by default, no intentional subaddress reuse, LWS consent, airgapped flows | Monero graph analysis, timing correlation, and off-device identity links remain |
 | Malicious app on device | Screen, clipboard, notifications, accessibility, logs | `FLAG_SECURE`, stealth mode, clipboard timeout, log suppression | Root, accessibility, screen capture, and privileged apps can defeat these |
 | Person with physical access | Device, wallet files, recents, coercion | Keystore-wrapped secret, PIN gate, decoy/duress, wipe | Coercion and forensic access; decoy is not plausible deniability |
-| Build/release compromise | Source, build artifacts, signing | Pinned inputs, hashes, manual CI, protected signing | Compromised runner, dependency, action, or signing secret |
+| Build/release compromise | Source, build artifacts, signing | Pinned inputs and signer certificates, hashes, manual CI, per-app protected signing | Compromised runner, dependency, action, or signing secret |
 
 ### Considered
 

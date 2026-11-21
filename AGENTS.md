@@ -238,7 +238,8 @@ threat models, regression requirements and remaining boundaries.
   - `.github/workflows/test.yml`: JVM unit tests, Android Lint, JNI symbol contract,
     localization, Kotlin/C++ policy, native archives, instrumented tests.
   - `.github/workflows/release.yml`: required test suite, unsigned release APKs,
-    protected-key signing, checksum/signature verification, GitHub Release publishing.
+    isolated ANON/NERO signing with pinned certificates, checksum/signature verification,
+    and separately approved GitHub Release publishing.
 - **Every diagnosis requires a root-cause pass.** A compile error, compiler warning, test
   failure, crash, JNI diagnostic, or sanitizer report must trigger:
   1. root-cause analysis;
@@ -278,6 +279,10 @@ threat models, regression requirements and remaining boundaries.
   advertise it.
 - Product flavors: `anon` and `nero`. `nero` is view-only; do not add spend, decoy, or
   backup-export paths to it.
+- Production application IDs are `dev.uhden.anon` and `dev.uhden.nero`. Preserve
+  each ID and signing identity for updates. Historical `io.anonero.*` packages
+  remain separate installs. Keep Kotlin and JNI in the `io.anonero` namespace.
+  See [Android release signing](docs/android-release-signing.md).
 - Preserve persisted formats unless a migration is explicitly designed:
   - backup prefix `ANONBAK2` for v2/v3; legacy `Salted__` v1 must still restore;
   - backup versions 2 (PIN-keyed) and 3 (passphrase-keyed) semantics;

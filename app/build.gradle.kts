@@ -36,7 +36,7 @@ android {
     compileSdkMinor = 2
 
     defaultConfig {
-        applicationId = "io.anonero"
+        applicationId = "dev.uhden"
         minSdk = 29
         targetSdk = 37
         versionCode = 3

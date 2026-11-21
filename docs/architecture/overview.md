@@ -316,3 +316,6 @@ validator regressions and instruction structure, with an optional base ref for
 committed knowledge synchronization. It requires the owner gate, read-only repository
 access and full history; it performs no Android builds or artifact publishing.
 Workflow execution remains unverified until an authorized manual CI run.
+
+Android production APKs use `dev.uhden.anon` and `dev.uhden.nero`. The Kotlin and JNI
+namespace remains `io.anonero`. See [signing and registration](../android-release-signing.md).

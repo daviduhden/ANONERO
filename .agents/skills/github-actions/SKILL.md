@@ -35,19 +35,21 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
   runnable jobs. A repository transfer to an organization changes the owner value; revisit
   the gate before transferring, because it fails closed.
 - Default `permissions: contents: read`. Only `publish` gets `contents: write`.
-- Signing and publishing use the protected `release` environment. No untrusted workflow
-  may reach signing secrets.
+- The owner dispatches from `main`. The tag must resolve to the dispatched SHA.
+- Sign ANON in `android-anon-release` and NERO in `android-nero-release`. Each job
+  downloads just its unsigned APKs, without checking out or executing project code.
+  The separate `release` environment approves publication and carries no signing keys.
 - Pin every `uses:` action to a full commit SHA with a version comment.
 - No Gradle cache in the publishing workflow. Cache poisoning before signing is a
   release risk.
 - `native-language-policy` must continue to enforce the Kotlin/C++ source layout.
 - Required gates stay required: `authorize`, `unit`, `lint`, `jni-contract`, `i18n`,
   `native-language-policy`, `native`, `assemble`, `instrumented` (via `test.yml`), then
-  build, sign, publish.
-- Release APKs must be unsigned before the `sign` job. No debug signing fallback.
-- Verify before publish: six APKs, package IDs, versionName/versionCode, minSdk 29,
-  non-debuggable, only arm64-v8a/armeabi-v7a, `libanonero.so`, signatures,
-  `SHA256SUMS`.
+  build, app-specific signing, prepare, and optional publish.
+- Release APKs must be unsigned when uploaded by `build`. No debug signing fallback.
+- Verify before publish: six versioned APKs and two canonical copies, package IDs, versionName/versionCode, minSdk 29,
+  non-debuggable, native ABI inventory, 16 KiB arm64 ELF and ZIP alignment, v2/v3
+  signatures pinned to one distinct certificate and public key per app, and `SHA256SUMS`.
 - The manual `tag` input must match `versionName` and point at the built commit. Re-check
   in `publish`.
 - Publishing requires `publish == true`; a build-only run must leave the signed artifacts
@@ -55,8 +57,8 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 - Do not overwrite existing release assets.
 - Keep `persist-credentials: false`, timeouts, and concurrency groups unless a change
   is explicitly justified.
-- Do not run workflows, `act`, `gh workflow run`, or project builds locally. `gh` is
-  read-only for auditing.
+- Do not run workflows, `act`, `gh workflow run`, or project builds locally. A
+  maintainer may explicitly authorize remote configuration or a workflow dispatch.
 
 ## Procedure
 
@@ -65,14 +67,14 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 2. **Classify the trust boundary.** PR code, third-party action, downloaded artifact,
    cache, secret, or published asset.
 3. **Check permissions, triggers, and the owner gate.** Only `workflow_dispatch` may remain; no callable entry point is allowed. Every job must need `authorize`; keep
-   `contents: read` as the default. Never expose `release` to an untrusted run.
+   `contents: read` as the default. Never expose signing or publishing environments to an untrusted ref.
 4. **Pin actions.** Use a full SHA and update the comment to the release version.
 5. **Preserve fail-closed checks.** New steps should `exit 1` on a failed invariant,
    not warn.
 6. **Check artifact paths.** Native layout is `external-libs/<abi>/` plus the
    generated `include/` and `VERSION` entries under `external-libs/`; the workflow
    accepts either a `native-out/` wrapper or the flat layout.
-7. **Check the release matrix.** Three APKs per flavor, six total. Do not add an ABI
+7. **Check the release matrix.** Three versioned APKs per flavor, plus one canonical universal copy per flavor. Do not add an ABI
    without a native target.
 8. **Update documentation.** If the contract changes, update
    `.github/workflows/AGENTS.md` and this skill.
@@ -85,11 +87,12 @@ description: "Use when creating, auditing, or modifying ANONERO GitHub Actions w
 2. Create a `v<versionName>` tag that points at the release commit.
 3. Authorize the tag push separately; the tag is an input to the manual release workflow,
    not an automatic trigger.
-4. Run the workflow manually as the repository owner (from the Actions UI or
-   `gh workflow run release.yml -f tag=v1.2.3 -f publish=false|true`).
-5. For a publish run, confirm the protected `release` environment approval and the four
-   signing secrets. A build-only run must not create a release.
-6. Confirm all six APKs and `SHA256SUMS` are present.
+4. Dispatch from `main` when its SHA matches the release tag. Leave `publish=false`
+   for verification and set `publish=true` only when authorizing a release.
+5. Confirm each signing environment has its own secrets and public pin. Verify the
+   source before approving each deployment. A publish run also requires approval
+   of the separate `release` environment and successful instrumentation.
+6. Confirm all eight APK files and `SHA256SUMS` are present.
 7. Confirm signatures with the workflow logs; do not manually re-sign or upload.
 8. If a release fails, fix forward with a new commit/tag. Do not mutate an existing
    release’s assets.
@@ -143,7 +146,7 @@ device farm), not as a reason to relax the test gate.
 - [ ] Every job depends on the owner `authorize` gate.
 - [ ] No cache in publishing.
 - [ ] All required gates intact.
-- [ ] Six APKs and all invariants verified before publish.
+- [ ] All eight APK files and invariants verified before publish.
 - [ ] No debug signing, no asset overwrite.
 - [ ] Documentation updated with manual run commands.
 - [ ] Success is not claimed without a manual owner run.

@@ -52,7 +52,7 @@ def shared_jobs(source: str) -> tuple[str, list[str]]:
         "unit", "lint", "jni-contract", "i18n", "native-language-policy",
         "native", "assemble", "instrumented",
     }
-    reserved = {"authorize", "test", "build", "sign", "publish"}
+    reserved = {"authorize", "test", "build", "sign-anon", "sign-nero", "prepare", "publish"}
     if not required.issubset(names) or len(names) != len(set(names)) or reserved.intersection(names):
         raise ValueError("test.yml: missing, duplicate or reserved shared job names")
     return jobs.rstrip() + "\n", names

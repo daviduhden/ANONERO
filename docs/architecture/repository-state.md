@@ -41,7 +41,7 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 | Backup v1/v2/v3 compatibility | `EncryptUtil.kt`, `BackupHelper.kt`, tests |
 | Stealth, decoy, duress, wipe | `PrivacySettings.kt`, `WalletProfiles.kt`, `DecoySettings.kt`, `SecureWipe.kt` |
 | FLAG_SECURE and no OS backup | `MainActivity.kt`, `AndroidManifest.xml`, XML exclusion rules |
-| CI release signs six APKs and verifies checksums | `.github/workflows/release.yml` |
+| CI release uses separate signing jobs, pins both certificates and verifies checksums | `.github/workflows/release.yml` |
 | No runtime verification performed | no builds, tests, emulator, or device access used |
 
 ## State classification
