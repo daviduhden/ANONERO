@@ -127,53 +127,45 @@ fi
 # instrumentation attach can time out; give ART/package work time to finish.
 sleep 30
 
-set +e
-# Leave cores for the software-emulated guest; host-side dexing has killed
-# system_server while the tests were starting.
-./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true \
-    :app:connectedAnonDebugAndroidTest \
-    :app:connectedNeroDebugAndroidTest
-status=$?
-set -e
+# Separate Gradle invocations preserve each flavor's outcome across retries.
+# Limit workers because host dexing competed with the software-emulated guest.
+run_connected() {
+    ./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true "$1"
+}
 
-if ! core_services_ok; then
-    capture_diagnostics
-    echo "::error::device lost package/activity services during instrumented tests"
-    exit 1
-fi
-
-# Retry only a flavor whose report says "failed to attach". Installation or
-# system_server failures are not retried; the XML and exit-code checks are final.
+status=0
 for flavor in anon nero; do
-    report=$(find app/build/outputs/androidTest-results \
-        -path "*flavors/${flavor}/*" -name 'TEST-*.xml' | head -n 1)
-    if [ -n "$report" ] && {
-        grep -q "failed to attach" "$report" ||
-            grep -q 'tests="0"' "$report" ||
-            grep -q "Failed to install" "$report"
-    } && core_services_ok; then
-        case "$flavor" in
-            anon) task=:app:connectedAnonDebugAndroidTest ;;
-            nero) task=:app:connectedNeroDebugAndroidTest ;;
-        esac
-        echo "Retrying ${flavor} after an instrumentation attach timeout"
-        set +e
-        ./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true "$task"
-        retry_status=$?
-        set -e
-        if [ "$retry_status" -eq 0 ]; then
-            # The retried flavor passed; reports_ok is still the final authority for
-            # the other flavor and for any non-attach failure.
-            status=0
-        else
-            status=$retry_status
+    case "$flavor" in
+        anon) task=:app:connectedAnonDebugAndroidTest ;;
+        nero) task=:app:connectedNeroDebugAndroidTest ;;
+    esac
+
+    if run_connected "$task"; then
+        flavor_status=0
+    else
+        flavor_status=$?
+        if core_services_ok &&
+            python3 scripts/check-instrumented-retry.py app/build/outputs/androidTest-results "$flavor"; then
+            echo "Retrying ${flavor} after an instrumentation attach timeout"
+            if run_connected "$task"; then
+                flavor_status=0
+            else
+                flavor_status=$?
+            fi
         fi
+    fi
+    if ! core_services_ok; then
+        capture_diagnostics
+        echo "::error::device lost package/activity services during instrumented tests"
+        exit 1
+    fi
+    if ((flavor_status != 0)); then
+        echo "::error::Connected Gradle task for $flavor exited with $flavor_status"
+        status=$flavor_status
     fi
 done
 
-if ! reports_ok; then
+if ! reports_ok || ((status != 0)); then
     capture_diagnostics
     exit 1
 fi
-
-exit "$status"

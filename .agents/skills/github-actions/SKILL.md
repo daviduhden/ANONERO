@@ -132,14 +132,21 @@ put loops or backslash continuations there. Keep the logic in
 - build the app and AndroidTest APKs before the emulator starts, and keep the connected
   Gradle invocation at `--max-workers=2` so host-side dexing cannot starve the guest;
 - capture crash/system/main/events logcat, guest memory, and disk on failure;
-- retry only instrumentation attach/zero-test failures while the guest is healthy;
+- retry only an explicitly reported attachment failure while the guest is healthy,
+  preserving each flavor's Gradle exit status;
 - leave the XML and `test-result-exit-code.txt` validation as the final authority.
 
 The emulator action needs `ANDROID_I_WANT_MY_TCG=yes` when it selects
 `-accel off`. Keep that opt-in on the runner step in Tests and synchronize Release.
-Hosted Linux runners have no `/dev/kvm`; the x86_64 emulator runs under software
-emulation. Treat instrumented stability as an infrastructure decision (self-hosted KVM or
-device farm), not as a reason to relax the test gate.
+Inspect device availability and current-user permissions separately on hosted Linux.
+Prepare KVM access only for the job user when the device exists. If absent, the action
+uses bounded software emulation. Its launch success does not prove boot or test success.
+Use the per-flavor XML and exit-code records to check both outcomes.
+
+Audit successful runs as well as failed runs. Record project diagnostics separately
+from dependency and hosted-runner advisories, and use reported artifact counts with
+their exact run and commit. A cancelled boot before the deadline cannot establish a
+timeout.
 
 ## Completion criteria
 

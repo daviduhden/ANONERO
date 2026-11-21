@@ -185,6 +185,8 @@ instrumented runner action so its software mode can start when KVM is unavailabl
 Regenerate the shared release job and keep boot and test-result gates intact.
 On ephemeral GitHub-hosted Linux jobs, check whether `/dev/kvm` is a character
 device and grant the job user read/write permission if needed. Preserve bounded
-software emulation when the device is absent.
+software emulation when the device is absent. Missing reports, a failed flavor,
+or a guest service failure still fail instrumentation. Retry only a documented,
+explicit attach failure with healthy guest services. Keep both flavor exit results.
 Optional emulator animation settings are disabled after run 43633496677 failed before the
 repository test script; readiness, instrumentation, report and nonzero-test gates remain.
