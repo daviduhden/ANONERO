@@ -252,8 +252,6 @@
     <string name="frozen_outputs_note">冻结的输出仍保留在钱包中，但不会用于交易输入选择。它们不会被花费，也不受共识锁定。</string>
     <string name="thaw_output">解冻输出</string>
 
-    <string name="broadcast_question">是否要广播交易？</string>
-    <string name="yes">是</string>
     <string name="exit_question">是否要退出 %1$s？</string>
     <string name="exit">退出</string>
     <string name="scan">扫描</string>
@@ -294,7 +292,6 @@
     <string name="broadcast_failed_generic">无法广播交易</string>
     <string name="signing_hint_omit_outputs">在 NERO 中打开菜单，点击“显示输出”，在此处扫描，然后再次发送。</string>
     <string name="unsigned_tx">未签名交易</string>
-    <string name="scan_signed_tx">扫描已签名交易</string>
 
     <string name="import_polyseed">导入 POLYSEED 助记词</string>
     <string name="enter_seed">输入助记词</string>

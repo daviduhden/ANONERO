@@ -252,8 +252,6 @@
     <string name="frozen_outputs_note">Замороженные выходы остаются в кошельке, но исключаются из выбора входов транзакции. Они не тратятся и не блокируются консенсусом.</string>
     <string name="thaw_output">Разморозить выход</string>
 
-    <string name="broadcast_question">Отправить транзакцию в сеть?</string>
-    <string name="yes">Да</string>
     <string name="exit_question">Выйти из %1$s?</string>
     <string name="exit">Выйти</string>
     <string name="scan">Сканировать</string>
@@ -294,7 +292,6 @@
     <string name="broadcast_failed_generic">Не удалось отправить транзакцию в сеть</string>
     <string name="signing_hint_omit_outputs">В NERO откройте меню, нажмите «Показать выходы», отсканируйте его здесь и отправьте снова.</string>
     <string name="unsigned_tx">НЕПОДПИСАННАЯ ТРАНЗАКЦИЯ</string>
-    <string name="scan_signed_tx">СКАНИРОВАТЬ ПОДПИСАННУЮ ТРАНЗАКЦИЮ</string>
 
     <string name="import_polyseed">ИМПОРТ МНЕМОНИЧЕСКОЙ ФРАЗЫ POLYSEED</string>
     <string name="enter_seed">ВВЕДИТЕ SEED-ФРАЗУ</string>

@@ -122,8 +122,6 @@
     <string name="frozen_outputs_note">Frozen outputs stay in the wallet but are excluded from transaction input selection. They are not spent or locked by consensus.</string>
     <string name="thaw_output">Thaw output</string>
 
-    <string name="broadcast_question">Do you want to broadcast transaction?</string>
-    <string name="yes">Yes</string>
     <string name="exit_question">Do you want to exit %1$s?</string>
     <string name="exit">Exit</string>
     <string name="scan">Scan</string>
@@ -164,7 +162,6 @@
     <string name="broadcast_failed_generic">Unable to broadcast transaction</string>
     <string name="signing_hint_omit_outputs">On NERO open the menu, tap Show Outputs, scan it here, then send again.</string>
     <string name="unsigned_tx">UNSIGNED TX</string>
-    <string name="scan_signed_tx">SCAN SIGNED TX</string>
 
     <string name="import_polyseed">IMPORT POLYSEED MNEMONIC</string>
     <string name="enter_seed">ENTER SEED</string>

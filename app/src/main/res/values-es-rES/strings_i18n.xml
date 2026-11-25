@@ -122,8 +122,6 @@
     <string name="frozen_outputs_note">Las salidas congeladas permanecen en el monedero, pero se excluyen de la selección de entradas de transacción. No se gastan ni se bloquean por consenso.</string>
     <string name="thaw_output">Descongelar salida</string>
 
-    <string name="broadcast_question">¿Desea difundir la transacción?</string>
-    <string name="yes">Sí</string>
     <string name="exit_question">¿Desea salir de %1$s?</string>
     <string name="exit">Salir</string>
     <string name="scan">Escanear</string>
@@ -164,7 +162,6 @@
     <string name="broadcast_failed_generic">No se pudo difundir la transacción</string>
     <string name="signing_hint_omit_outputs">En NERO, abra el menú, pulse Mostrar salidas, escanéelo aquí y vuelva a enviar.</string>
     <string name="unsigned_tx">TX SIN FIRMAR</string>
-    <string name="scan_signed_tx">ESCANEAR TX FIRMADA</string>
 
     <string name="import_polyseed">IMPORTAR FRASE MNEMÓNICA POLYSEED</string>
     <string name="enter_seed">INTRODUCIR SEMILLA</string>

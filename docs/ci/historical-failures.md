@@ -985,6 +985,13 @@ resource and URI warnings are absent. See the [preventive audit](preventive-audi
   still has to succeed. The wrapper uses the same pinned inputs, and connected
   instrumentation keeps its own retry policy. CI's static-checker regressions
   exercise eligible and ineligible failures and preserve the second exit code.
+- The available lint reports contain zero errors and 16 warnings per flavor.
+  Eight are dependency update notices. Five are explicit preference editor
+  sites that rely on the Boolean commit result (including two in the PIN rate
+  limiter). The remaining three are unused labels for the retired signed-file
+  broadcast path, removed from every locale after checking code and XML
+  references. Recheck both lint XML reports on the next run. No dependency
+  pin has changed.
 - The cancelled native log contains upstream warnings including easylogging++
   non-null diagnostics, Boost timer deprecations in Monero, and warnings from
   autotools and libtool. It has no completed JNI link evidence. Upstream
