@@ -146,6 +146,14 @@ Key process facts:
 - Kotlin is the primary implementation language. Jetpack Compose is the UI toolkit.
 - C++ is the only project-owned native language; it is retained for the JNI adapter and
   native build glue. JNI is the only Kotlin/native boundary.
+- New project-owned source files and scripts use the full Apache-2.0 license
+  header with `Copyright (c) 2026, David Uhden Collado`. Copy the header from
+  `app/src/main/java/io/anonero/model/ManagedWalletSlot.kt` and adapt the comment
+  delimiters to the language. Use the full notice rather than a short identifier.
+  Keep script shebangs on the first line and preserve
+  existing license notices and attributions. For a wholly new file, include only
+  the attribution applicable to its authorship. Trace renames, extracted code,
+  and copied portions before changing an upstream attribution.
 - Do not introduce new Java, another native runtime, or another FFI layer. The
   Kotlin/Compose + C++/JNI split is the permanent architecture.
 - Upstream Monero C++ is vendored through the pinned submodule. Do not edit the
