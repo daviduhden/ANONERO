@@ -240,13 +240,13 @@ object BackupHelper {
                     var copyFailure: Throwable? = null
                     try {
                         if (!copy.status.isOk) {
-                            throw Exception("backup copy did not open: ${copy.status.errorString}")
+                            throw Exception("backup copy did not open")
                         }
                         if (!copy.setPassword(seedPassphrase)) {
-                            throw Exception("backup copy could not be re-keyed: ${copy.status.errorString}")
+                            throw Exception("backup copy could not be re-keyed")
                         }
                         if (!copy.store()) {
-                            throw Exception("backup copy could not be stored: ${copy.status.errorString}")
+                            throw Exception("backup copy could not be stored")
                         }
                     } catch (failure: Throwable) {
                         copyFailure = failure
@@ -332,6 +332,7 @@ object BackupHelper {
         manager: WalletManager,
         passPhrase: String,
         pin: String,
+        restoreHeight: Long,
     ): Wallet? {
         val context = AnonConfig.context!!
         val walletFile = AnonConfig.getDefaultWalletFile(context)
@@ -372,7 +373,7 @@ object BackupHelper {
         return try {
             val w = WalletKey.newSecret()
             if (!wallet.setPassword(w)) {
-                throw Exception("setPassword failed: ${wallet.status.errorString}")
+                throw Exception("setPassword failed")
             }
             if (!wallet.store()) {
                 throw Exception("store failed after re-key")
@@ -382,6 +383,8 @@ object BackupHelper {
                 prefs
                     .edit()
                     .putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                    .putString(PREFS_PASSPHRASE_HASH, KeyStoreHelper.getCrazyPass(context, passPhrase))
+                    .putLong(RESTORE_HEIGHT, restoreHeight)
                     .commit()
             if (!committed) throw Exception("could not persist the restored PIN hash")
             bound = true
@@ -393,10 +396,8 @@ object BackupHelper {
             // Best effort: put the in-memory wallet back on the credential that opened it
             // so a later store cannot leave the file keyed to an unrecorded secret.
             val original = if (openedWithPin) pin else passPhrase
-            runCatching {
-                wallet.setPassword(original)
-                wallet.store()
-            }
+            val restored = runCatching { wallet.setPassword(original) && wallet.store() }.getOrDefault(false)
+            if (!restored) Timber.tag(TAG).e("Restore credential rollback failed")
             null
         } finally {
             if (!bound) closeRestoredWallet(manager, wallet)
@@ -560,23 +561,16 @@ object BackupHelper {
                 Timber.tag(TAG).w("restore: dropped malformed backup node records")
             }
 
-            walletPrefs.edit(commit = true) {
-                putString(
-                    PREFS_PASSPHRASE_HASH,
-                    KeyStoreHelper.getCrazyPass(context, passPhrase),
-                )
-                putLong(RESTORE_HEIGHT, restoreHeight)
-            }
-            val decoyName = WalletProfile.DECOY.walletName
-            extractDestination.listFiles()?.forEach { entry ->
-                if (entry.name == "anon.json") return@forEach
-                // Never let an archive overwrite the decoy profile's files.
-                if (entry.name == decoyName || entry.name.startsWith("$decoyName.")) return@forEach
-                entry.copyTo(File(anonDir, entry.name), true)
-            }
+            val main = WalletProfile.MAIN.walletName
+            val installed =
+                manager.withWalletPathClosed(File(anonDir, main).path) {
+                    BackupArchive.installWalletFiles(extractDestination, anonDir, main)
+                    true
+                }
+            if (!installed) return false
             val restored =
                 try {
-                    bindRestoredWallet(manager, passPhrase, pin)
+                    bindRestoredWallet(manager, passPhrase, pin, restoreHeight)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {

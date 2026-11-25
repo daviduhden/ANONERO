@@ -71,6 +71,9 @@ retry = backup.index("opened = openRestoredWallet(manager, walletFile, pin)", st
 if "if (opened != null && !closeRestoredWallet(manager, opened)) return null" not in backup[start:retry]:
     failures.append("Legacy backup retry must confirm that the previous wallet closed")
 
+if "wallet.setPassword(original) && wallet.store()" not in backup:
+    failures.append("Backup rollback must confirm the credential change before storing")
+
 seed_display = (JAVA / "ui/home/settings/SeedSettings.kt").read_text(encoding="utf-8")
 if (
     "WalletProfileStore.passphraseHashKey(owner.profile)" not in seed_display

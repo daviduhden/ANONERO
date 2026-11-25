@@ -135,3 +135,17 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+An interrupted restore can leave wallet files before the Keystore and PIN gate
+are ready. Reserve fresh final filenames, roll back only files acquired by this
+attempt on copy failure, and publish the restore height and passphrase verifier
+in the same checked preference commit as the PIN gate. On a failed re-key, store
+only after wallet2 confirms it restored the original credential. Keep native
+status text out of exceptions and migration logs.
+
+Keep a PIN verification scoped to its captured wallet instance, profile and stored
+gate. Carry that proof into background unlock, signing and credential changes.
+Serialize gate writes with provisioning and reject work after the gate changes.
+Upgrade a legacy gate only after the matching PIN authenticates that profile.
+Settings must leave PIN-encrypted files intact if device-key migration is still
+incomplete. The next authenticated open owns migration and its rollback.

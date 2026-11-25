@@ -31,3 +31,21 @@ cleanup could displace a native owner or remove files needed to retry close.
   timing, native memory safety, or fund safety.
 - **Rollback.** Revert the ownership change and its tests as a unit. No on-disk
   migration is needed. Preserve wallet files and credentials after any failed close.
+
+### BK-001 — Partial backup installation and password rollback
+
+Static review at `bf1cf25` found that a copy failure after preferences or the
+first wallet file were written could block a retry at the empty-target check.
+A failed password rollback also called wallet2 store after setPassword returned
+false. The protected assets are the existing wallet files and the original
+encrypted backup. Disk exhaustion, a destination collision or a native re-key
+failure suffices. The restore now exclusively creates destination files under the
+closed-path guard, removes its own partial copies on I/O failure, and commits
+the PIN verifier, passphrase verifier and restore height together after binding.
+A failed rollback skips the explicit store. The external backup, archive formats,
+KDFs and DECOY files are unchanged. Fixed diagnostics avoid including wallet2
+text in exceptions. The JVM fixture forces a collision after the first copy.
+Device fault injection must still exercise credential and disk failures. Process
+death during installation can leave an occupied target requiring recovery.
+Reverting the code requires no format conversion. Preserve a partial target when
+native ownership or the outcome of cleanup is uncertain.

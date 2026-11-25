@@ -66,6 +66,31 @@ internal object BackupArchive {
             files.any { it.name == "$walletName.keys" }
     }
 
+    /** Install only wallet files from the locked preview. Roll back files created by this attempt. */
+    fun installWalletFiles(
+        source: File,
+        target: File,
+        walletName: String,
+    ) {
+        if (!isValidDirectory(source, walletName)) throw IOException("Invalid backup staging directory")
+        val entries = source.listFiles() ?: throw IOException("Could not list backup files")
+        val created = mutableListOf<File>()
+        try {
+            for (entry in entries.sortedBy { it.name }) {
+                if (entry.name == METADATA_NAME) continue
+                val output = File(target, entry.name)
+                if (!output.createNewFile()) throw IOException("Restore target is occupied")
+                created.add(output)
+                entry.inputStream().use { input -> output.outputStream().use { input.copyTo(it) } }
+            }
+        } catch (failure: Exception) {
+            for (file in created) {
+                if (!file.delete()) failure.addSuppressed(IOException("Could not remove incomplete restore file"))
+            }
+            throw failure
+        }
+    }
+
     fun extract(
         archive: File,
         destination: File,

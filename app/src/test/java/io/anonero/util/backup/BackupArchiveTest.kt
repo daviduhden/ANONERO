@@ -54,6 +54,18 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun `restore copy failure removes only files created by the current attempt`() {
+        val staged = File(tmp.root, "staged")
+        BackupArchive.extract(archive("anon.json", "anon", "anon.keys"), staged, "anon")
+        val target = tmp.newFolder()
+        val existing = File(target, "anon.keys").apply { writeText("existing fixture") }
+        expectRejected { BackupArchive.installWalletFiles(staged, target, "anon") }
+        assertEquals("existing fixture", existing.readText())
+        assertFalse(File(target, "anon").exists())
+        assertTrue(BackupArchive.isValidDirectory(staged, "anon"))
+    }
+
+    @Test
     fun `flat metadata keys cache and sidecars extract unchanged`() {
         val names = arrayOf("anon.json", "anon.keys", "anon", "anon.address.txt")
         val source = archive(*names)
