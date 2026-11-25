@@ -9,13 +9,12 @@ import kotlinx.serialization.Serializable
 /**
  * One wallet2 transaction as exposed to the UI and history.
  *
- * The primary constructor is called from JNI; field order and types are part of that
- * contract. `transfers` may be null when wallet2 reports no transfer list, while the
- * Parcel path assumes a list is always present; callers should not parcel an empty
- * transaction without checking [transfers].
+ * JNI uses the constructor with an integer direction. Its parameter order and types
+ * are part of the native contract. The Parcel always carries a nullable [transfers]
+ * list field before the notes.
  *
- * Amounts are atomic units. `accountIndex`/`addressIndex` are wallet2 subaddress indices,
- * not display positions.
+ * Amounts are atomic units. [accountIndex] and [addressIndex] identify wallet2 subaddresses
+ * independently of the list order in the UI.
  */
 @Serializable
 class TransactionInfo :
@@ -84,13 +83,11 @@ class TransactionInfo :
         confirmations = `in`.readLong()
         subaddressLabel = `in`.readString()
         transfers =
-            transfers?.toMutableList()?.also { transfersList ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    `in`.readList(transfersList, Transfer::class.java.classLoader, Transfer::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    `in`.readList(transfersList, Transfer::class.java.classLoader)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                `in`.readArrayList(Transfer::class.java.classLoader, Transfer::class.java)
+            } else {
+                @Suppress("DEPRECATION", "UNCHECKED_CAST")
+                (`in`.readArrayList(Transfer::class.java.classLoader) as List<Transfer>?)
             }
         notes = `in`.readString()
     }
@@ -131,9 +128,7 @@ class TransactionInfo :
         out.writeInt(addressIndex)
         out.writeLong(confirmations)
         out.writeString(subaddressLabel)
-        transfers?.let {
-            out.writeList(transfers)
-        }
+        out.writeList(transfers)
         out.writeString(notes)
     }
 
