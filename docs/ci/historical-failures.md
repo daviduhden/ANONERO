@@ -964,3 +964,29 @@ In [44932222742](https://github.com/daviduhden/ANONERO/actions/runs/44932222742)
 the archived lint XML contains zero errors and 11 warnings per flavor, all from
 the eight dependency notices and the three checked editor calls. The unused
 resource and URI warnings are absent. See the [preventive audit](preventive-audit.md).
+
+### Maven Central throttled Gradle configuration on b85919b
+
+- [Tests 45677086262](https://github.com/daviduhden/ANONERO/actions/runs/45677086262)
+  returned HTTP 429 when resolving the Kotlin Gradle plugin from Maven Central
+  during root buildscript classpath configuration. The 61 further failures
+  shared that cause. No JVM test ran. The native job was cancelled during
+  Monero compilation. Debug assembly and instrumentation did not run to
+  completion, so this run cannot verify the JNI or device fixes.
+- [Tests 44949185924](https://github.com/daviduhden/ANONERO/actions/runs/44949185924)
+  resolved the same pinned toolchain and both JVM suites passed. The newer
+  run's Android Lint job also configured and ran on its own runner.
+  [Agent Knowledge Validation 45677087065](https://github.com/daviduhden/ANONERO/actions/runs/45677087065)
+  passed on the same revision.
+- All pre-emulator Gradle invocations can encounter the same classpath failure.
+  Tests and Release now use a shared wrapper that keeps the original output
+  and waits 60 seconds before at most one retry, limited to Maven Central
+  HTTP 429 during root classpath resolution before any task starts. A retry
+  still has to succeed. The wrapper uses the same pinned inputs, and connected
+  instrumentation keeps its own retry policy. CI's static-checker regressions
+  exercise eligible and ineligible failures and preserve the second exit code.
+- The cancelled native log contains upstream warnings including easylogging++
+  non-null diagnostics, Boost timer deprecations in Monero, and warnings from
+  autotools and libtool. It has no completed JNI link evidence. Upstream
+  diagnostics need comparison against a completed build and are outside this
+  Gradle failure fix.

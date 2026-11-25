@@ -191,3 +191,10 @@ or a guest service failure still fail instrumentation. Retry only a documented,
 explicit attach failure with healthy guest services. Keep both flavor exit results.
 Optional emulator animation settings are disabled after run 43633496677 failed before the
 repository test script; readiness, instrumentation, report and nonzero-test gates remain.
+
+CI Gradle steps before emulator startup may use `.github/scripts/run-gradle-ci.sh`
+to retry once after Maven Central returns HTTP 429 during root classpath resolution.
+Keep the original output and return the final invocation's failure status. Never
+retry through this wrapper once Gradle has started tasks. Connected instrumentation
+has its own device-health and attach retry rules. The wrapper regression uses a stub
+and runs in the shared CI Python suite.

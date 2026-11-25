@@ -196,3 +196,10 @@ Both signing jobs must depend directly on the instrumented job and require
 its success, in addition to the owner and build jobs. The release suite source
 validator checks those dependencies, the condition and the distinct environments.
 Keep the corresponding regression cases in the manual workflow's Python suite.
+
+CI Gradle steps before emulator startup may use `.github/scripts/run-gradle-ci.sh`
+to retry once after Maven Central returns HTTP 429 during root classpath resolution.
+Keep the original output and return the final invocation's failure status. Never
+retry through this wrapper once Gradle has started tasks. Connected instrumentation
+has its own device-health and attach retry rules. The wrapper regression uses a stub
+and runs in the shared CI Python suite.

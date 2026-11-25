@@ -129,7 +129,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --continue --stacktrace \
+          bash .github/scripts/run-gradle-ci.sh --no-daemon --continue --stacktrace \
             :app:testAnonDebugUnitTest \
             :app:testNeroDebugUnitTest
 
@@ -200,7 +200,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --continue --stacktrace :app:lintAnonDebug :app:lintNeroDebug
+          bash .github/scripts/run-gradle-ci.sh --no-daemon --continue --stacktrace :app:lintAnonDebug :app:lintNeroDebug
 
       - name: Upload lint reports
         if: always()
@@ -471,7 +471,7 @@ jobs:
           set -euo pipefail
           AAPT2="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
           test -x "$AAPT2"
-          ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
+          bash .github/scripts/run-gradle-ci.sh --no-daemon --continue --stacktrace -PanonDisableSplits=true \
             :app:assembleAnonDebug \
             :app:assembleNeroDebug
           echo "=== debug APK outputs ==="
@@ -616,7 +616,7 @@ jobs:
           test -x "$AAPT2"
           # Build the test APKs before the emulator starts. Compiling and dexing them
           # while the software-emulated guest runs starves system_server and can kill it.
-          ./gradlew --no-daemon --continue --stacktrace -PanonDisableSplits=true \
+          bash .github/scripts/run-gradle-ci.sh --no-daemon --continue --stacktrace -PanonDisableSplits=true \
             :app:assembleAnonDebug \
             :app:assembleNeroDebug \
             :app:assembleAnonDebugAndroidTest \
@@ -999,7 +999,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --continue --stacktrace clean \
+          bash .github/scripts/run-gradle-ci.sh --no-daemon --continue --stacktrace clean \
             :app:lintAnonRelease \
             :app:lintNeroRelease \
             :app:assembleAnonRelease \
