@@ -342,18 +342,28 @@ fun NavGraphBuilder.onboardingGraph(
             )
         }
         composable<OnboardSeedScreen> {
+            var seedLoadFailed by remember { mutableStateOf(false) }
             val seed by produceState(initialValue = emptyList<String>()) {
                 value =
-                    withContext(Dispatchers.IO) {
-                        onboardViewModel
-                            .getSeed()
-                            .trim()
-                            .split(Regex("\\s+"))
-                            .filter { it.isNotEmpty() }
+                    try {
+                        withContext(Dispatchers.IO) {
+                            onboardViewModel
+                                .getSeed()
+                                .trim()
+                                .split(Regex("\\s+"))
+                                .filter { it.isNotEmpty() }
+                                .also { check(it.isNotEmpty()) }
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: IllegalStateException) {
+                        seedLoadFailed = true
+                        emptyList()
                     }
             }
             SeedSetup(
                 seed = seed,
+                seedLoadFailed = seedLoadFailed,
                 oNextPressed = {
                     navController.navigate(
                         Home,

@@ -124,6 +124,13 @@ another JNI string acquisition or result allocation. A normal null input can
 still use an established fallback when no exception is pending. Include CheckJNI
 in the failure-path verification for changes to this boundary.
 
+Keep seed offset conversion and wallet2 seed/key reads inside the JNI catch
+boundary. Use a fixed JVM error on native failure and preserve pending JVM
+exceptions. A failed Polyseed lookup may reach the legacy mnemonic only when
+wallet2 returns normally with false. Secret display callers must surface the
+localized failure without logging material or treating the failed read as an
+unlock. See [seed JNI failure paths](../../../docs/ci/seed-jni-boundary.md).
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

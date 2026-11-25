@@ -912,85 +912,124 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
 
 /* Wallet */
 
-// For backwards compatibility reasons, getSeed will continue silently fallback to legacy mnemonic
-// seed.
-// Since the changes aren't upstremead yet, and we don't know how polyseed will evolve / if there
-// will be any changes we wouldn't like to have the users stuck with not working wallet that they
-// can't backup.
+static void throwWalletSeedFailure(JNIEnv *env) {
+    if (env->ExceptionCheck())
+        return;
+    jclass failure = env->FindClass("java/lang/IllegalStateException");
+    if (failure == nullptr)
+        return;
+    ScopedLocalRef failureRef(env, failure);
+    env->ThrowNew(failure, "Native wallet seed or key operation failed");
+}
+
+// Prefer the wallet's Polyseed. When wallet2 cannot provide one, return its
+// legacy mnemonic so wallets created in the older format can still show a seed.
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSeed(JNIEnv *env, jobject instance,
                                                                jstring seedOffset) {
-    std::string offset;
-    if (seedOffset != nullptr) {
-        ScopedUtfChars offsetChars(env, seedOffset);
-        if (offsetChars.get() == nullptr)
-            return nullptr;
-        offset = offsetChars.get();
-    }
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (env->ExceptionCheck())
         return nullptr;
+    try {
+        std::string offset;
+        if (seedOffset != nullptr) {
+            ScopedUtfChars offsetChars(env, seedOffset);
+            if (offsetChars.get() == nullptr)
+                return nullptr;
+            offset = offsetChars.get();
+        }
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return nullptr;
 
-    std::string _seed;
-    bool _getPolyseed = wallet->getPolyseed(_seed, offset);
-
-    if (!_getPolyseed) {
-        _seed = wallet->seed(offset);
+        std::string seed;
+        if (!wallet->getPolyseed(seed, offset)) {
+            seed = wallet->seed(offset);
+        }
+        return env->NewStringUTF(seed.c_str());
+    } catch (...) {
+        throwWalletSeedFailure(env);
+        return nullptr;
     }
-    return env->NewStringUTF(_seed.c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getLegacySeed(JNIEnv *env, jobject instance,
                                                                      jstring seedOffset) {
-    std::string offset;
-    if (seedOffset != nullptr) {
-        ScopedUtfChars offsetChars(env, seedOffset);
-        if (offsetChars.get() == nullptr)
-            return nullptr;
-        offset = offsetChars.get();
-    }
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (env->ExceptionCheck())
         return nullptr;
-    std::string seed = wallet->seed(offset);
-    return env->NewStringUTF(seed.c_str());
+    try {
+        std::string offset;
+        if (seedOffset != nullptr) {
+            ScopedUtfChars offsetChars(env, seedOffset);
+            if (offsetChars.get() == nullptr)
+                return nullptr;
+            offset = offsetChars.get();
+        }
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return nullptr;
+        std::string seed = wallet->seed(offset);
+        return env->NewStringUTF(seed.c_str());
+    } catch (...) {
+        throwWalletSeedFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_isPolyseedSupported(JNIEnv *env,
                                                                             jobject instance,
                                                                             jstring seedOffset) {
-    std::string offset;
-    if (seedOffset != nullptr) {
-        ScopedUtfChars offsetChars(env, seedOffset);
-        if (offsetChars.get() == nullptr)
-            return JNI_FALSE;
-        offset = offsetChars.get();
-    }
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (env->ExceptionCheck())
         return JNI_FALSE;
-    std::string seed;
-    return static_cast<jboolean>(wallet->getPolyseed(seed, offset));
+    try {
+        std::string offset;
+        if (seedOffset != nullptr) {
+            ScopedUtfChars offsetChars(env, seedOffset);
+            if (offsetChars.get() == nullptr)
+                return JNI_FALSE;
+            offset = offsetChars.get();
+        }
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return JNI_FALSE;
+        std::string seed;
+        return static_cast<jboolean>(wallet->getPolyseed(seed, offset));
+    } catch (...) {
+        throwWalletSeedFailure(env);
+        return JNI_FALSE;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSeedLanguage(JNIEnv *env,
                                                                        jobject instance) {
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
-        return env->NewStringUTF("");
-    return env->NewStringUTF(wallet->getSeedLanguage().c_str());
+    if (env->ExceptionCheck())
+        return nullptr;
+    try {
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return env->NewStringUTF("");
+        return env->NewStringUTF(wallet->getSeedLanguage().c_str());
+    } catch (...) {
+        throwWalletSeedFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT void JNICALL Java_io_anonero_model_Wallet_setSeedLanguage(JNIEnv *env, jobject instance,
                                                                     jstring language) {
-    if (language == nullptr)
+    if (env->ExceptionCheck())
         return;
-    ScopedUtfChars languageChars(env, language);
-    if (languageChars.get() == nullptr)
-        return;
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
-        return;
-    wallet->setSeedLanguage(std::string(languageChars.get()));
+    try {
+        if (language == nullptr)
+            return;
+        ScopedUtfChars languageChars(env, language);
+        if (languageChars.get() == nullptr)
+            return;
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return;
+        wallet->setSeedLanguage(std::string(languageChars.get()));
+    } catch (...) {
+        throwWalletSeedFailure(env);
+    }
 }
 
 JNIEXPORT jint JNICALL Java_io_anonero_model_Wallet_getStatusJ(JNIEnv *env, jobject instance) {
@@ -1085,18 +1124,32 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getIntegratedAddress(JNIE
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSecretViewKey(JNIEnv *env,
                                                                         jobject instance) {
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (env->ExceptionCheck())
         return nullptr;
-    return env->NewStringUTF(wallet->secretViewKey().c_str());
+    try {
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return nullptr;
+        return env->NewStringUTF(wallet->secretViewKey().c_str());
+    } catch (...) {
+        throwWalletSeedFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSecretSpendKey(JNIEnv *env,
                                                                          jobject instance) {
-    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (env->ExceptionCheck())
         return nullptr;
-    return env->NewStringUTF(wallet->secretSpendKey().c_str());
+    try {
+        Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
+        if (wallet == nullptr)
+            return nullptr;
+        return env->NewStringUTF(wallet->secretSpendKey().c_str());
+    } catch (...) {
+        throwWalletSeedFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_store(JNIEnv *env, jobject instance,

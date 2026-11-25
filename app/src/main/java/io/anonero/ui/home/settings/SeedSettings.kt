@@ -143,6 +143,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     }
     val focusRequester = remember { FocusRequester() }
     var passPhraseDialog by remember { mutableStateOf(true) }
+    var seedLoadFailed by remember { mutableStateOf(false) }
     var passPhrase by remember { mutableStateOf("") }
     var neroPayload by remember { mutableStateOf("") }
     // nothing secret is composed until the passphrase checks out: the blur behind the
@@ -164,6 +165,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
         if (locked) {
             seedJob?.cancel()
             seedJob = null
+            seedLoadFailed = false
             verified = false
             seedWords = placeholderSeed
             legacySeed = placeholderSeed
@@ -252,37 +254,44 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     fun getSeed() {
         if (walletState.backgroundSync) return
         seedJob?.cancel()
+        seedLoadFailed = false
         val enteredPassphrase = passPhrase
         seedJob =
             scope.launch {
                 val seeds =
-                    withContext(Dispatchers.IO) {
-                        val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
-                        val appContext = AnonConfig.context?.applicationContext
-                        val hashedPass =
-                            appContext?.let {
-                                KeyStoreHelper.getCrazyPass(it, enteredPassphrase)
-                            } ?: ""
-                        currentCoroutineContext().ensureActive()
-                        if (hash == hashedPass && !walletState.backgroundSync) {
-                            val seed = getWalletSeed(enteredPassphrase)?.split(" ")
+                    try {
+                        withContext(Dispatchers.IO) {
+                            val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
+                            val appContext = AnonConfig.context?.applicationContext
+                            val hashedPass =
+                                appContext?.let {
+                                    KeyStoreHelper.getCrazyPass(it, enteredPassphrase)
+                                } ?: ""
                             currentCoroutineContext().ensureActive()
-                            val legacy = getLegacySeed(enteredPassphrase)?.split(" ")
-                            seed to legacy
-                        } else {
-                            null
+                            if (hash == hashedPass && !walletState.backgroundSync) {
+                                val seed = checkNotNull(getWalletSeed(enteredPassphrase)).split(" ")
+                                currentCoroutineContext().ensureActive()
+                                val legacy = getLegacySeed(enteredPassphrase)?.split(" ")
+                                seed to legacy
+                            } else {
+                                null
+                            }
                         }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: IllegalStateException) {
+                        currentCoroutineContext().ensureActive()
+                        if (!walletState.backgroundSync) seedLoadFailed = true
+                        return@launch
                     }
                 currentCoroutineContext().ensureActive()
                 if (walletState.backgroundSync) return@launch
                 if (seeds != null) {
                     val (seed, legacy) = seeds
-                    if (seed != null) {
-                        seedWords = seed
-                        verified = true
-                        passPhraseDialog = false
-                        passPhrase = ""
-                    }
+                    seedWords = seed
+                    verified = true
+                    passPhraseDialog = false
+                    passPhrase = ""
                     if (legacy != null) {
                         legacySeed = legacy
                     }
@@ -379,6 +388,12 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             text = {
                 OutlinedTextField(
                     value = passPhrase,
+                    isError = seedLoadFailed,
+                    supportingText = {
+                        if (seedLoadFailed) {
+                            Text(stringResource(R.string.wallet_operation_failed))
+                        }
+                    },
                     shape = MaterialTheme.shapes.small,
                     singleLine = true,
                     colors =
@@ -405,6 +420,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                             },
                         ),
                     onValueChange = {
+                        seedLoadFailed = false
                         passPhrase = it
                     },
                 )

@@ -113,6 +113,9 @@ Additional rules:
 - Wallet initialization, both proxy setters, LWS login and background-sync start/stop
   report native exceptions through their existing false result. Keep implicit string
   allocations inside the catch boundary and reject negative limits before conversion.
+- Seed and key exports keep offset conversion and wallet2 calls inside the native
+  catch boundary. A native exception raises a fixed Java error. The legacy mnemonic
+  remains a fallback only when Polyseed lookup returns false normally.
 - Keep `setTrustedDaemon`, `setProxy`, and light-wallet calls faithful to wallet2. Do
   not “fix” trust by hardcoding a safe-looking value on the native side.
 - Do not weaken validation to make a test or UI path easier.

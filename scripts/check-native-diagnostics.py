@@ -139,6 +139,34 @@ for owner, operation, call in (
     if operation == "initJ" and "upper_transaction_size_limit < 0" not in before_try:
         failures.append("Wallet.initJ: check size limit before converting to unsigned")
 
+# Seed and key exports also allocate before or during the wallet2 call. A
+# native failure must become a fixed JVM error, not a mnemonic fallback.
+for operation, calls in (
+    ("getSeed", ("->getPolyseed(", "->seed(")),
+    ("getLegacySeed", ("->seed(",)),
+    ("isPolyseedSupported", ("->getPolyseed(",)),
+    ("getSeedLanguage", ("->getSeedLanguage(",)),
+    ("setSeedLanguage", ("->setSeedLanguage(",)),
+    ("getSecretViewKey", ("->secretViewKey(",)),
+    ("getSecretSpendKey", ("->secretSpendKey(",)),
+):
+    start = code.index(f"Java_io_anonero_model_Wallet_{operation}(")
+    end = code.index("\n}\n", start)
+    preamble, _, implementation = code[start:end].partition("try {")
+    native_calls, _, failure = implementation.partition("catch (...)")
+    if (
+        "std::string" in preamble
+        or "ScopedUtfChars" in preamble
+        or any(call not in native_calls or call in preamble or call in failure for call in calls)
+        or "throwWalletSeedFailure(env);" not in failure
+    ):
+        failures.append(f"Wallet.{operation}: seed and key work must remain in the native catch")
+    if operation == "getSeed" and not re.search(
+        r"if\s*\(\s*!wallet->getPolyseed\(seed, offset\)\s*\)\s*\{\s*seed = wallet->seed\(offset\);",
+        native_calls,
+    ):
+        failures.append("Wallet.getSeed: legacy fallback requires a normal false Polyseed result")
+
 # wallet2 does not serialize listener pointer swaps against callback delivery.
 listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")
 listener_end = code.index("\n}\n", listener_start)

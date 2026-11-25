@@ -55,6 +55,7 @@ fun SeedSetup(
     oNextPressed: () -> Unit = {},
     onBackPressed: () -> Unit = {},
     seed: List<String> = emptyList(),
+    seedLoadFailed: Boolean = false,
 ) {
     BackHandler(true) {
         onBackPressed.invoke()
@@ -88,6 +89,9 @@ fun SeedSetup(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
+            }
+            if (seedLoadFailed) {
+                Text(stringResource(R.string.wallet_operation_failed))
             }
             LazyVerticalGrid(
                 modifier =
