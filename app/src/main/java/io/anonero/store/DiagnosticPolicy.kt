@@ -38,6 +38,7 @@ object DiagnosticPolicy {
             "could not persist refreshed wallet state",
             "could not create account",
             "PIN verification failed",
+            "PIN throttle reset failed",
             "Backup export failed",
             "Transaction broadcast failed",
             "Uncaught application failure",

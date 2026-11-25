@@ -125,6 +125,8 @@ the NERO build has no spend path.
 - `PinHash` stores `v2:<iterations>:<salt>:<hash>` using PBKDF2-HMAC-SHA256 at 210,000
   iterations, a 16-byte salt, and a 256-bit key. Comparison is constant-time.
 - Legacy reversible PIN values still verify and are replaced on the next successful unlock.
+- The lock screen requires a successful commit of the attempt count before checking the
+  PIN. Failed storage denies the current attempt.
   The legacy CrAzYpass path uses `KeyStoreHelper.getCrazyPass` and the native `slowHash` with
   its ARM32 broken-variant compatibility rule; it is not a new key-derivation design.
 - `PinThrottle` counts an attempt before checking it, uses the boot clock, and increases the

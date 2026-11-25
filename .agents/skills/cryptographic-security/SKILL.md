@@ -40,6 +40,9 @@ already in the repository.
 - **PIN gate:** PBKDF2-HMAC-SHA256, 16-byte random salt, 210,000 iterations, 256-bit
   derived key, constant-time comparison. Do not lower the work factor. Legacy
   reversible CrazyPass values must still verify and be replaced on successful unlock.
+  Count the attempt with an explicit successful preferences commit before any PIN
+  verification. A failed counter reset after authentication must not interrupt a
+  wallet that has already opened.
 - **Wallet secret:** 32 random bytes, Base64 without wrap, used as the wallet2
   password. It is wrapped by an Android Keystore AES-256-GCM key, StrongBox preferred,
   IV 12 bytes, tag 128 bits, prefs file `wallet`, prefix `walletSecret-`. It must not

@@ -213,14 +213,14 @@ fun LockScreen(
             if (!checkingPin.compareAndSet(false, true)) return
             scope
                 .launch(Dispatchers.IO) {
-                    // counted before the check: killing the app mid-check must not skip it
-                    val wait = PinThrottle.tryAttempt(prefs)
-                    if (wait > 0) {
-                        lockedFor = wait
-                        withContext(Dispatchers.Main) { showError() }
-                        return@launch
-                    }
+                    var wait = 0L
                     try {
+                        // Verify the PIN only after persisting the counted attempt.
+                        wait = PinThrottle.tryAttempt(prefs)
+                        if (wait > 0) {
+                            withContext(Dispatchers.Main) { showError() }
+                            return@launch
+                        }
                         if (mode == LockScreenMode.VERYFY_PIN) {
                             val prefsHash = prefs.getString(WalletProfileStore.activePinHashKey(), "")
                             if (PinHash.matches(pin, prefsHash)) {
@@ -285,8 +285,7 @@ fun LockScreen(
                         Timber.tag(TAG).e("PIN verification failed")
                         withContext(Dispatchers.Main) { showError() }
                     } finally {
-                        // a correct PIN has cleared the wait by now; a wrong one shows it at once
-                        lockedFor = PinThrottle.waitLeft(prefs)
+                        lockedFor = if (wait > 0) wait else PinThrottle.waitLeft(prefs)
                     }
                 }.invokeOnCompletion { checkingPin.set(false) }
         } else {
