@@ -29,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,11 +40,10 @@ import com.sparrowwallet.hummingbird.UREncoder
 import io.anonero.ui.components.qr.QrCodeColors
 import io.anonero.ui.components.qr.QrCodeView
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Presents successive UR fragments until the composable leaves the screen. The
- * receiver assembles the payload across camera frames. [fps] must be positive.
+ * receiver assembles the payload across camera frames. [fps] must allow at least one millisecond between frames.
  */
 @Composable
 fun AnimatedQrCode(
@@ -56,21 +54,20 @@ fun AnimatedQrCode(
     fps: Int = 10,
     size: Dp = 300.dp,
 ) {
+    require(fps in 1..1000)
     val frameDelayMillis = 1000L / fps
-    var frameString by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    var frameString by remember(Ur, minFragmentLength, maxFragmentLength, fps) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(true) {
-        scope.launch {
-            delay(100)
-            val encoder = UREncoder(Ur, maxFragmentLength, minFragmentLength, 0)
-            while (true) {
-                frameString = encoder.nextPart().toString()
-                delay(frameDelayMillis)
-            }
+    LaunchedEffect(Ur, minFragmentLength, maxFragmentLength, fps) {
+        delay(100)
+        val encoder = UREncoder(Ur, maxFragmentLength, minFragmentLength, 0)
+        while (true) {
+            frameString = encoder.nextPart().toString()
+            delay(frameDelayMillis)
         }
     }
 
+    val frame = frameString
     Box(
         modifier =
             modifier
@@ -78,9 +75,9 @@ fun AnimatedQrCode(
                 .background(Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
-        if (frameString != null) {
+        if (frame != null) {
             QrCodeView(
-                data = frameString!!,
+                data = frame,
                 colors =
                     QrCodeColors(
                         background = MaterialTheme.colorScheme.background,

@@ -108,6 +108,11 @@ details, use the transaction's own account and subaddress indices. Validate the
 history entry against the current wallet session before resolving addresses and
 again before publishing results from the IO dispatcher.
 
+Capture the receipt and note text before launching a write. Carry its original wallet
+and profile to WalletState and surface rejected or unpersisted edits. For animated UR
+output, key both the stored frame and its coroutine to the actual payload and encoder
+parameters. A fixed-key or detached producer can redisplay a superseded export.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and
