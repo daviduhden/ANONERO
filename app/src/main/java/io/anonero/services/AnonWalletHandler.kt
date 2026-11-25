@@ -331,7 +331,7 @@ class AnonWalletHandler(
                 if (validation != null) throw Exception(validation.technicalMessage)
             }
             // no node (offline signer): nothing to route, leave the transport off
-            if (host.isNotEmpty()) applyProxy()
+            if (host.isNotEmpty()) applyProxy(wallet, profile)
             // A profile switch or close can replace this session while Tor is starting.
             if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) return
             check(transportController.config.value == transport && LwsConfig.load(prefs, profile) == lws) {
@@ -372,7 +372,7 @@ class AnonWalletHandler(
                     check(persistNode(replacement)) { "Cannot persist selected node" }
                     node = replacement
                 }
-                updateDaemon(node, lightWallet = lwsActive)
+                updateDaemon(wallet, node, lightWallet = lwsActive)
                 walletState.setLoading(true)
             }
             walletState.update()
@@ -435,13 +435,18 @@ class AnonWalletHandler(
      * authorization only after both native proxy updates and the session rechecks.
      * The caller can then initialize the backend and resume refresh on success.
      */
-    private suspend fun applyProxy() {
+    private suspend fun applyProxy(
+        wallet: Wallet,
+        profile: WalletProfile,
+    ) {
         transportApplyMutex.withLock {
             check(!walletState.backgroundSyncFaulted) { "Wallet session requires reopening" }
             val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-            val wallet = checkNotNull(manager.wallet) { "Wallet unavailable" }
+            val context = checkNotNull(AnonConfig.context) { "Wallet context unavailable" }
+            if (WalletSession.profile != profile || manager.managedWalletAt(WalletProfileStore.walletFile(context, profile)) !== wallet) {
+                throw CancellationException("Wallet session changed before acquiring transport")
+            }
             appliedTransport = null
-            val profile = WalletSession.profile
             wallet.pauseRefresh()
             wallet.setOffline(true)
             walletState.setOffline(true)
@@ -466,12 +471,21 @@ class AnonWalletHandler(
      * a transport change: the old HTTP client must not keep using the previous proxy.
      * The caller marks the wallet offline if this throws.
      */
-    suspend fun reapplyLightWallet() = walletNetworkMutex.withLock { reapplyCurrentLightWallet() }
+    internal suspend fun reapplyLightWallet(
+        wallet: Wallet,
+        profile: WalletProfile,
+    ) = walletNetworkMutex.withLock { reapplyCurrentLightWallet(wallet, profile) }
 
-    private suspend fun reapplyCurrentLightWallet() {
+    private suspend fun reapplyCurrentLightWallet(
+        wallet: Wallet,
+        profile: WalletProfile,
+    ) {
         val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-        val wallet = manager.wallet ?: return
-        val profile = WalletSession.profile
+        val context = checkNotNull(AnonConfig.context) { "Wallet context unavailable" }
+        if (WalletSession.profile != profile || manager.managedWalletAt(WalletProfileStore.walletFile(context, profile)) !== wallet) {
+            throw CancellationException("Wallet session changed before LWS configuration")
+        }
+        check(wallet.isLightWallet) { "LWS settings require a wallet restart" }
         val transport = transportController.config.value
         val lws = LwsConfig.load(prefs, profile)
         if (!lws.enabled) throw IllegalStateException("LWS is not enabled")
@@ -483,7 +497,7 @@ class AnonWalletHandler(
         wallet.setOffline(true)
         walletState.setOffline(true)
         wallet.setTrustedDaemon(false)
-        applyProxy()
+        applyProxy(wallet, profile)
         if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
             throw CancellationException("Wallet session changed while preparing LWS")
         }
@@ -499,7 +513,7 @@ class AnonWalletHandler(
                 lws = true,
                 useTls = lws.useTls,
             ) ?: throw IllegalStateException("Invalid LWS endpoint")
-        updateDaemon(node, lightWallet = true)
+        updateDaemon(wallet, node, lightWallet = true)
         requireAppliedProxy(wallet)
         check(wallet.init(0, lightWallet = true)) { "LWS initialization failed" }
         if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
@@ -520,13 +534,17 @@ class AnonWalletHandler(
     internal suspend fun connectRpcNode(
         node: Node,
         wallet: Wallet?,
-    ) = walletNetworkMutex.withLock { connectCurrentRpcNode(node, wallet) }
+        profile: WalletProfile,
+    ) = walletNetworkMutex.withLock { connectCurrentRpcNode(node, wallet, profile) }
 
     private suspend fun connectCurrentRpcNode(
         node: Node,
         wallet: Wallet?,
+        profile: WalletProfile,
     ) {
-        val profile = WalletSession.profile
+        if (WalletSession.profile != profile || WalletManager.instance?.wallet !== wallet) {
+            throw CancellationException("Wallet session changed before RPC configuration")
+        }
         val transport = transportController.config.value
         check(!LwsConfig.load(prefs, profile).enabled) { "LWS settings require a wallet restart" }
         require(NodeSelectionPolicy.accepts(transport, node, AnonConfig.getNetworkType())) {
@@ -536,13 +554,13 @@ class AnonWalletHandler(
             check(WalletManager.instance?.wallet === wallet && !wallet.isLightWallet) {
                 "Current wallet cannot change RPC node"
             }
-            applyProxy()
+            applyProxy(wallet, profile)
             check(
                 WalletManager.instance?.wallet === wallet && WalletSession.profile == profile &&
                     transportController.config.value == transport && !wallet.isLightWallet &&
                     !LwsConfig.load(prefs, profile).enabled,
             ) { "Wallet session changed while preparing RPC" }
-            updateDaemon(node, lightWallet = false)
+            updateDaemon(wallet, node, lightWallet = false)
             requireAppliedProxy(wallet)
             check(wallet.init(0, lightWallet = false)) { "Node initialization failed" }
             requireAppliedProxy(wallet)
@@ -624,52 +642,42 @@ class AnonWalletHandler(
         }
 
     private fun updateDaemon(
-        node: Node?,
+        wallet: Wallet,
+        node: Node,
         lightWallet: Boolean,
     ) {
+        val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
+        requireAppliedProxy(wallet)
         walletState.setLoading(true)
-        val wallet = WalletManager.instance?.wallet
-        val walletManager = WalletManager.instance
-        wallet?.pauseRefresh()
+        wallet.pauseRefresh()
         walletState.setOffline(true)
         // Callers state the backend explicitly: startup applies the pending mode before
         // wallet.init(), and a pending enable/disable must not change trust or skip the
         // node-network check for the current RPC wallet.
         val lwsActive = lightWallet
         try {
-            if (!lwsActive && node != null) {
+            if (!lwsActive) {
                 require(NodeSelectionPolicy.accepts(transportController.config.value, node, AnonConfig.getNetworkType())) {
                     "Node network does not match the selected transport"
                 }
             }
-            if (node != null && wallet != null) check(hasAppliedTransport(wallet)) { "Wallet transport is unavailable" }
-            if (lwsActive) wallet?.setTrustedDaemon(false)
-            val manager = checkNotNull(walletManager) { "Wallet manager unavailable" }
+            if (lwsActive) wallet.setTrustedDaemon(false)
             manager.setDaemon(node)
-            if (node != null) {
-                if (wallet != null) check(hasAppliedTransport(wallet)) { "Wallet transport is unavailable" }
-                wallet?.setOffline(false)
-                walletState.updateDaemon(
-                    DaemonInfo(
-                        daemon = node.hostPort,
-                        Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
-                        daemonHeight = 0L,
-                    ),
-                )
-            } else {
-                walletState.updateDaemon(
-                    DaemonInfo(
-                        daemon = null,
-                        Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
-                        daemonHeight = 0L,
-                    ),
-                )
-            }
-            wallet?.setTrustedDaemon(!lwsActive)
+            requireAppliedProxy(wallet)
+            wallet.setOffline(false)
+            walletState.updateDaemon(
+                DaemonInfo(
+                    daemon = node.hostPort,
+                    Wallet.ConnectionStatus.ConnectionStatus_Disconnected,
+                    daemonHeight = 0L,
+                ),
+            )
+            wallet.setTrustedDaemon(!lwsActive)
             walletState.setLoading(false)
         } catch (e: Exception) {
-            wallet?.pauseRefresh()
-            wallet?.setOffline(true)
+            if (manager.wallet !== wallet) throw e
+            wallet.pauseRefresh()
+            wallet.setOffline(true)
             walletState.setOffline(true)
             walletState.updateDaemon(
                 DaemonInfo(
@@ -679,7 +687,7 @@ class AnonWalletHandler(
                 ),
             )
             walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
-            if (lwsActive) wallet?.setTrustedDaemon(false)
+            if (lwsActive) wallet.setTrustedDaemon(false)
             walletState.setLoading(false)
             throw e
         }

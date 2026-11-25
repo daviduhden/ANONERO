@@ -82,6 +82,7 @@ import io.anonero.store.NodesRepository
 import io.anonero.ui.components.SettingsSectionHeader
 import io.anonero.ui.components.SettingsSwitchItem
 import io.anonero.util.LwsConfig
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -161,17 +162,23 @@ class NetworkSettingsViewModel(
             _error.postValue(NetworkSettingsError.INVALID_CONFIG)
             return
         }
+        val profile = WalletSession.profile
+        val manager = WalletManager.instance
+        val wallet = manager?.wallet
+
+        fun isCurrent() = WalletSession.profile == profile && WalletManager.instance === manager && manager?.wallet === wallet
+
         viewModelScope.launch(Dispatchers.IO) {
             mutation.withLock {
                 _busy.postValue(true)
                 _error.postValue(null)
-                val manager = WalletManager.instance
-                val wallet = manager?.wallet
                 try {
+                    if (!isCurrent()) return@withLock
                     wallet?.pauseRefresh()
                     wallet?.setOffline(true)
                     transportController.saveConfig(config).getOrThrow()
-                    val lws = LwsConfig.load(prefs)
+                    if (!isCurrent()) return@withLock
+                    val lws = LwsConfig.load(prefs, profile)
                     val lwsActive = lws.enabled && wallet?.isLightWallet == true
                     val lwsPendingDisable = !lws.enabled && wallet?.isLightWallet == true
                     // The transport is now saved. If the active LWS endpoint belongs to a
@@ -199,7 +206,7 @@ class NetworkSettingsViewModel(
                     }
                     if (wallet != null) {
                         if (lwsActive) {
-                            walletHandler.reapplyLightWallet()
+                            walletHandler.reapplyLightWallet(wallet, profile)
                         } else {
                             val walletNetwork = io.anonero.AnonConfig.getNetworkType()
                             val active = activeNode.value
@@ -212,14 +219,14 @@ class NetworkSettingsViewModel(
                             if (selected == null) {
                                 throw IllegalStateException("No compatible node")
                             }
-                            walletHandler.connectRpcNode(selected, wallet)
+                            walletHandler.connectRpcNode(selected, wallet, profile)
                         }
                     }
                     walletState.setLoading(false)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (WalletManager.instance !== manager || manager?.wallet !== wallet) return@withLock
+                    if (!isCurrent()) return@withLock
                     wallet?.pauseRefresh()
                     wallet?.setOffline(true)
                     walletState.setOffline(true)
@@ -235,14 +242,16 @@ class NetworkSettingsViewModel(
     }
 
     fun selectNode(node: Node) {
+        val profile = WalletSession.profile
+        val wallet = WalletManager.instance?.wallet
         viewModelScope.launch(Dispatchers.IO) {
             mutation.withLock {
                 _busy.postValue(true)
-                val wallet = WalletManager.instance?.wallet
                 try {
+                    if (WalletSession.profile != profile || WalletManager.instance?.wallet !== wallet) return@withLock
                     // An active light wallet must not be pointed at a full node. The LWS toggle takes
                     // effect on restart, so refuse instead of changing trust or the backend.
-                    if (LwsConfig.load(prefs).enabled || wallet?.isLightWallet == true) {
+                    if (LwsConfig.load(prefs, profile).enabled || wallet?.isLightWallet == true) {
                         _error.postValue(NetworkSettingsError.LWS_ACTIVE)
                         return@withLock
                     }
@@ -251,12 +260,12 @@ class NetworkSettingsViewModel(
                         return@withLock
                     }
 
-                    walletHandler.connectRpcNode(node, wallet)
+                    walletHandler.connectRpcNode(node, wallet, profile)
                     _error.postValue(null)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (wallet != null && WalletManager.instance?.wallet === wallet) {
+                    if (wallet != null && WalletManager.instance?.wallet === wallet && WalletSession.profile == profile) {
                         wallet.pauseRefresh()
                         wallet.setOffline(true)
                         walletState.setOffline(true)

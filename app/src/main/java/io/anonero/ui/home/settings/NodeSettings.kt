@@ -104,6 +104,7 @@ import io.anonero.store.NodesRepository
 import io.anonero.ui.components.DaemonStatus
 import io.anonero.ui.components.WalletProgressIndicator
 import io.anonero.ui.theme.DangerColor
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -235,11 +236,13 @@ class NodeSettingsViewModel(
     }
 
     suspend fun connect(node: Node) {
+        val profile = WalletSession.profile
+        val manager = WalletManager.instance
+        val wallet = manager?.wallet
         withContext(Dispatchers.IO) {
-            val manager = WalletManager.instance
-            val wallet = manager?.wallet
+            if (WalletSession.profile != profile || WalletManager.instance !== manager || manager?.wallet !== wallet) return@withContext
             if (io.anonero.util.LwsConfig
-                    .load(prefs)
+                    .load(prefs, profile)
                     .enabled ||
                 wallet?.isLightWallet == true
             ) {
@@ -248,21 +251,21 @@ class NodeSettingsViewModel(
                 return@withContext
             }
             try {
-                walletHandler.connectRpcNode(node, checkNotNull(wallet) { "Wallet unavailable" })
+                walletHandler.connectRpcNode(node, checkNotNull(wallet) { "Wallet unavailable" }, profile)
                 walletState.setLoading(false)
                 walletState.update()
                 uriValidationError.postValue(null)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                if (WalletManager.instance !== manager || manager?.wallet !== wallet) {
+                if (WalletSession.profile != profile || WalletManager.instance !== manager || manager?.wallet !== wallet) {
                     return@withContext
                 }
                 wallet?.pauseRefresh()
                 wallet?.setOffline(true)
                 walletState.setOffline(true)
                 if (io.anonero.util.LwsConfig
-                        .load(prefs)
+                        .load(prefs, profile)
                         .enabled || wallet?.isLightWallet == true
                 ) {
                     wallet?.setTrustedDaemon(false)

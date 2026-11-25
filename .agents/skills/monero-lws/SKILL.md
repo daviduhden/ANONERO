@@ -69,7 +69,7 @@ Keep these separate in design and review:
   non-loopback clearnet.
 - `LwsConfig.validateTransport(config, transport)` is the single compatibility gate,
   shared with the settings UI, `AnonWalletHandler`, and the transport-change path.
-- Changing configuration applies through `reapplyLightWallet()` (stop refresh, re-apply
+- Changing configuration applies through `reapplyLightWallet(wallet, profile)` (stop refresh, re-apply
   proxy, `wallet.init(0, lightWallet = true)`, login, restart refresh) or a full restart;
   do not pretend an endpoint change applies to in-flight requests.
 - Light-wallet sync height may legitimately trail the chain; do not apply the full-node
@@ -111,7 +111,7 @@ Keep these separate in design and review:
 5. **Validate configuration.** Use `LwsConfig.validate` and `validateTransport`; add
    stable error codes, not raw exception text, for UI.
 6. **Handle reconnect.** `MoneroHandlerThread.tryRestartConnection` re-inits and
-   re-logs in for light wallets. `AnonWalletHandler.reapplyLightWallet()` is the
+   re-logs in for light wallets. `AnonWalletHandler.reapplyLightWallet(wallet, profile)` is the
    transport-change path. Keep the trust flag false in both.
 7. **Handle transport changes.** Pause refresh, apply the new proxy, re-init LWS, log in,
    and restart refresh. If the new transport is incompatible, keep the wallet offline and
@@ -165,3 +165,9 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+A transport edit belongs to the wallet and profile that initiated it. Capture
+both before dispatch. After waiting for settings persistence and for the
+network mutex, reject a changed owner or inactive LWS backend. Bind shared
+proxy and daemon helpers to that same wallet. An enabled preference on an
+active full-node wallet takes effect only at the intended wallet restart.

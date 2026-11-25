@@ -81,6 +81,27 @@ if (
     failures.append("Seed display must authenticate and read the same wallet/profile")
 
 wallet_handler = (JAVA / "services/AnonWalletHandler.kt").read_text(encoding="utf-8")
+network_settings = (JAVA / "ui/home/settings/NetworkSettings.kt").read_text(encoding="utf-8")
+reapply = wallet_handler.split("private suspend fun reapplyCurrentLightWallet(", 1)[-1].split(
+    "internal suspend fun connectRpcNode(", 1
+)[0]
+required_lws_order = (
+    "manager.managedWalletAt(WalletProfileStore.walletFile(context, profile)) !== wallet",
+    "check(wallet.isLightWallet)",
+    "LwsConfig.load(prefs, profile)",
+    "applyProxy(wallet, profile)",
+    "updateDaemon(wallet, node, lightWallet = true)",
+    "wallet.lightWalletLogin()",
+)
+lws_positions = [reapply.find(marker) for marker in required_lws_order]
+if (
+    -1 in lws_positions
+    or lws_positions != sorted(lws_positions)
+    or "walletHandler.reapplyLightWallet(wallet, profile)" not in network_settings
+    or "val wallet = manager.wallet" in reapply
+):
+    failures.append("LWS reapply must keep the initiating wallet and profile through login")
+
 wipe = wallet_handler[wallet_handler.index("internal fun wipe("):]
 if (
     "WalletProfileStore.passphraseHashKey(profile)" not in wipe
