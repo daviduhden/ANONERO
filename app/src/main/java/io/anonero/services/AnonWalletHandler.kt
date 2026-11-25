@@ -182,8 +182,17 @@ class AnonWalletHandler(
         appliedTransport = null
         walletState.resetSession(profile)
 
+        if (profile == WalletProfile.MAIN) {
+            val recovered =
+                WalletManager.instance?.withWalletPathClosed(walletFile.path) {
+                    WalletKey.recoverInterruptedMigration(context, walletFile.path, walletName)
+                    true
+                }
+            if (recovered != true) throw InvalidPin()
+        }
+        val bound = WalletKey.exists(context, walletName)
         val anonWallet =
-            if (WalletKey.exists(context, walletName)) {
+            if (bound) {
                 // Keystore-bound: the PIN never encrypts the wallet, it gates access to the
                 // wrapped secret. Verify it in software, then open with that secret.
                 val key =
@@ -200,22 +209,26 @@ class AnonWalletHandler(
                 // Legacy PIN-encrypted wallet: opening with the PIN verifies it. On success,
                 // migrate it to a Keystore-bound key. The decoy is only ever created through
                 // the Keystore path and must never fall back to a legacy open.
-                val opened = WalletManager.instance?.openWallet(walletFile.path, pin)
-                if (opened?.status?.isOk == true) {
-                    migrateToKeystore(walletFile, walletName, opened, pin)
-                }
-                opened
+                WalletManager.instance?.openWallet(walletFile.path, pin)
             } else {
                 Timber.tag(TAG).e("decoy wallet key unavailable")
                 throw InvalidPin()
             }
 
         if (anonWallet?.status?.isOk != true) {
-            val error = anonWallet?.status?.errorString
             runCatching { anonWallet?.close() }
                 .onFailure { Timber.tag(TAG).e(it, "could not close failed wallet") }
-            Timber.tag(TAG).e("openWallet error: %s", error)
+            Timber.tag(TAG).e("Wallet open failed")
             throw InvalidPin()
+        }
+        if (profile == WalletProfile.MAIN) {
+            try {
+                WalletKey.discardMigrationSnapshots(walletFile.path)
+                if (!bound) migrateToKeystore(walletFile, walletName, anonWallet, pin)
+            } catch (failure: Exception) {
+                anonWallet.close()
+                throw failure
+            }
         }
         WalletSession.select(profile)
         return true
@@ -224,9 +237,8 @@ class AnonWalletHandler(
     /*
      * One-time migration of a legacy PIN-encrypted wallet to a Keystore-wrapped random
      * key. Snapshot the keys file, re-encrypt with the new secret, wrap it, then drop the
-     * snapshot. Any failure rolls back to the snapshot and leaves the wallet
-     * PIN-encrypted -- still openable. A crash between re-encrypt and wrap is caught at
-     * startup by WalletKey.recoverInterruptedMigration. The seed is the ultimate net.
+     * snapshots. If restoring the PIN in memory fails, refuse this unlock and retain
+     * the snapshots for recovery with the wallet closed.
      */
     private fun migrateToKeystore(
         walletFile: File,
@@ -249,12 +261,13 @@ class AnonWalletHandler(
             val key = WalletKey.newSecret()
             rekeyed = true // from here the files on disk may already be keyed to `key`
             if (!wallet.setPassword(key)) {
-                throw Exception("setPassword failed: ${wallet.status.errorString}")
+                throw Exception("Wallet password change failed")
             }
             if (!wallet.store()) {
                 throw Exception("store failed after re-key")
             }
             WalletKey.store(context, walletName, key)
+            check(WalletKey.load(context, walletName) == key) { "Wallet credential verification failed" }
             // the gate must match this exact PIN, which just opened the wallet; always
             // rewrite it rather than trusting whatever was there
             val committed =
@@ -263,10 +276,9 @@ class AnonWalletHandler(
                     .putString(PREFS_PIN_HASH, PinHash.hash(pin))
                     .commit()
             if (!committed) throw Exception("could not persist the migrated PIN hash")
-            snapshots.forEach { (snapshot, _) -> snapshot.delete() }
             Timber.tag(TAG).i("wallet migrated to a keystore-bound key")
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "keystore migration failed -- rolling back")
+        } catch (_: Exception) {
+            Timber.tag(TAG).e("Keystore migration failed; rolling back")
             WalletKey.remove(context, walletName)
             // Put the open wallet back on the PIN first: it keeps storing on every refresh,
             // and a store keyed to the abandoned secret would undo a file-level rollback.
@@ -275,15 +287,12 @@ class AnonWalletHandler(
                 !rekeyed ||
                     runCatching { wallet.setPassword(pin) && wallet.store() }.getOrDefault(false)
             if (!restoredInMemory) {
-                runCatching {
-                    snapshots.forEach { (snapshot, live) ->
-                        if (snapshot.exists()) snapshot.copyTo(live, overwrite = true)
-                    }
-                }
-                Timber.tag(TAG).e("could not re-key the open wallet to the PIN; restored snapshot, restart required")
+                // A live wallet with an uncertain password must never overwrite recovery files.
+                // Keep both snapshots until a subsequent open can restore them after close.
+                throw InvalidPin()
             }
-            snapshots.forEach { (snapshot, _) -> snapshot.delete() }
         }
+        WalletKey.discardMigrationSnapshots(walletFile.path)
     }
 
     suspend fun startService() = walletNetworkMutex.withLock { startCurrentWalletService() }

@@ -44,3 +44,21 @@ legacy PIN retry. CI still needs to run the JVM suite and verify backup previews
 and restore on both flavors, including false and throwing native close, and
 startup recovery after an interrupted decrypt. Static checks do not prove native
 lifetime, data erasure or end-to-end restore.
+
+## MIG-001 — Legacy wallet recovery after a failed re-key
+
+At `bf1cf25` an unsuccessful in-memory rollback could fall back to a failed
+file copy, discard its snapshots and still return the wallet to the caller.
+Startup also treated ciphertext presence as permission to delete the last
+PIN-keyed fallback. Failure requires a storage, Keystore or wallet2 error or
+an interruption between operations. There is no recorded CI data-loss event.
+
+Recovery now runs before MAIN opens, under the closed-path guard, and retains
+both snapshots for another attempt if copying the pair fails. A lone keys
+snapshot precedes any re-key, while a lone cache snapshot may be stale and
+cannot replace the live cache. Successful wrapped-secret opening or verified
+migration permits retirement. Failed password rollback denies unlock. No new
+credential, archive format or network disclosure is introduced. The JVM cases
+exercise file replay and cleanup. Android Keystore invalidation, process death
+and wallet2 reopen require device validation. Retain legacy snapshot readers
+and any remaining fallback files if the migration code is rolled back.

@@ -133,7 +133,10 @@ the NERO build has no spend path.
   wait after five attempts up to five minutes.
 - `AnonWalletHandler.migrateToKeystore` snapshots `.keys` and the cache to `.premigrate`,
   re-keys the live wallet, wraps the new secret, and rolls back on failure.
-  `WalletKey.recoverInterruptedMigration` runs at startup before any wallet open.
+  Recovery runs under a closed-path guard after PIN verification and before MAIN opens. It
+  retains legacy snapshots through copy failures. A wrapped-secret preference
+  alone cannot retire the fallback. Cleanup requires a successful wallet open
+  or verified migration. A cache-only sidecar cannot overwrite a newer cache.
 
 **Limits:** the PIN is an app-level gate, not a device biometric. An attacker with live
 app-context code execution can use the Keystore key. A Keystore reset or device change makes

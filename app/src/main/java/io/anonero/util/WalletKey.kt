@@ -20,8 +20,11 @@ package io.anonero.util
 
 import android.content.Context
 import android.util.Base64
-import timber.log.Timber
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.SecureRandom
 
 /**
@@ -65,47 +68,48 @@ object WalletKey {
     // Where the secret actually lives: "strongbox" | "tee" | "software" | "unknown".
     fun securityLevel(wallet: String): String = KeyStoreHelper.walletSecretSecurityLevel(wallet)
 
-    /*
-     * Recovers from a migration interrupted by a crash. AnonWalletHandler.migrateToKeystore
-     * snapshots <wallet>.keys to <wallet>.keys.premigrate before re-encrypting. Call this
-     * at startup, before any wallet open:
-     *  - snapshot present and the key is wrapped -> migration finished, drop the snapshot.
-     *  - snapshot present and no wrapped key -> crash before wrap; the keys file may be
-     *    encrypted with a secret that was never stored, so restore the legacy keys.
-     */
+    /** The caller must hold the wallet path closed while restoring its legacy files. */
     fun recoverInterruptedMigration(
         context: Context,
         walletBasePath: String,
         wallet: String,
     ) {
-        val snapshots = migrationSnapshots(walletBasePath)
-        val keysPair = snapshots[0]
-        val cachePair = snapshots[1]
-        val anySnapshot = keysPair.first.exists() || cachePair.first.exists()
-        if (!anySnapshot) return
-        if (exists(context, wallet)) {
-            snapshots.forEach { (snapshot, _) -> snapshot.delete() }
-            Timber.tag("WalletKey").i("migration confirmed; stale snapshot removed")
-            return
+        recoverLegacyFiles(walletBasePath, exists(context, wallet))
+    }
+
+    internal fun recoverLegacyFiles(
+        walletBasePath: String,
+        wrappedSecretPresent: Boolean,
+    ) {
+        // Ciphertext presence selects the normal unwrap/open path. Only a successful
+        // authenticated open can retire a fallback if the Keystore key is unavailable.
+        if (wrappedSecretPresent) return
+        val (keys, cache) = migrationSnapshots(walletBasePath)
+        if (!isSnapshotPresent(keys.first)) return
+        keys.first.copyTo(keys.second, overwrite = true)
+        // The writer publishes the keys snapshot first and changes the password only
+        // after both snapshots exist. A crash before the second copy leaves the live
+        // legacy cache intact, including metadata a chain rescan cannot reconstruct.
+        if (isSnapshotPresent(cache.first)) cache.first.copyTo(cache.second, overwrite = true)
+    }
+
+    private fun isSnapshotPresent(file: File): Boolean =
+        try {
+            check(Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS).isRegularFile) {
+                "Invalid wallet migration snapshot"
+            }
+            true
+        } catch (_: NoSuchFileException) {
+            false
         }
-        // No wrapped key: the migration did not finish. The keys file may be encrypted
-        // with a secret that was never stored. Restore the keys snapshot if it exists;
-        // restore the cache only when its snapshot also exists, otherwise delete the
-        // possibly re-keyed cache and let wallet2 rebuild it from the restore height.
-        if (!keysPair.first.exists()) {
-            Timber
-                .tag("WalletKey")
-                .e("migration recovery incomplete: keys snapshot missing; seed recovery required")
-            return
+
+    internal fun discardMigrationSnapshots(walletBasePath: String) {
+        // The keys snapshot is the replay marker. A lone cache sidecar after a
+        // cleanup interruption must never overwrite the current wallet cache.
+        for ((snapshot, _) in migrationSnapshots(walletBasePath)) {
+            Files.deleteIfExists(snapshot.toPath())
+            Files.deleteIfExists(File(snapshot.path + ".tmp").toPath())
         }
-        keysPair.first.copyTo(keysPair.second, overwrite = true)
-        if (cachePair.first.exists()) {
-            cachePair.first.copyTo(cachePair.second, overwrite = true)
-        } else {
-            cachePair.second.delete()
-        }
-        snapshots.forEach { (snapshot, _) -> snapshot.delete() }
-        Timber.tag("WalletKey").w("migration interrupted; restored legacy keys and cache")
     }
 
     // (snapshot, live file) for the keys file and the cache, both password-keyed.

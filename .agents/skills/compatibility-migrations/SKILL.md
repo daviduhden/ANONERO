@@ -83,8 +83,13 @@ description: "Use when changing persisted formats, legacy compatibility paths, b
   and are replaced on successful unlock.
 - `PinThrottle` counts attempts before verification and uses the boot clock.
 - `WalletKey` snapshots `<wallet>.keys` and `<wallet>` to `.premigrate` during
-  migration; startup `recoverInterruptedMigration` either confirms and deletes the
-  snapshot or restores it.
+  migration, publishing the keys snapshot first and re-keying only after both
+  copies exist. Retain both recovery sources across failed copies and native
+  opens. A lone keys snapshot can precede cache capture. Preserve the live
+  cache in that case. A lone cache snapshot can follow interrupted cleanup
+  and must never overwrite the current cache. Retire the snapshots only
+  after verifying the live credential. Ciphertext presence alone cannot
+  establish that the Keystore can open the wallet.
 - Keystore aliases/prefixes (`MonerujoRSA`, `walletKey-`, `walletSecret-`, prefs file
   `wallet`) are compatibility contracts.
 

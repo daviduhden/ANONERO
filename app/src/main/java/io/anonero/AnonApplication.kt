@@ -34,7 +34,6 @@ import io.anonero.store.NodesRepository
 import io.anonero.ui.util.AnonLogTree
 import io.anonero.util.LocaleController
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WalletKey
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext.startKoin
@@ -113,11 +112,6 @@ class AnonApplication :
             ?.forEach { stale ->
                 if (!stale.delete()) Timber.tag(TAG).w("Could not clear stale backup archive")
             }
-        // recover a keystore migration interrupted by a crash, before any wallet open
-        runCatching {
-            val walletFile = AnonConfig.getDefaultWalletFile(this)
-            WalletKey.recoverInterruptedMigration(this, walletFile.path, walletFile.name)
-        }
     }
 
     private fun plantLog() {
