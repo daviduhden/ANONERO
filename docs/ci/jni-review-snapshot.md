@@ -35,3 +35,24 @@ Both the method names and descriptor argument types are derived from the
 source and compared to native `GetMethodID` declarations. CI mutations cover
 a changed descriptor and boxed primitive. Remaining export bytecode and
 callback execution require the real link and device checks.
+
+## JNI-PREVENTIVE-STATUS-02 — wallet status, credentials and persistence
+
+Static inspection at `bf1cf25` found unguarded wallet2 status reads, password
+verification/device queries, re-key and store calls. The combined wallet status
+copies a native string. Password and path conversions also allocate. A native
+exception during any of these calls could terminate a process holding an open
+wallet, including during a migration. This finding has no observed CI crash.
+Callers include transaction review, wallet refresh, backup and PIN migration.
+The assets are the process, wallet files and credentials. Input comes from local
+wallet files and the active session, and allocation can fail under memory
+pressure. Preserve the existing failure contracts and use fixed error text
+when native status itself is unavailable. The change creates no new external
+recipient, record, identifier, JNI signature or persisted format.
+
+The manual JNI diagnostics job checks the native exception boundaries. Both
+ARM builds and device tests with injected wallet2/allocation failures are
+required for runtime evidence. A false re-key or store result cannot establish
+that the files on disk are untouched. Keep the caller's rollback logic and
+snapshots when revisiting these exports. Rollback of the adapter and its source
+guards requires no data migration.

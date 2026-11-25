@@ -74,7 +74,9 @@ for model in ("Coins", "TransactionHistory"):
     end = text.index("\n}\n", start)
     body = text[start:end]
     if "catch (...)" not in body or "throwSnapshotFailure(env)" not in body:
-        failures.append(f"{model}: refresh must contain native exceptions and reject null snapshots")
+        failures.append(
+            f"{model}: refresh must contain native exceptions and reject null snapshots"
+        )
 
 # Collections can allocate before wallet2 itself is reached. Review the
 # complete export boundary, not just the wallet2 call.
@@ -122,6 +124,9 @@ if re.search(
 # These Boolean exports gate transport setup and the lock screen. Both argument
 # conversion and wallet2 failures must stay inside the export's catch boundary.
 for owner, operation, call in (
+    ("WalletManager", "verifyWalletPassword", "->verifyWalletPassword("),
+    ("Wallet", "setPassword", "->setPassword("),
+    ("Wallet", "store", "->store("),
     ("WalletManager", "setProxyJ", "->setProxy("),
     ("Wallet", "setProxyJ", "->setProxy("),
     ("Wallet", "initJ", "->init("),
@@ -133,10 +138,52 @@ for owner, operation, call in (
     end = code.index("\n}\n", start)
     before_try, _, implementation = code[start:end].partition("try {")
     native_call, _, fallback = implementation.partition("catch (...)")
-    if call in before_try or call not in native_call or "return JNI_FALSE;" not in fallback:
+    if (
+        call in before_try
+        or "std::string(" in before_try
+        or call not in native_call
+        or "return JNI_FALSE;" not in fallback
+    ):
         failures.append(f"{owner}.{operation}: native call must fail closed inside a catch")
     if operation == "initJ" and "upper_transaction_size_limit < 0" not in before_try:
         failures.append("Wallet.initJ: check size limit before converting to unsigned")
+
+# Scalar status reads and the status/error snapshot may be consulted during
+# recovery. A failed read must never grant access or report a ready wallet.
+for owner, operation, call, fallback in (
+    ("Wallet", "getStatusJ", "->status(", "Monero::Wallet::Status_Critical"),
+    ("Wallet", "getConnectionStatusJ", "->connected(", "return 0;"),
+    (
+        "Wallet",
+        "statusWithErrorString",
+        "->statusWithErrorString(",
+        "Monero::Wallet::Status_Critical",
+    ),
+    (
+        "PendingTransaction",
+        "getStatusJ",
+        "->status(",
+        "Monero::PendingTransaction::Status_Critical",
+    ),
+    (
+        "UnsignedTransaction",
+        "getStatusJ",
+        "->status(",
+        "Monero::UnsignedTransaction::Status_Critical",
+    ),
+    ("WalletManager", "queryWalletDeviceJ", "->queryWalletDevice(", "return -1;"),
+):
+    start = code.index(f"Java_io_anonero_model_{owner}_{operation}(")
+    end = code.index("\n}\n", start)
+    before_try, _, implementation = code[start:end].partition("try {")
+    native, _, failure = implementation.partition("catch (...)")
+    if (
+        call in before_try
+        or "std::string" in before_try
+        or call not in native
+        or fallback not in failure
+    ):
+        failures.append(f"{owner}.{operation}: preserve a failing status on native exception")
 
 # Seed and key exports also allocate before or during the wallet2 call. A
 # native failure must become a fixed JVM error, not a mnemonic fallback.
@@ -169,15 +216,29 @@ for operation, calls in (
 # Transaction review reads wallet2 summaries and totals before publishing a
 # signable or broadcastable model. Allocation failures must propagate as Java errors.
 for owner, operations in (
-    ("PendingTransaction", {
-        "getErrorString": "errorString", "getAmount": "amount", "getDust": "dust",
-        "getFee": "fee", "getFirstTxIdJ": "txid", "getTxCount": "txCount",
-    }),
-    ("UnsignedTransaction", {
-        "getErrorString": "errorString", "getAddress": "recipientAddress",
-        "getAmount": "amount", "getFee": "fee", "getFirstTxIdJ": "paymentId",
-        "getTxCount": "txCount", "confirmationMessageJ": "confirmationMessage",
-    }),
+    (
+        "PendingTransaction",
+        {
+            "getErrorString": "errorString",
+            "getAmount": "amount",
+            "getDust": "dust",
+            "getFee": "fee",
+            "getFirstTxIdJ": "txid",
+            "getTxCount": "txCount",
+        },
+    ),
+    (
+        "UnsignedTransaction",
+        {
+            "getErrorString": "errorString",
+            "getAddress": "recipientAddress",
+            "getAmount": "amount",
+            "getFee": "fee",
+            "getFirstTxIdJ": "paymentId",
+            "getTxCount": "txCount",
+            "confirmationMessageJ": "confirmationMessage",
+        },
+    ),
 ):
     for operation, method in operations.items():
         start = code.index(f"Java_io_anonero_model_{owner}_{operation}(")
@@ -185,8 +246,14 @@ for owner, operations in (
         preamble, _, implementation = code[start:end].partition("try {")
         native, _, failure = implementation.partition("catch (...)")
         call = f"->{method}("
-        if call in preamble or call not in native or "throwTransactionReviewFailure(env);" not in failure:
-            failures.append(f"{owner}.{operation}: review read must fail through the Java error path")
+        if (
+            call in preamble
+            or call not in native
+            or "throwTransactionReviewFailure(env);" not in failure
+        ):
+            failures.append(
+                f"{owner}.{operation}: review read must fail through the Java error path"
+            )
 
 # wallet2 does not serialize listener pointer swaps against callback delivery.
 listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")
@@ -212,7 +279,9 @@ if (
     or close_result.find("env->SetLongField(") < close_result.find("catch (...)")
     or close_result.find("delete listener;") < close_result.find("env->SetLongField(")
 ):
-    failures.append("WalletManager.closeJ: clear fields and free the listener after successful close")
+    failures.append(
+        "WalletManager.closeJ: clear fields and free the listener after successful close"
+    )
 
 if failures:
     raise SystemExit("\n".join(failures))

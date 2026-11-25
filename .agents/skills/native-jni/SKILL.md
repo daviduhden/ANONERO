@@ -137,6 +137,12 @@ A failed read must raise a fixed Java error rather than collapse into an ordinar
 zero, empty string, or empty summary. Publish review ownership only after the
 review model is built from the authoritative transaction data.
 
+Native status snapshots must also work on the error path. Keep wallet2 status
+reads and native string copies inside the exception boundary. On native
+failure use a critical status or disconnected result. Credential verification,
+re-key and store must preserve the existing failure signal so callers can
+recover without assuming the persisted file is unchanged.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and
