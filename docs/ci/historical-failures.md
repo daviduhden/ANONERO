@@ -2,8 +2,14 @@
 
 ## Run inventory
 
+[Job inventory](run-jobs.tsv) records the API result of each of the 395 jobs
+across these 51 runs, including skips and cancellations, with exact commit and
+job IDs. The platform and dependency pins for those revisions are described below.
+
 | Run | Workflow | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| [45691880970](https://github.com/daviduhden/ANONERO/actions/runs/45691880970) | Agent Knowledge Validation | `bf1cf25` | `workflow_dispatch` | success | none | Both owner and validation jobs passed. |
+| [45691880945](https://github.com/daviduhden/ANONERO/actions/runs/45691880945) | Tests | `bf1cf25` | `workflow_dispatch` | failure | Android Lint; Instrumented tests (API 35) | CI-039 recurred during Gradle configuration in both jobs. Neither produced test or lint reports. Seven jobs passed, including both ARM links and 133 JVM cases per flavor. |
 | [`45679643727`](https://github.com/daviduhden/ANONERO/actions/runs/45679643727) | Agent Knowledge Validation | `2ca0edb` | `workflow_dispatch` | success | none | Owner authorization, nine Python regressions, and worktree and committed-range checks passed. |
 | [`45679643013`](https://github.com/daviduhden/ANONERO/actions/runs/45679643013) | Tests | `2ca0edb` | `workflow_dispatch` | success | none | All nine jobs passed. Archived XML confirms 130 JVM and nine API 35 tests per flavor, with no failures, errors, or skips. Lint: 0 errors, 13 warnings per flavor. Maven retry was not exercised. |
 | [`45677087065`](https://github.com/daviduhden/ANONERO/actions/runs/45677087065) | Agent Knowledge Validation | `b85919b` | `workflow_dispatch` | success | none | Owner authorization and Python and committed-range checks passed. |
@@ -60,16 +66,15 @@ The two historical `push` triggers are no longer present.
 
 ### Provenance and platform coverage
 
-The paginated API returned 49 runs on 2026-11-25: 42 Tests runs (29 failed,
-eight succeeded and five cancelled) and seven successful Agent Knowledge
+The paginated API returned 51 runs on 2026-11-25: 43 Tests runs (30 failed,
+eight succeeded and five cancelled) and eight successful Agent Knowledge
 Validation runs. Every returned record is listed above, including the two
 historical push events. All records show attempt 1. The release workflow has no
 returned runs. The API supplied job inventories and readable log archives for
-all 49 records, but archives cannot supply steps that were skipped, cancelled
+the previous 49 records, but archives cannot supply steps that were skipped, cancelled
 before logging, or never uploaded. During the prior audit `gh run view --log`
 could not retrieve particular cancelled job logs for `42692271873` and
-`43632817394`. The JVM failure in the latter was available by job ID. As of this
-refresh the API lists 49 artifacts, none flagged expired. Previously listed
+`43632817394`. The JVM failure in the latter was available by job ID. The latest API listing counts 52 artifacts, including three for the new Tests run. Previously listed
 artifacts absent from this snapshot are unavailable via the current listing.
 Logs and selected reports were kept outside the repository.
 
@@ -90,7 +95,7 @@ dispatched Tests revisions use CMake 4.4.5, Boost 1.92.0 and zlib 1.4. Both pin
 OpenSSL 3.5.9. The individual run's exact inputs can be resolved from the linked
 SHA using `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties`,
 `app/build.gradle.kts`, `external-libs/build.sh` and the Monero gitlink.
-The [latest Tests log](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
+The [last fully green Tests log](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
 records Clang 21.0.0 for native compilation and API 29 ARM target wrappers. The
 emulator used API 35 `google_apis` x86_64 and completed boot in 30.9 seconds.
 Agent Knowledge Validation has two jobs and runs Python only, so Android and
@@ -1085,3 +1090,9 @@ The existing Unit-returning extension cannot observe write failure.
 This does not establish warning-free third-party builds. Native ASan/UBSan/TSan/LSan,
 fuzzing, ARM hardware execution, API 29 device execution and production
 signing remain without positive Actions evidence.
+
+The five W-009 preference write sites now share an editor helper returning the
+synchronous commit result. PIN throttling, transport persistence, LWS and node
+selection still observe storage failure. A clock-rebase write failure is covered
+by an instrumented regression. The eight dependency advisories remain under
+upstream review. The next completed lint XML must confirm the new counts.

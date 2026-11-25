@@ -9,7 +9,7 @@ validation.
 - Repository: `daviduhden/ANONERO`, default branch `main`.
 - Workflows: `Tests`, `Build and publish APKs` and `Agent Knowledge Validation`. All are
   manual-only and owner-gated.
-- Current evidence:
+- Historical baselines (see Latest evidence below):
   - `43528256395` (`0cf9db0`) — all jobs pass, including instrumented; anon and nero each
     ran one smoke test with zero failures. Boot took 919 s; lint is 0/0, 62 JVM tests per
     flavor, and the adapter compiles under `-Werror`.
@@ -43,6 +43,8 @@ validation.
 - [Seed and key JNI containment](seed-jni-boundary.md)
 - [QR frame ownership and received transaction details](qr-frame-and-transaction-detail.md)
 - [PIN persistence and transaction Parcel](pin-throttle-and-transaction-parcel.md)
+- [LWS reconnect and wallet ownership](lws-session-reapply.md)
+- [Dependency caching and Debug APK verification](gradle-cache.md)
 - [Managed wallet lifetime](managed-wallet-lifetime.md)
 - [UI session boundaries and animated QR lifecycle](ui-session-boundaries.md)
 - [JNI review snapshots](jni-review-snapshot.md)
@@ -67,6 +69,14 @@ or evidence for the uncommitted working tree. Current CI source uses only workfl
 release embeds synchronized required jobs. See [iteration](../development-iteration-2026-11.md).
 
 ## Latest evidence
+
+- [Tests 45691880945](https://github.com/daviduhden/ANONERO/actions/runs/45691880945)
+  on `bf1cf25` built both ARM native archives with Clang 21 and linked both Debug
+  flavors. Archived JUnit XML records 133 cases per flavor with zero failures,
+  errors or skips. Android Lint and API 35 instrumentation both stopped at Maven
+  Central HTTP 429 before their tasks ran. Their latest completed reports remain
+  those from `2ca0edb`. See the [CI-039 cache diagnosis](gradle-cache.md). [Knowledge validation](https://github.com/daviduhden/ANONERO/actions/runs/45691880970)
+  passed at `bf1cf25`.
 
 - [Tests 45679643013](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
   on `2ca0edb` passed all nine jobs. Both debug APKs linked against the ARM
@@ -104,7 +114,7 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
 - [Agent Knowledge Validation 44927810481](https://github.com/daviduhden/ANONERO/actions/runs/44927810481)
   on `75939ea` passed the Python regression and knowledge checks. It did not
   execute Android tests.
-- The [historical inventory](historical-failures.md) covers all 49 API records,
+- The [historical inventory](historical-failures.md) covers all 51 API records,
   including successful runs with warnings, incomplete logs and artifact evidence.
   No production signing, sanitizer, fuzz or device-farm execution was found.
 

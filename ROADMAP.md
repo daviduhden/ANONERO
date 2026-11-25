@@ -6,6 +6,8 @@ required constraints, alongside correctness, compatibility and maintainability.
 
 ## 1. Fund-safety and lifecycle hardening
 
+- Exercise failed password rollback, process restart and snapshot recovery on the same legacy wallet fixture before accepting device migration.
+
 - Keep the wallet lifecycle transactional: no partial MAIN profile, wrapped secret, or
   credential set may survive a failed create/restore.
 - Add tests for failed creation, interrupted Keystore migration, restore-target rejection,

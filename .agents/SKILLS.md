@@ -87,3 +87,9 @@ auxiliary ownership, snapshot contracts, UI/payment correctness and dispatch-onl
 Knowledge synchronization is checked by `scripts/validate-agent-knowledge.py`. Every
 skill must retain its Maintenance & Continuous Learning section and current name and
 description frontmatter. The gate checks text structure, not procedural correctness.
+
+For failed wallet re-key or restore, use compatibility-migrations for snapshot
+replay and cryptographic-security for credential rollback. For a delayed LWS
+reconnect, use monero-lws to trace the initiating profile through the transport
+wait. For a missing lint or instrumentation report, use github-actions to trace
+the first failed dependency request and the job that wrote its cache.

@@ -5,6 +5,8 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## November 25 CI and preventive follow-up
 
+- At `bf1cf25`, 133 JVM tests per flavor passed, including the new managed-slot regressions. Native builds and APK assembly passed. Maven Central throttled Android Lint and instrumented APK preparation before either produced results.
+
 - Tests `45679643013` passed on `2ca0edb` with Android API 35 instrumentation, and
   `45679643727` passed the agent-knowledge checks at the same SHA. The archived
   reports record 130 JVM tests and nine instrumented tests per flavor.
@@ -12,6 +14,12 @@ records progress; it is not a release note and does not claim CI validation.
   native close failures, checks JNI callback descriptors, contains native transaction
   review exceptions, and binds sensitive UI actions to their wallet session. See
   [CI findings and coverage](docs/ci/README.md). New regressions require authorized CI.
+
+The follow-up adds success-only Gradle dependency caching, Debug APK ABI
+inspection, checked preference writes, wallet migration replay and backup-copy
+rollback. PIN operations, destructive profile changes and LWS reconfiguration
+now carry the originating session through the affected paths. CI has not run
+these changes. The [CI index](docs/ci/README.md) links the source evidence.
 
 ## Completed in the current cycle
 

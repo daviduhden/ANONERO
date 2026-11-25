@@ -219,3 +219,10 @@ The current source includes SOCKS5 negotiation before external proxy readiness,
 wallet-chain-aware node selection, and stale LWS startup/reapply guards. The native
 adapter rejects unreadable message input and contains exceptions during transaction
 input conversion. See [iteration and evidence](../development-iteration-modernization.md).
+
+### Evidence after the bf1cf25 build
+
+Both Debug flavors linked for the ARM targets, and both JVM suites passed.
+The lint and instrumented jobs stopped during dependency resolution. The
+[CI inventory](../ci/README.md) distinguishes this revision from subsequent
+source changes to authentication, snapshot recovery and network session checks.

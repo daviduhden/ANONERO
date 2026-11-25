@@ -279,6 +279,8 @@ threat models, regression requirements and remaining boundaries.
 
 ## 6. Error handling and logging
 
+Treat a failed credential rollback as an uncertain wallet state. Preserve recovery files until the wallet is closed and recovery succeeds. Require a report from each expected flavor before attributing a lint or device result to a revision.
+
 - Preserve coroutine cancellation: catch `CancellationException` and rethrow it.
 - Do not swallow exceptions that indicate an inconsistent wallet, profile, or proxy
   state. Log a redacted technical message and return a failed result.

@@ -5,6 +5,8 @@ the rationale to `ROADMAP.md`.
 
 ## Critical
 
+- [ ] Verify both Lint reports and both API 35 test XMLs after the dependency-cache correction. Include rollback failure during legacy re-key in the device migration suite.
+
 - [ ] Validate managed-wallet close/replacement and incomplete profile deletion with
       the JVM and device cases in [MW-001](docs/ci/managed-wallet-lifetime.md).
 
