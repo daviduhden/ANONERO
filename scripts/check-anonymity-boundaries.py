@@ -66,6 +66,12 @@ end = backup.index("val manager =", start)
 if "check(!AnonConfig.viewOnly)" not in backup[start:end] or "if (WalletSession.isDecoy)" not in backup[start:end]:
     failures.append("Backup export must reject view-only/decoy contexts before auxiliary wallet access")
 
+# A non-OK restore handle must close before the next credential attempt.
+start = backup.index("private fun bindRestoredWallet(")
+retry = backup.index("opened = openRestoredWallet(manager, walletFile, pin)", start)
+if "if (opened != null && !closeRestoredWallet(manager, opened)) return null" not in backup[start:retry]:
+    failures.append("Legacy backup retry must confirm that the previous wallet closed")
+
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
 app = manifest.find("application")

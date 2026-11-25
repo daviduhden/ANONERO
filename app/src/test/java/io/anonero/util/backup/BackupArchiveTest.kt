@@ -157,6 +157,42 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun `restore archives are confined to private staging and removed after use`() {
+        val staging = tmp.newFolder("tmp_backup")
+        val retained = File(staging, "retained-copy").apply { writeText("retained fixture") }
+        val contents =
+            BackupArchive.withTemporaryRestoreArchive(tmp.root) { scratch ->
+                assertEquals(staging, scratch.parentFile)
+                File(scratch, "backup.zip").apply { writeText("archive fixture") }.readText()
+            }
+        assertEquals("archive fixture", contents)
+        assertEquals(setOf(retained), staging.listFiles()!!.toSet())
+    }
+
+    @Test
+    fun `restore staging is removed even after partial archive failure`() {
+        expectRejected {
+            BackupArchive.withTemporaryRestoreArchive(tmp.root) { scratch ->
+                File(scratch, "backup.zip").writeText("partial fixture")
+                throw IOException("archive read failed")
+            }
+        }
+        assertTrue(File(tmp.root, "tmp_backup").listFiles()!!.isEmpty())
+    }
+
+    @Test
+    fun `restore staging rejects a symbolic link parent`() {
+        val target = tmp.newFolder("target")
+        Files.createSymbolicLink(File(tmp.root, "tmp_backup").toPath(), target.toPath())
+        expectRejected {
+            BackupArchive.withTemporaryRestoreArchive(tmp.root) {
+                fail("Archive must not be written through the link")
+            }
+        }
+        assertTrue(target.listFiles()!!.isEmpty())
+    }
+
+    @Test
     fun `staging cleanup does not follow symbolic links`() {
         val outside = tmp.newFolder("keep")
         val sentinel = File(outside, "sentinel").apply { writeText("keep fixture") }

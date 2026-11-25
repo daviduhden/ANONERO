@@ -186,14 +186,19 @@ path.
 
 ## 8. Backups
 
-- The current writer emits v3: PBKDF2-HMAC-SHA256 at 600,000 iterations, AES-256-GCM, a
-  12-byte IV, and a 128-bit tag. The wallet copy is re-keyed to the seed passphrase; the live
-  wallet is not touched.
-- v1 (`Salted__`, 11,000 iterations, AES-CBC) and v2 AEAD/PIN-keyed backups remain readable.
-  Do not write new data with v1.
-- `BackupArchive` accepts only flat `anon.json`, `<wallet>`, and `<wallet>.*` entries. It
-  rejects symlinks, duplicate names, traversal, and non-fresh destinations, and validates all
-  entries before writing plaintext.
+- Export uses `ANONBAK2` with PBKDF2-HMAC-SHA256 at 600,000 iterations, AES-256-GCM,
+  a 12-byte IV and a 128-bit tag. The payload version identifies the copied wallet's
+  credential. Version 3 re-keys the copy to the seed passphrase. Version 2 preserves
+  the legacy PIN. The live wallet keeps its existing secret.
+- The reader also accepts v1 (`Salted__`, 11,000 iterations, AES-CBC). That envelope
+  has no authentication tag.
+- `BackupArchive` accepts flat `anon.json`, `<wallet>` and `<wallet>.*` entries.
+  It rejects duplicate names, traversal and non-fresh destinations. It checks entries
+  before extraction, then copies their contents to regular files without restoring
+  ZIP attributes.
+- Restore stages the decrypted ZIP under app-private `tmp_backup` and removes it
+  before publishing the preview. A failed native close prevents a legacy PIN retry
+  and defers deletion of the managed wallet’s files.
 - The decoy cannot be exported through this path because a restore targets MAIN; use the
   decoy seed instead.
 - `BackupHelper.createBackUp` clears only transient backup/airgapped artifacts, preserving

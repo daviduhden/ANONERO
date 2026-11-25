@@ -85,7 +85,10 @@ import io.anonero.util.backup.BackupHelper
 import io.anonero.util.backup.NetworkMismatchException
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -116,15 +119,24 @@ fun RestorePreview(
     var showPinSetup by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    val previewOwner = remember { Job() }
     val errorShake = rememberShakeController()
     val view = LocalView.current
 
-    // The extracted backup (anon.json holds the plaintext seed) must not outlive this
-    // screen, whether the user backs out or the restore fails.
-    DisposableEffect(Unit) {
+    DisposableEffect(previewOwner) {
         onDispose {
-            runCatching { BackupHelper.cleanCacheDir(preserveTransport = true) }
-                .onFailure { Timber.tag(TAG).w("Restore cache cleanup deferred") }
+            previewOwner.cancel()
+            // Wait for any active operation. This cleanup must outlive the screen scope
+            // and can remove only the files still owned by this preview.
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    BackupHelper.discardRestorePreview(previewOwner)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    Timber.tag(TAG).w("Restore cache cleanup deferred")
+                }
+            }
         }
     }
 
@@ -134,8 +146,10 @@ fun RestorePreview(
                 loading = true
                 passphraseDialog = false
                 loadingMessage = R.string.extracting_backup
-                backupPayload = BackupHelper.extractBackUp(backUpPath, passPhrase)
+                backupPayload = BackupHelper.extractBackUp(previewOwner, backUpPath, passPhrase)
                 loading = false
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: NetworkMismatchException) {
                 errorMessage = R.string.invalid_network
                 loading = false
@@ -623,12 +637,20 @@ fun RestorePreview(
                         loadingMessage = R.string.restoring_wallet
                         val success = BackupHelper.restoreBackUp(backupPayload!!, passPhrase, pin)
                         if (success) {
-                            BackupHelper.cleanCacheDir(preserveTransport = true)
+                            try {
+                                BackupHelper.discardRestorePreview(previewOwner)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                Timber.tag(TAG).w("Restore cache cleanup deferred")
+                            }
                             delay(1000)
                             withContext(Dispatchers.Main) { oNextPressed() }
                         } else {
                             withContext(Dispatchers.Main) { errorMessage = R.string.restore_failed }
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         Timber.tag(TAG).e("Backup restore failed")
                         withContext(Dispatchers.Main) {

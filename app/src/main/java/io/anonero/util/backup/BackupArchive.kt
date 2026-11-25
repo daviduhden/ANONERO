@@ -30,9 +30,9 @@ import java.util.zip.ZipFile
 /**
  * Extracts the flat MAIN-wallet layout emitted by ANONERO, without replacing files.
  *
- * Every entry is validated before writing: names must be the metadata file, the wallet
- * base, or a wallet sidecar, with no directory separators, traversal, duplicates, or
- * symlinks. A failed extraction removes only the generated staging tree.
+ * Entry names are checked against the flat layout before writing. Extraction creates
+ * regular files in a fresh staging directory and copies entry bytes without restoring
+ * ZIP file attributes. On failure it attempts to remove only that staging tree.
  */
 internal object BackupArchive {
     private const val METADATA_NAME = "anon.json"
@@ -104,6 +104,8 @@ internal object BackupArchive {
                     zip.getInputStream(entry).use { input ->
                         output.outputStream().use { out ->
                             val buffer = ByteArray(64 * 1024)
+                            // Bound actual decompression even when the archive's size
+                            // metadata is absent or inaccurate.
                             var entryTotal = 0L
                             while (true) {
                                 val read = input.read(buffer)
@@ -125,6 +127,31 @@ internal object BackupArchive {
                     e.addSuppressed(cleanup)
                 }
                 throw e
+            }
+        }
+    }
+
+    internal fun <T> withTemporaryRestoreArchive(
+        cacheDir: File,
+        action: (File) -> T,
+    ): T {
+        val root = File(cacheDir, "tmp_backup").toPath()
+        if (Files.isSymbolicLink(root)) throw IOException("Invalid backup staging directory")
+        Files.createDirectories(root)
+        // Do not reuse or delete export scratch: it can contain a retained wallet.
+        val scratch = Files.createTempDirectory(root, "restore-").toFile()
+        var failure: Throwable? = null
+        try {
+            return action(scratch)
+        } catch (e: Throwable) {
+            failure = e
+            throw e
+        } finally {
+            try {
+                removeExtractionDirectory(scratch)
+            } catch (cleanup: Exception) {
+                val original = failure ?: throw cleanup
+                original.addSuppressed(cleanup)
             }
         }
     }

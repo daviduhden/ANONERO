@@ -113,6 +113,13 @@ closure before success; no KDF/backup-format change is implied. Backup export re
 and DECOY before inspecting MAIN scratch state. Retained scratch password transitions are
 not independently proven atomic; do not claim stronger at-rest/zeroization guarantees.
 
+Restore preview stages its encrypted input and plaintext ZIP in a fresh child of
+`cache/tmp_backup`. Remove the child before exposing preview metadata. The startup purge
+remains necessary after a crash. Keep the archive outside FileProvider paths, and never
+reuse retained export wallet files as restore scratch. For legacy credential retries, a
+non-OK native handle still owns its backing wallet. Stop on false or throwing close and
+preserve the wallet's files and credentials.
+
 ## Production signing keys
 
 The release runbook defines certificate pinning, two independent PKCS#12 stores,
