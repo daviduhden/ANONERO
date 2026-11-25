@@ -133,7 +133,7 @@ class OnboardViewModel(
     fun getSeed() = walllet?.getSeed(passPhrase) ?: ""
 
     suspend fun create(pin: String) {
-        WalletProfileStore.mainProvisioning.withLock {
+        WalletProfileStore.provisioning.withLock {
             if (AnonConfig.context == null) return
             withContext(Dispatchers.IO) {
                 requirePinNotDuress(pin)
@@ -183,7 +183,7 @@ class OnboardViewModel(
     }
 
     suspend fun createViewOnly(pin: String) {
-        WalletProfileStore.mainProvisioning.withLock {
+        WalletProfileStore.provisioning.withLock {
             val payload =
                 neroKeyPayload
                     ?: throw IllegalStateException("view-only key payload missing")
@@ -253,7 +253,7 @@ class OnboardViewModel(
     fun getRestorePayload(): RestorePayload? = restorePayload
 
     suspend fun restoreFromSeed(pin: String) {
-        WalletProfileStore.mainProvisioning.withLock {
+        WalletProfileStore.provisioning.withLock {
             val payload =
                 restorePayload
                     ?: throw IllegalStateException("restore payload missing")

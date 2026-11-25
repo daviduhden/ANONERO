@@ -504,7 +504,7 @@ object BackupHelper {
         passPhrase: String,
         pin: String,
     ): Boolean =
-        WalletProfileStore.mainProvisioning.withLock {
+        WalletProfileStore.provisioning.withLock {
             backupMutex.withLock {
                 // A newer preview can replace the staged files between preview and restore.
                 val preview = activePreview ?: return false

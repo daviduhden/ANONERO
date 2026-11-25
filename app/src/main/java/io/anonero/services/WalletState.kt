@@ -33,6 +33,7 @@ import io.anonero.ui.util.getAllUsedSubAddresses
 import io.anonero.ui.util.getLatestSubAddress
 import io.anonero.util.SecureClipboard
 import io.anonero.util.WalletKey
+import io.anonero.util.WalletPinSession
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
@@ -431,46 +432,52 @@ class WalletState {
      * which for a keystore-bound wallet is the device secret, not the PIN; only a legacy
      * wallet that never migrated is still keyed to the PIN.
      */
-    suspend fun exitBackgroundSync(pin: String): Boolean =
+    internal suspend fun exitBackgroundSync(
+        pin: String,
+        owner: WalletPinSession?,
+    ): Boolean =
         bgSyncMutex.withLock {
             if (nativeBackgroundSync == NativeBackgroundSync.FAULT) return false
-            val wallet = getWallet ?: return false
-            // An overlay can be active without native background sync, such as while a
-            // session is still starting. A recorded native fault is rejected above.
-            if (!backgroundSyncRunning) {
-                _backgroundSync.value = false
-                update()
-                return true
-            }
-            if (AnonConfig.viewOnly) {
-                _backgroundSync.value = false
-                nativeBackgroundSync = NativeBackgroundSync.NOT_ATTEMPTED
-                update()
-                return true
-            }
-            _blockUpdates.set(true)
-            try {
-                val context = AnonConfig.context ?: return false
-                val walletName = WalletProfileStore.activeWalletName(context)
-                val password =
-                    if (WalletKey.exists(context, walletName)) WalletKey.load(context, walletName) else pin
-                if (wallet.stopBackgroundSync(password)) {
+            val context = AnonConfig.context ?: return false
+            WalletProfileStore.tryProfileMutation(onBusy = { false }) {
+                if (owner == null || !owner.current()) return false
+                val wallet = owner.wallet
+                // An overlay can be active without native background sync, such as while a
+                // session is still starting. A recorded native fault is rejected above.
+                if (!backgroundSyncRunning) {
+                    _backgroundSync.value = false
+                    update()
+                    return true
+                }
+                if (AnonConfig.viewOnly) {
                     _backgroundSync.value = false
                     nativeBackgroundSync = NativeBackgroundSync.NOT_ATTEMPTED
                     update()
-                    if (!offline && isTransportApplied(wallet)) wallet.startRefresh()
-                    Timber.tag(TAG).i("Exited background sync")
                     return true
                 }
-                Timber.tag(TAG).e("stopBackgroundSync returned false")
-                return false
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                Timber.tag(TAG).e("stopBackgroundSync error")
-                return false
-            } finally {
-                _blockUpdates.set(false)
+                _blockUpdates.set(true)
+                try {
+                    val walletName = owner.profile.walletName
+                    val password =
+                        if (WalletKey.exists(context, walletName)) WalletKey.load(context, walletName) else pin
+                    if (wallet.stopBackgroundSync(password)) {
+                        _backgroundSync.value = false
+                        nativeBackgroundSync = NativeBackgroundSync.NOT_ATTEMPTED
+                        update()
+                        if (!offline && isTransportApplied(wallet)) wallet.startRefresh()
+                        Timber.tag(TAG).i("Exited background sync")
+                        return true
+                    }
+                    Timber.tag(TAG).e("stopBackgroundSync returned false")
+                    return false
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    Timber.tag(TAG).e("stopBackgroundSync error")
+                    return false
+                } finally {
+                    _blockUpdates.set(false)
+                }
             }
         }
 

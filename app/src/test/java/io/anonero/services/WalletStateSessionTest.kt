@@ -47,7 +47,7 @@ class WalletStateSessionTest {
             assertTrue(state.offline)
             assertFalse(state.backgroundSyncRunning)
             assertEquals(WalletProfile.MAIN, state.profile.first())
-            assertFalse(state.exitBackgroundSync(""))
+            assertFalse(state.exitBackgroundSync("", null))
 
             state.resetSession(WalletProfile.MAIN)
 

@@ -242,13 +242,13 @@ class MainActivity : ComponentActivity() {
                                 modifier =
                                     androidx.compose.ui.Modifier
                                         .fillMaxSize(),
-                                onUnLocked = { pin, shortCut ->
+                                onVerified = { owner, pin, shortCut ->
                                     // The lock screen stays up until wallet2 has actually left
                                     // background sync; hiding it first showed a wallet that
                                     // looked unlocked but had no spend key.
-                                    val profile = WalletSession.profile
+                                    val profile = owner.profile
                                     scope.launch(Dispatchers.IO) {
-                                        val exited = walletState.exitBackgroundSync(pin)
+                                        val exited = walletState.exitBackgroundSync(pin, owner)
                                         withContext(Dispatchers.Main) {
                                             if (!exited) {
                                                 android.widget.Toast

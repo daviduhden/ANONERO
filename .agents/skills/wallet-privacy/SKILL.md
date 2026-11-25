@@ -195,3 +195,16 @@ If native background sync cannot start, keep the faulted session locked and
 offline. Proxy and node setup must check the fault after asynchronous acquisition
 and before enabling network activity. Require fresh authenticated wallet opening
 to clear the fault.
+
+Run authenticated profile deletion in the successful managed-close callback,
+under the slot monitor and the auxiliary path guard. Resolve the manager before
+entering the monitor. An idle check after close permits a second session to open
+and close before the old request deletes its replacement. Keep suspending
+shared-store cleanup and wallet2 shutdown outside the slot monitor.
+
+Decoy provisioning, explicit recovery removal and duress credential changes share
+one process-wide provisioning mutex with MAIN setup and authenticated wipe. A recovery close must never
+run against the auxiliary wallet of a still-active setup. Check for orphaned
+files, snapshots and credentials under that guard before writing a new secret.
+Verify the synchronous preference commit before publishing creation or PIN
+change success.

@@ -67,14 +67,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
-import androidx.core.content.edit
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
 import io.anonero.AnonConfig
 import io.anonero.BuildConfig
 import io.anonero.R
-import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.ui.components.SettingsActionItem
 import io.anonero.ui.components.SettingsSectionHeader
@@ -96,12 +94,15 @@ import io.anonero.ui.theme.ThemeMode
 import io.anonero.ui.theme.ThemeStore
 import io.anonero.util.AppLanguage
 import io.anonero.util.LocaleController
-import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
 import io.anonero.util.StealthMode
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WalletKey
+import io.anonero.util.WalletPinSession
+import io.anonero.util.WalletProfile
+import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
+import io.anonero.util.commitEdit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -123,7 +124,7 @@ fun SettingsPage(
     val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val toastState = rememberToasterState()
     var showLockScreen by remember { mutableStateOf(false) }
-    var newPinDialog by remember { mutableStateOf(false) }
+    var pinChangeOwner by remember { mutableStateOf<WalletPinSession?>(null) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var stealthEnabled by remember { mutableStateOf(StealthMode.isEnabled(prefs)) }
@@ -145,7 +146,7 @@ fun SettingsPage(
     LaunchedEffect(locked) {
         if (locked) {
             showLockScreen = false
-            newPinDialog = false
+            pinChangeOwner = null
             showThemeDialog = false
             showLanguageDialog = false
         }
@@ -168,14 +169,15 @@ fun SettingsPage(
             LockScreen(
                 mode = LockScreenMode.VERYFY_PIN,
                 modifier = Modifier.fillMaxHeight(0.95f),
-                onUnLocked = { _, shortCut ->
+                onVerified = { owner, _, _ ->
                     showLockScreen = false
-                    newPinDialog = true
+                    pinChangeOwner = owner
                 },
             )
         }
     }
-    if (newPinDialog && !locked) {
+    val owner = pinChangeOwner
+    if (owner != null && !locked) {
         Dialog(
             properties =
                 DialogProperties(
@@ -186,7 +188,7 @@ fun SettingsPage(
                     securePolicy = SecureFlagPolicy.SecureOn,
                 ),
             onDismissRequest = {
-                if (!pinChangeInProgress) newPinDialog = false
+                if (!pinChangeInProgress) pinChangeOwner = null
             },
         ) {
             PinSetup(
@@ -200,47 +202,19 @@ fun SettingsPage(
                             val changed =
                                 withContext(Dispatchers.IO) {
                                     try {
-                                        // A keystore-bound wallet is encrypted with the device
-                                        // secret W, so changing the PIN only re-writes the gate
-                                        // hash and W is untouched. A wallet whose migration has
-                                        // not happened yet is still encrypted with the PIN
-                                        // itself: re-key it first, or the next open with the
-                                        // new PIN fails and the user is locked out.
-                                        val duressHash =
-                                            prefs.getString(
-                                                io.anonero.util.PREFS_DURESS_PIN_HASH,
-                                                "",
-                                            )
-                                        if (!WalletSession.isDecoy && !duressHash.isNullOrEmpty() &&
-                                            PinHash.matches(newPin, duressHash)
-                                        ) {
-                                            throw Exception("The normal PIN must differ from the duress PIN")
-                                        }
-                                        if (WalletSession.isDecoy &&
-                                            PinHash.matches(newPin, prefs.getString(PREFS_PIN_HASH, ""))
-                                        ) {
-                                            throw Exception("The duress PIN must differ from the normal PIN")
-                                        }
-                                        val context = AnonConfig.context!!
-                                        val walletName =
-                                            io.anonero.util.WalletProfileStore
-                                                .activeWalletName(context)
-                                        if (!WalletKey.exists(context, walletName)) {
-                                            val wallet =
-                                                WalletManager.instance?.wallet
-                                                    ?: throw Exception("wallet not open")
-                                            if (!wallet.setPassword(newPin)) {
-                                                throw Exception("setPassword failed: ${wallet.status.errorString}")
+                                        WalletProfileStore.tryProfileMutation(onBusy = { false }) {
+                                            val context = AnonConfig.context ?: return@tryProfileMutation false
+                                            val other = if (owner.profile.isDecoy) WalletProfile.MAIN else WalletProfile.DECOY
+                                            val otherHash = prefs.getString(WalletProfileStore.pinHashKey(other), null)
+                                            if ((!otherHash.isNullOrEmpty() && PinHash.matches(newPin, otherHash)) ||
+                                                !WalletKey.exists(context, owner.profile.walletName)
+                                            ) {
+                                                return@tryProfileMutation false
                                             }
+                                            val hash = PinHash.hash(newPin)
+                                            owner.current() && !walletState.backgroundSync && !walletState.backgroundSyncRunning &&
+                                                prefs.commitEdit { putString(WalletProfileStore.pinHashKey(owner.profile), hash) }
                                         }
-                                        prefs.edit(commit = true) {
-                                            putString(
-                                                io.anonero.util.WalletProfileStore
-                                                    .activePinHashKey(),
-                                                PinHash.hash(newPin),
-                                            )
-                                        }
-                                        true
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                         throw cancelled
                                     } catch (_: Exception) {
@@ -254,7 +228,7 @@ fun SettingsPage(
                             } else {
                                 toastState.show(pinChangeErrorMessage, type = ToastType.Error)
                             }
-                            newPinDialog = false
+                            pinChangeOwner = null
                             pinChangeInProgress = false
                         }
                     }

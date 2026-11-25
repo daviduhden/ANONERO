@@ -57,6 +57,18 @@ class RestoreTargetTest {
     }
 
     @Test
+    fun `decoy creation preserves orphaned decoy keys beside the main wallet`() {
+        val directory = tmp.newFolder("wallets")
+        File(directory, "anon.keys").writeText("main fixture")
+        RestoreTarget.requireEmpty(directory, "anon-alt", false, false)
+        val key = File(directory, "anon-alt.keys.premigrate").apply { writeText("decoy fixture") }
+        assertThrows(RestoreTargetNotEmptyException::class.java) {
+            RestoreTarget.requireEmpty(directory, "anon-alt", false, false)
+        }
+        assertEquals("decoy fixture", key.readText())
+    }
+
+    @Test
     fun `each MAIN artifact blocks restore without deleting it`() {
         val names = listOf("anon", "anon.keys", "anon.address.txt", "anon.premigrate", "anon.keys.premigrate")
         names.forEachIndexed { index, name ->

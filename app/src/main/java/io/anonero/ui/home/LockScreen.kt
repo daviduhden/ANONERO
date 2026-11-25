@@ -75,18 +75,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import io.anonero.R
 import io.anonero.icons.AnonIcons
+import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.ui.MainActivity
 import io.anonero.ui.viewmodels.AppViewModel
-import io.anonero.util.PREFS_PIN_HASH
-import io.anonero.util.PinHash
 import io.anonero.util.PinThrottle
 import io.anonero.util.ShakeConfig
 import io.anonero.util.WALLET_PREFERENCES
-import io.anonero.util.WalletProfileStore
+import io.anonero.util.WalletPinSession
+import io.anonero.util.WalletSession
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
 import io.anonero.util.shuffleExcept
@@ -148,10 +147,11 @@ private const val TAG = "LockScreen"
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LockScreen(
+internal fun LockScreen(
     modifier: Modifier = Modifier,
     mode: LockScreenMode = LockScreenMode.OPEN_WALLET,
     onUnLocked: (String, LockScreenShortCut) -> Unit = { _, _ -> },
+    onVerified: (WalletPinSession, String, LockScreenShortCut) -> Unit = { _, pin, shortcut -> onUnLocked(pin, shortcut) },
 ) {
     val view = LocalView.current
     val activity = LocalActivity.current
@@ -211,6 +211,8 @@ fun LockScreen(
         val pin = currentPin.joinToString(separator = "")
         if (pin.length >= 4) {
             if (!checkingPin.compareAndSet(false, true)) return
+            val profile = WalletSession.profile
+            val owner = if (mode == LockScreenMode.OPEN_WALLET) null else WalletManager.instance?.wallet
             scope
                 .launch(Dispatchers.IO) {
                     var wait = 0L
@@ -221,62 +223,32 @@ fun LockScreen(
                             withContext(Dispatchers.Main) { showError() }
                             return@launch
                         }
-                        if (mode == LockScreenMode.VERYFY_PIN) {
-                            val prefsHash = prefs.getString(WalletProfileStore.activePinHashKey(), "")
-                            if (PinHash.matches(pin, prefsHash)) {
+                        if (mode == LockScreenMode.OPEN_WALLET) {
+                            if (appViewModel.openWallet(pin)) {
                                 PinThrottle.reset(prefs)
-                                // a legacy value is the reversible encoding; replace it now,
-                                // while the PIN is in hand
-                                if (PinHash.isLegacy(prefsHash)) {
-                                    prefs.edit(commit = true) {
-                                        putString(WalletProfileStore.activePinHashKey(), PinHash.hash(pin))
-                                    }
-                                }
-                                withContext(Dispatchers.Main) { onUnLocked(pin, shortCut) }
-                            } else {
                                 withContext(Dispatchers.Main) {
-                                    showError()
-                                }
-                            }
-                        } else if (mode == LockScreenMode.OPEN_WALLET) {
-                            val result = appViewModel.openWallet(pin)
-                            // persist the gate hash only for a PIN that actually opened --
-                            // writing it for a wrong PIN would corrupt it. Hashed here, off the
-                            // main thread: 210k PBKDF2 rounds would freeze the UI.
-                            if (result) {
-                                PinThrottle.reset(prefs)
-                                prefs.edit(commit = true) {
-                                    putString(WalletProfileStore.activePinHashKey(), PinHash.hash(pin))
-                                }
-                            }
-                            withContext(Dispatchers.Main) {
-                                if (result) {
                                     appViewModel.startService()
-                                    withContext(Dispatchers.Main) {
-                                        onUnLocked(pin, shortCut)
-                                        (activity as MainActivity).startNotificationService()
-                                    }
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        showError()
-                                    }
+                                    onUnLocked(pin, shortCut)
+                                    (activity as MainActivity).startNotificationService()
                                 }
+                            } else {
+                                withContext(Dispatchers.Main) { showError() }
                             }
                         } else {
-                            // if wallet is already open, stop background sync from lock screen
-
-                            // Verify PIN locally against stored hash — instant, no network needed.
-                            val prefsHash = prefs.getString(WalletProfileStore.activePinHashKey(), "")
-                            if (!PinHash.matches(pin, prefsHash)) {
+                            val verified = owner?.let { WalletPinSession.verify(it, profile, prefs, pin) }
+                            if (verified == null) {
                                 withContext(Dispatchers.Main) { showError() }
                             } else {
                                 PinThrottle.reset(prefs)
-                                if (PinHash.isLegacy(prefsHash)) {
-                                    prefs.edit(commit = true) {
-                                        putString(WalletProfileStore.activePinHashKey(), PinHash.hash(pin))
+                                withContext(Dispatchers.Main) {
+                                    val unlocked = !walletState.backgroundSync && !walletState.backgroundSyncRunning
+                                    val allowed = mode == LockScreenMode.LOCK_SCREEN || unlocked
+                                    if (verified.current() && allowed) {
+                                        onVerified(verified, pin, shortCut)
+                                    } else {
+                                        showError()
                                     }
                                 }
-                                withContext(Dispatchers.Main) { onUnLocked(pin, shortCut) }
                             }
                         }
                     } catch (cancelled: CancellationException) {

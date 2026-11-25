@@ -21,6 +21,7 @@ package io.anonero.util
 import android.content.Context
 import android.content.SharedPreferences
 import io.anonero.AnonConfig
+import io.anonero.model.WalletManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import timber.log.Timber
@@ -73,7 +74,20 @@ object WalletSession {
  * passphrase hashes. No key or secret is shared between them.
  */
 object WalletProfileStore {
-    internal val mainProvisioning = Mutex()
+    // Both credential gates participate in PIN collision checks, so mutations share one process-wide lock.
+    internal val provisioning = Mutex()
+
+    internal inline fun <T> tryProfileMutation(
+        onBusy: () -> T,
+        mutate: () -> T,
+    ): T {
+        if (!provisioning.tryLock()) return onBusy()
+        return try {
+            mutate()
+        } finally {
+            provisioning.unlock()
+        }
+    }
 
     private const val TAG = "WalletProfileStore"
     private const val DECOY_RESTORE_HEIGHT = "decoyRestoreHeight"
@@ -89,7 +103,17 @@ object WalletProfileStore {
 
     fun pinHashKey(profile: WalletProfile): String = if (profile.isDecoy) PREFS_DURESS_PIN_HASH else PREFS_PIN_HASH
 
-    fun activePinHashKey(): String = pinHashKey(WalletSession.profile)
+    /** Called under [provisioning] after this PIN authenticated the specified profile. */
+    internal fun upgradeVerifiedPin(
+        prefs: SharedPreferences,
+        profile: WalletProfile,
+        pin: String,
+    ): Boolean {
+        val key = pinHashKey(profile)
+        val hash = prefs.getString(key, null)
+        if (hash.isNullOrEmpty()) return false
+        return !PinHash.isLegacy(hash) || prefs.commitEdit { putString(key, PinHash.hash(pin)) }
+    }
 
     fun passphraseHashKey(profile: WalletProfile): String = if (profile.isDecoy) PREFS_DECOY_PASSPHRASE_HASH else PREFS_PASSPHRASE_HASH
 
@@ -110,6 +134,24 @@ object WalletProfileStore {
         val file = walletFile(context, WalletProfile.DECOY)
         return file.exists() && WalletKey.exists(context, file.name)
     }
+
+    internal fun isDecoyTargetEmpty(
+        context: Context,
+        prefs: SharedPreferences,
+    ): Boolean =
+        try {
+            RestoreTarget.requireEmpty(
+                directory = AnonConfig.getDefaultWalletDir(context),
+                walletName = WalletProfile.DECOY.walletName,
+                hasWrappedSecret = WalletKey.exists(context, WalletProfile.DECOY.walletName),
+                hasCredentials =
+                    prefs.contains(PREFS_DURESS_PIN_HASH) || prefs.contains(PREFS_DECOY_PASSPHRASE_HASH) ||
+                        prefs.contains(PREFS_DECOY_CONFIGURED) || prefs.contains(DECOY_RESTORE_HEIGHT),
+            )
+            true
+        } catch (_: RestoreTargetNotEmptyException) {
+            false
+        }
 
     // Files belonging to one wallet file: base cache, .keys, .address.txt, snapshots.
     fun walletFiles(
@@ -145,11 +187,19 @@ object WalletProfileStore {
         prefs: SharedPreferences,
         profile: WalletProfile,
     ): Boolean {
-        val manager = io.anonero.model.WalletManager.instance ?: return false
-        return manager.withWalletPathClosed(walletFile(context, profile).path) {
+        val manager = WalletManager.instance ?: return false
+        return removeProfile(context, prefs, profile, manager)
+    }
+
+    internal fun removeProfile(
+        context: Context,
+        prefs: SharedPreferences,
+        profile: WalletProfile,
+        manager: WalletManager,
+    ): Boolean =
+        manager.withWalletPathClosed(walletFile(context, profile).path) {
             removeClosedProfile(context, prefs, profile)
         }
-    }
 
     private fun removeClosedProfile(
         context: Context,

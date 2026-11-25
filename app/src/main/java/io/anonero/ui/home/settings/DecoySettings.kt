@@ -56,7 +56,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.WalletManager
@@ -70,9 +69,11 @@ import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
 import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WalletKey
+import io.anonero.util.WalletPinSession
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
+import io.anonero.util.commitEdit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -119,7 +120,7 @@ fun DecoySettingsScreen(
     val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
     val context = AnonConfig.context
     val scope = rememberCoroutineScope()
-    var unlocked by remember { mutableStateOf(false) }
+    var verified by remember { mutableStateOf<WalletPinSession?>(null) }
     val initialConfigured = context?.let { WalletProfileStore.isDecoyConfigured(it, prefs) } ?: false
     var configured by remember { mutableStateOf(initialConfigured) }
     var showPassphrase by remember { mutableStateOf(false) }
@@ -138,7 +139,7 @@ fun DecoySettingsScreen(
         if (locked) {
             // Dialog windows can sit above the lock overlay; never leave a destructive
             // action reachable without re-entering the main PIN.
-            unlocked = false
+            verified = null
             showPassphrase = false
             showDuressPin = false
             showChangeDuress = false
@@ -164,11 +165,12 @@ fun DecoySettingsScreen(
         return
     }
 
-    if (!unlocked) {
+    val owner = verified
+    if (owner == null || !owner.current() || locked) {
         io.anonero.ui.home.LockScreen(
             mode = io.anonero.ui.home.LockScreenMode.VERYFY_PIN,
             modifier = modifier.fillMaxSize(),
-            onUnLocked = { _, _ -> unlocked = true },
+            onVerified = { session, _, _ -> verified = session },
         )
         return
     }
@@ -210,7 +212,7 @@ fun DecoySettingsScreen(
                             showPassphrase = true
                         } else {
                             creating = true
-                            createDecoy(pin, passphrase, context, prefs, scope) { result, message ->
+                            createDecoy(pin, passphrase, context, prefs, scope, owner, walletState) { result, message ->
                                 showDuressPin = false
                                 creating = false
                                 if (result == null) {
@@ -240,14 +242,18 @@ fun DecoySettingsScreen(
                             prefs.getString(PREFS_PIN_HASH, ""),
                         )
                     val newHash = if (sameAsMain) null else PinHash.hash(pin)
-                    withContext(Dispatchers.Main) {
-                        if (sameAsMain || newHash == null) {
-                            error = DecoyError.DURESS_PIN_DIFFERS
-                        } else {
-                            prefs.edit(commit = true) {
-                                putString(PREFS_DURESS_PIN_HASH, newHash)
+                    val updated =
+                        newHash != null && context != null &&
+                            WalletProfileStore.tryProfileMutation(onBusy = { false }) {
+                                owner.current() && !walletState.backgroundSync && !walletState.backgroundSyncRunning &&
+                                    WalletProfileStore.isDecoyConfigured(context, prefs) &&
+                                    prefs.commitEdit { putString(PREFS_DURESS_PIN_HASH, newHash) }
                             }
-                            showChangeDuress = false
+                    withContext(Dispatchers.Main) {
+                        when {
+                            sameAsMain -> error = DecoyError.DURESS_PIN_DIFFERS
+                            updated -> showChangeDuress = false
+                            else -> error = DecoyError.CREDENTIALS_FAILED
                         }
                     }
                 }
@@ -270,9 +276,12 @@ fun DecoySettingsScreen(
                     scope.launch(Dispatchers.IO) {
                         val removed =
                             try {
-                                val manager = checkNotNull(WalletManager.instance)
-                                manager.retryUnmanagedClose(WalletProfileStore.walletFile(ctx, WalletProfile.DECOY).path) &&
-                                    WalletProfileStore.removeProfile(ctx, prefs, WalletProfile.DECOY)
+                                WalletProfileStore.tryProfileMutation(onBusy = { false }) {
+                                    val manager = checkNotNull(WalletManager.instance)
+                                    owner.current() && !walletState.backgroundSync && !walletState.backgroundSyncRunning &&
+                                        manager.retryUnmanagedClose(WalletProfileStore.walletFile(ctx, WalletProfile.DECOY).path) &&
+                                        WalletProfileStore.removeProfile(ctx, prefs, WalletProfile.DECOY)
+                                }
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
@@ -404,12 +413,7 @@ fun DecoySettingsScreen(
                     ) { Text(stringResource(R.string.continue_action)) }
                 }
             }
-            if (!configured && context != null &&
-                (
-                    WalletProfileStore.walletFile(context, WalletProfile.DECOY).exists() ||
-                        WalletKey.exists(context, WalletProfile.DECOY.walletName)
-                )
-            ) {
+            if (!configured && context != null && !WalletProfileStore.isDecoyTargetEmpty(context, prefs)) {
                 item {
                     AnonOutlineButton(onClick = { showRemoveConfirm = true }) {
                         Text(stringResource(R.string.remove_decoy_wallet))
@@ -459,6 +463,8 @@ private fun createDecoy(
     context: android.content.Context?,
     prefs: android.content.SharedPreferences,
     scope: kotlinx.coroutines.CoroutineScope,
+    owner: WalletPinSession,
+    walletState: WalletState,
     onDone: (List<String>?, DecoyError?) -> Unit,
 ) {
     if (context == null) {
@@ -466,86 +472,104 @@ private fun createDecoy(
         return
     }
     scope.launch(Dispatchers.IO) {
-        val file = WalletProfileStore.walletFile(context, WalletProfile.DECOY)
-        if (file.exists() || WalletKey.exists(context, file.name)) {
-            onDone(null, DecoyError.EXISTS)
-            return@launch
-        }
-        val manager = WalletManager.instance ?: return@launch
-        val walletKey = WalletKey.newSecret()
-        var created: io.anonero.model.Wallet? = null
-        var creationComplete = false
+        WalletProfileStore.tryProfileMutation(
+            onBusy = { withContext(Dispatchers.Main) { onDone(null, DecoyError.CREATION_FAILED) } },
+        ) {
+            fun authorized() =
+                !owner.profile.isDecoy && owner.current() && !walletState.backgroundSync && !walletState.backgroundSyncRunning
+            if (!authorized()) {
+                withContext(Dispatchers.Main) { onDone(null, DecoyError.CREATION_FAILED) }
+                return@launch
+            }
+            if (PinHash.matches(duressPin, prefs.getString(PREFS_PIN_HASH, null))) {
+                withContext(Dispatchers.Main) { onDone(null, DecoyError.DURESS_PIN_DIFFERS) }
+                return@launch
+            }
+            val file = WalletProfileStore.walletFile(context, WalletProfile.DECOY)
+            if (!WalletProfileStore.isDecoyTargetEmpty(context, prefs)) {
+                withContext(Dispatchers.Main) { onDone(null, DecoyError.EXISTS) }
+                return@launch
+            }
+            val manager = WalletManager.instance ?: return@launch
+            val walletKey = WalletKey.newSecret()
+            var created: io.anonero.model.Wallet? = null
+            var creationComplete = false
 
-        fun rollback(): Boolean {
-            val auxiliary = created
-            if (auxiliary != null) {
-                try {
-                    if (!manager.closeUnmanaged(auxiliary)) return false
-                    created = null
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    Timber.tag(TAG).e("Decoy wallet close failed; recovery data retained")
-                    return false
+            fun rollback(): Boolean {
+                val auxiliary = created
+                if (auxiliary != null) {
+                    try {
+                        if (!manager.closeUnmanaged(auxiliary)) return false
+                        created = null
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        Timber.tag(TAG).e("Decoy wallet close failed; recovery data retained")
+                        return false
+                    }
                 }
+                return WalletProfileStore.removeProfile(context, prefs, WalletProfile.DECOY)
             }
-            return WalletProfileStore.removeProfile(context, prefs, WalletProfile.DECOY)
-        }
-        try {
-            WalletKey.store(context, file.name, walletKey)
-            val wallet =
-                manager.createWalletUnmanaged(
-                    aFile = file,
-                    password = walletKey,
-                    passphrase = passphrase,
-                    language = "English",
-                    height = 1,
-                )
-            created = wallet
-            if (wallet.status.isOk != true) {
-                Timber.tag(TAG).e("decoy creation status is not OK")
-                throw DecoyException(DecoyError.CREATION_FAILED)
-            }
-            if (!wallet.store()) {
-                Timber.tag(TAG).e("decoy store failed")
-                throw DecoyException(DecoyError.WRITE_FAILED)
-            }
-            val words = wallet.getSeed(passphrase)?.split(" ").orEmpty()
-            if (words.isEmpty()) throw DecoyException(DecoyError.SEED_FAILED)
-            val restoreHeight = wallet.getRestoreHeight()
-            // Do not publish credentials or seed-display success before native closure.
-            if (!manager.closeUnmanaged(wallet)) throw DecoyException(DecoyError.WRITE_FAILED)
-            created = null
-            prefs.edit(commit = true) {
-                putString(PREFS_DURESS_PIN_HASH, PinHash.hash(duressPin))
-                putString(
-                    PREFS_DECOY_PASSPHRASE_HASH,
-                    KeyStoreHelper.getCrazyPass(context, passphrase),
-                )
-                putBoolean(PREFS_DECOY_CONFIGURED, true)
-                putLong(WalletProfileStore.restoreHeightKey(WalletProfile.DECOY), restoreHeight)
-            }
-            if (!WalletProfileStore.isDecoyConfigured(context, prefs)) {
-                throw DecoyException(DecoyError.CREDENTIALS_FAILED)
-            }
-            creationComplete = true
-            withContext(Dispatchers.Main) { onDone(words, null) }
-        } catch (cancelled: CancellationException) {
-            if (!creationComplete) {
-                try {
-                    rollback()
-                } catch (cleanup: Exception) {
-                    cancelled.addSuppressed(cleanup)
+            try {
+                WalletKey.store(context, file.name, walletKey)
+                val wallet =
+                    manager.createWalletUnmanaged(
+                        aFile = file,
+                        password = walletKey,
+                        passphrase = passphrase,
+                        language = "English",
+                        height = 1,
+                    )
+                created = wallet
+                if (wallet.status.isOk != true) {
+                    Timber.tag(TAG).e("decoy creation status is not OK")
+                    throw DecoyException(DecoyError.CREATION_FAILED)
                 }
+                if (!wallet.store()) {
+                    Timber.tag(TAG).e("decoy store failed")
+                    throw DecoyException(DecoyError.WRITE_FAILED)
+                }
+                val words = wallet.getSeed(passphrase)?.split(" ").orEmpty()
+                if (words.isEmpty() || words.any { it.isBlank() }) throw DecoyException(DecoyError.SEED_FAILED)
+                val restoreHeight = wallet.getRestoreHeight()
+                // Do not publish credentials or seed-display success before native closure.
+                if (!manager.closeUnmanaged(wallet)) throw DecoyException(DecoyError.WRITE_FAILED)
+                created = null
+                val committed =
+                    authorized() &&
+                        prefs.commitEdit {
+                            putString(PREFS_DURESS_PIN_HASH, PinHash.hash(duressPin))
+                            putString(
+                                PREFS_DECOY_PASSPHRASE_HASH,
+                                KeyStoreHelper.getCrazyPass(context, passphrase),
+                            )
+                            putBoolean(PREFS_DECOY_CONFIGURED, true)
+                            putLong(WalletProfileStore.restoreHeightKey(WalletProfile.DECOY), restoreHeight)
+                        }
+                if (!committed || !WalletProfileStore.isDecoyConfigured(context, prefs)) {
+                    throw DecoyException(DecoyError.CREDENTIALS_FAILED)
+                }
+                creationComplete = true
+                withContext(Dispatchers.Main) {
+                    if (authorized()) onDone(words, null) else onDone(null, DecoyError.CREATION_FAILED)
+                }
+            } catch (cancelled: CancellationException) {
+                if (!creationComplete) {
+                    try {
+                        rollback()
+                    } catch (cleanup: Exception) {
+                        cancelled.addSuppressed(cleanup)
+                    }
+                }
+                throw cancelled
+            } catch (e: Exception) {
+                Timber.tag(TAG).e("Decoy creation failed")
+                if (!creationComplete && !rollback()) {
+                    Timber.tag(TAG).e("Decoy recovery data retained after cleanup failure")
+                }
+                val mapped = (e as? DecoyException)?.error ?: DecoyError.CREATION_FAILED
+                withContext(Dispatchers.Main) { onDone(null, mapped) }
             }
-            throw cancelled
-        } catch (e: Exception) {
-            Timber.tag(TAG).e("Decoy creation failed")
-            if (!creationComplete && !rollback()) {
-                Timber.tag(TAG).e("Decoy recovery data retained after cleanup failure")
-            }
-            val mapped = (e as? DecoyException)?.error ?: DecoyError.CREATION_FAILED
-            withContext(Dispatchers.Main) { onDone(null, mapped) }
         }
     }
 }

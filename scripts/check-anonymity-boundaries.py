@@ -32,10 +32,23 @@ if "Timber.plant(DebugTree())" in application:
     failures.append("An independent logcat tree bypasses persistent diagnostic policy")
 if "defaultHandler?.uncaughtException(t, e)" in application:
     failures.append("Original uncaught exceptions must not reach the system log handler")
-for field in ("MODEL", "MANUFACTURER", "BRAND", "DEVICE", "PRODUCT", "HARDWARE", "BOARD", "HOST", "FINGERPRINT"):
+for field in (
+    "MODEL",
+    "MANUFACTURER",
+    "BRAND",
+    "DEVICE",
+    "PRODUCT",
+    "HARDWARE",
+    "BOARD",
+    "HOST",
+    "FINGERPRINT",
+):
     if f"Build.{field}" in logs:
         failures.append(f"Log export must not fingerprint hardware via Build.{field}")
-if "DiagnosticPolicy.sanitize" not in repository or "expectedGeneration != generation" not in repository:
+if (
+    "DiagnosticPolicy.sanitize" not in repository
+    or "expectedGeneration != generation" not in repository
+):
     failures.append("Diagnostic persistence requires sanitization and stale-session rejection")
 if service.count(".setVisibility(NotificationCompat.VISIBILITY_SECRET)") != 2:
     failures.append("Both wallet notification builders require secret lock-screen visibility")
@@ -45,9 +58,13 @@ for source in JAVA.rglob("*.kt"):
         continue
     content = source.read_text(encoding="utf-8")
     if ".submitTransaction(" in content:
-        failures.append(f"Unverified signed-file submission is disabled: {source.relative_to(ROOT)}")
+        failures.append(
+            f"Unverified signed-file submission is disabled: {source.relative_to(ROOT)}"
+        )
     if "PREFS_LWS_" in content:
-        failures.append(f"Raw MAIN LWS preference access outside profile boundary: {source.relative_to(ROOT)}")
+        failures.append(
+            f"Raw MAIN LWS preference access outside profile boundary: {source.relative_to(ROOT)}"
+        )
 
 # Void JNI freeze/thaw calls cannot establish success on their own. The Kotlin
 # wrapper must verify the refreshed native snapshot before reporting the mutation.
@@ -62,13 +79,21 @@ for operation, verdict in (("freeze", "it.frozen"), ("thaw", "!it.frozen")):
 backup = (JAVA / "util/backup/BackupHelper.kt").read_text(encoding="utf-8")
 start = backup.index("private suspend fun createBackupLocked(")
 end = backup.index("val manager =", start)
-if "check(!AnonConfig.viewOnly)" not in backup[start:end] or "if (WalletSession.isDecoy)" not in backup[start:end]:
-    failures.append("Backup export must reject view-only/decoy contexts before auxiliary wallet access")
+if (
+    "check(!AnonConfig.viewOnly)" not in backup[start:end]
+    or "if (WalletSession.isDecoy)" not in backup[start:end]
+):
+    failures.append(
+        "Backup export must reject view-only/decoy contexts before auxiliary wallet access"
+    )
 
 # A non-OK restore handle must close before the next credential attempt.
 start = backup.index("private fun bindRestoredWallet(")
 retry = backup.index("opened = openRestoredWallet(manager, walletFile, pin)", start)
-if "if (opened != null && !closeRestoredWallet(manager, opened)) return null" not in backup[start:retry]:
+if (
+    "if (opened != null && !closeRestoredWallet(manager, opened)) return null"
+    not in backup[start:retry]
+):
     failures.append("Legacy backup retry must confirm that the previous wallet closed")
 
 if "wallet.setPassword(original) && wallet.store()" not in backup:
@@ -105,14 +130,46 @@ if (
 ):
     failures.append("LWS reapply must keep the initiating wallet and profile through login")
 
-wipe = wallet_handler[wallet_handler.index("internal fun wipe("):]
+wipe = wallet_handler[wallet_handler.index("internal fun wipe(") :]
 if (
     "WalletProfileStore.passphraseHashKey(profile)" not in wipe
     or "manager.managedWalletAt(walletFile) === wallet" not in wipe
-    or "WalletProfileStore.removeProfile(context, prefs, profile)" not in wipe
+    or "manager.close(wallet) {" not in wipe
+    or "WalletProfileStore.removeProfile(context, prefs, profile, manager)" not in wipe
     or "WalletProfileStore.removeProfile(context, prefs, WalletSession.profile)" in wipe
 ):
     failures.append("Wipe must authenticate and delete the captured wallet/profile")
+
+decoy = (JAVA / "ui/home/settings/DecoySettings.kt").read_text(encoding="utf-8")
+create_decoy = decoy[decoy.index("private fun createDecoy(") :]
+required_order = (
+    "tryProfileMutation(",
+    "isDecoyTargetEmpty(context, prefs)",
+    "WalletKey.store(",
+    "manager.createWalletUnmanaged(",
+    "manager.closeUnmanaged(wallet)",
+    "if (!committed",
+    "creationComplete = true",
+)
+positions = [create_decoy.find(step) for step in required_order]
+if -1 in positions or positions != sorted(positions):
+    failures.append(
+        "Decoy provisioning must guard its empty target through close and durable credential publication"
+    )
+
+lock_screen = (JAVA / "ui/home/LockScreen.kt").read_text(encoding="utf-8")
+settings = (JAVA / "ui/home/settings/Settings.kt").read_text(encoding="utf-8")
+if (
+    "WalletPinSession.verify(it, profile, prefs, pin)" not in lock_screen
+    or "onVerified(verified, pin, shortCut)" not in lock_screen
+    or "owner.current()" not in settings
+    or "pinHashKey(owner.profile)" not in settings
+    or "setPassword(" in settings
+    or "activePinHashKey(" in lock_screen + settings
+):
+    failures.append(
+        "PIN actions must retain the authenticated wallet/profile through credential changes"
+    )
 
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"

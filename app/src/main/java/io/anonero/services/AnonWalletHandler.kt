@@ -153,7 +153,10 @@ class AnonWalletHandler(
     }
 
     @Synchronized
-    fun openWallet(pin: String): Boolean {
+    fun openWallet(pin: String): Boolean =
+        WalletProfileStore.tryProfileMutation(onBusy = { throw InvalidPin() }) { openVerifiedWallet(pin) }
+
+    private fun openVerifiedWallet(pin: String): Boolean {
         val context = AnonConfig.context!!
         val profile = WalletProfileStore.resolvePin(context, prefs, pin) ?: throw InvalidPin()
         val walletFile = WalletProfileStore.walletFile(context, profile)
@@ -229,6 +232,12 @@ class AnonWalletHandler(
                 anonWallet.close()
                 throw failure
             }
+        }
+        try {
+            if (!WalletProfileStore.upgradeVerifiedPin(prefs, profile, pin)) throw InvalidPin()
+        } catch (failure: Exception) {
+            anonWallet.close()
+            throw failure
         }
         WalletSession.select(profile)
         return true
@@ -720,13 +729,18 @@ class AnonWalletHandler(
         val hashKey = WalletProfileStore.passphraseHashKey(profile)
         val hash = prefs.getString(hashKey, null)
         if (hash.isNullOrEmpty() || KeyStoreHelper.getCrazyPass(context, passPhrase) != hash) return false
-        if (!isAuthorizedSession() || prefs.getString(hashKey, null) != hash) throw UnableToWipeWallet()
 
-        wallet.pauseRefresh()
-        if (!isAuthorizedSession() || !wallet.close()) throw UnableToCloseWallet()
+        return WalletProfileStore.tryProfileMutation(onBusy = { throw UnableToWipeWallet() }) {
+            if (!isAuthorizedSession() || prefs.getString(hashKey, null) != hash) throw UnableToWipeWallet()
+            wallet.pauseRefresh()
+            if (!isAuthorizedSession()) throw UnableToCloseWallet()
+            val closed =
+                manager.close(wallet) {
+                    if (!WalletProfileStore.removeProfile(context, prefs, profile, manager)) throw UnableToWipeWallet()
+                }
+            if (!closed) throw UnableToCloseWallet()
 
-        // Deletion uses the authenticated profile even if WalletSession changes.
-        if (!WalletProfileStore.removeProfile(context, prefs, profile)) throw UnableToWipeWallet()
-        return true
+            true
+        }
     }
 }

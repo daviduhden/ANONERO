@@ -64,6 +64,7 @@ import io.anonero.services.WalletState
 import io.anonero.ui.home.LockScreen
 import io.anonero.ui.home.LockScreenMode
 import io.anonero.util.SecureClipboard
+import io.anonero.util.WalletPinSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -114,23 +115,23 @@ fun SignVerifyScreen(
 
     // The form can change while wallet2 is working. Publish a signature only if
     // the same message and wallet are still active and the session is unlocked.
-    fun doSign() {
+    fun doSign(owner: WalletPinSession) {
         if (message.isEmpty() || signing || locked || walletState.backgroundSyncRunning) return
         val requestedMessage = message
         signing = true
         errorRes = null
         scope.launch {
             try {
-                val wallet = withContext(Dispatchers.IO) { WalletManager.instance?.wallet }
+                val wallet = owner.wallet
                 val result =
                     withContext(Dispatchers.IO) {
-                        if (walletState.backgroundSync || walletState.backgroundSyncRunning) {
+                        if (!owner.current() || walletState.backgroundSync || walletState.backgroundSyncRunning) {
                             null
                         } else {
-                            wallet?.signMessage(requestedMessage)
+                            wallet.signMessage(requestedMessage)
                         }
                     }
-                if (message != requestedMessage || WalletManager.instance?.wallet !== wallet ||
+                if (message != requestedMessage || !owner.current() ||
                     walletState.backgroundSync || walletState.backgroundSyncRunning
                 ) {
                     return@launch
@@ -196,9 +197,9 @@ fun SignVerifyScreen(
             LockScreen(
                 mode = LockScreenMode.VERYFY_PIN,
                 modifier = Modifier.fillMaxSize(),
-                onUnLocked = { _, _ ->
+                onVerified = { owner, _, _ ->
                     confirmSign = false
-                    doSign()
+                    doSign(owner)
                 },
             )
         }
