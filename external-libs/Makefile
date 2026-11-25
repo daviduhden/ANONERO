@@ -87,8 +87,8 @@ VERSION: patches
 	@echo "ANONERO `git -C . rev-parse --short HEAD 2>/dev/null || echo unknown` with monero `git -C monero describe --tags --always 2>/dev/null || echo unknown`" > VERSION
 	-@chown $${SUDO_UID:-$$(id -u)}:$${SUDO_GID:-$$(id -g)} VERSION
 
-# Applies the pinned ANONERO wallet-API patch series to the official Monero
-# submodule and initialises the nested submodules it adds.  Idempotent.
+# Prepare the Monero source tree before it is copied into the container.
+# The patch helper also prepares nested dependencies on an already patched tree.
 patches: check-monero
 	@./patches/apply.sh
 

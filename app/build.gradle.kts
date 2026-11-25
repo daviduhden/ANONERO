@@ -31,7 +31,7 @@ android {
     namespace = "io.anonero"
     // compile/target are independent of the minimum. Android 10 (API 29) is the
     // supported floor; raising targetSdk changes runtime behavior and needs tests.
-    // Compile against the latest stable API 37 minor release; target stays 37.0.
+    // Compile against the pinned API 37 minor revision while targeting API 37.
     compileSdk = 37
     compileSdkMinor = 2
 
@@ -125,6 +125,8 @@ android {
 
     flavorDimensions += "anon_mode"
 
+    // Both products share Kotlin and JNI. The package suffix separates installs and
+    // VIEW_ONLY selects the NERO application paths at build time.
     productFlavors {
         create("anon") {
             applicationIdSuffix = ".anon"

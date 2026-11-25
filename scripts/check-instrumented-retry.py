@@ -6,6 +6,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+# Attach text can accompany a more serious failure in the same report.
 NON_RETRYABLE = (
     "failed to install",
     "process crashed",
@@ -22,6 +23,7 @@ def attach_only(reports: list[Path]) -> bool:
         for report in reports:
             suite = ET.parse(report).getroot()
             issues = [element for element in suite.iter() if element.tag in {"error", "failure"}]
+            # Verify the summary against the actual failure elements before classifying them.
             expected = int(suite.get("failures", "0")) + int(suite.get("errors", "0"))
             if (
                 suite.tag != "testsuite"

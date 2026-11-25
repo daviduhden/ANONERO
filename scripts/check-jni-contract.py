@@ -123,6 +123,8 @@ def kotlin_external_symbols() -> tuple[dict[str, str], list[str]]:
             continue
         package_path = "_".join(escape_jni(part) for part in package.group(1).split("."))
 
+        # Reconstruct the JVM owner from declaration order and brace depth in the
+        # masked source. This scanner targets the declaration forms used here.
         events: list[tuple[int, str, re.Match[str]]] = []
         for declaration in re.finditer(r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)", code):
             events.append((declaration.start(), "class", declaration))

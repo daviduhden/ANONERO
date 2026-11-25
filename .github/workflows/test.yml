@@ -49,6 +49,8 @@ env:
   ANDROID_NDK: '30.0.16248370'
   ANDROID_CMAKE: '4.1.2'
 
+# Release embeds the jobs from unit onward via scripts/sync-release-test-jobs.py.
+# Each workflow owns its authorization job and dispatch inputs.
 jobs:
   authorize:
     name: Owner authorization

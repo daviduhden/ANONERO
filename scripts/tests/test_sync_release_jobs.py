@@ -32,6 +32,7 @@ SPEC.loader.exec_module(SYNC)
 
 class ReleaseSuiteSynchronizationTest(unittest.TestCase):
     def setUp(self):
+        # Start each mutation from the workflows that CI will actually load.
         self.source = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
         self.release = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 

@@ -66,6 +66,7 @@ capture_diagnostics() {
     } >ci-diagnostics/instrumented-diagnostics.txt 2>&1
 }
 
+# Require XML evidence for both flavors in addition to their Gradle exit statuses.
 reports_ok() {
     python3 - <<'PY'
 import glob
@@ -144,6 +145,8 @@ for flavor in anon nero; do
         flavor_status=0
     else
         flavor_status=$?
+        # Retry only when the guest still answers and the flavor's XML attributes
+        # every reported failure to instrumentation attachment.
         if core_services_ok &&
             python3 scripts/check-instrumented-retry.py app/build/outputs/androidTest-results "$flavor"; then
             echo "Retrying ${flavor} after an instrumentation attach timeout"

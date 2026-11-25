@@ -4,7 +4,7 @@ set +x
 set -Eeuo pipefail
 trap 'printf "Aprovisionamiento detenido en la línea %d.\n" "$LINENO" >&2' ERR
 umask 077
-
+# Provision production signing from the owner's interactive session.
 if [[ ! -t 0 ]]; then
     echo "Ejecuta este programa en una terminal local interactiva." >&2
     exit 1
@@ -13,7 +13,7 @@ fi
 repo=daviduhden/ANONERO
 [[ "$(gh api user --jq .login)" == daviduhden ]]
 [[ "$(gh repo view "$repo" --json nameWithOwner --jq .nameWithOwner)" == "$repo" ]]
-
+# Keep scratch and key stores on one filesystem for no-overwrite hard links.
 base="$HOME/.local/share/android-signing"
 dir="$base/anonero"
 for path in "$base" "$dir"; do
@@ -123,7 +123,7 @@ anon_cert="$(<"$scratch/anon.sha256")"
 nero_cert="$(<"$scratch/nero.sha256")"
 [[ "$anon_cert" != "$nero_cert" ]]
 [[ "$(<"$scratch/anon.spki")" != "$(<"$scratch/nero.spki")" ]]
-
+# Register each identity before adding secrets so a retry can require the same key.
 for flavor in anon nero; do
     env="android-$flavor-release"
     prefix="${flavor^^}"

@@ -86,6 +86,8 @@ def load_config(text):
 
 
 def normalized(text):
+    # Compare a multiset of content lines. Moving a paragraph or changing its
+    # spacing alone supplies no evidence of a knowledge update.
     lines = []
     for line in text.splitlines():
         line = line.strip()
@@ -132,6 +134,7 @@ def validate(root, args):
         )
 
     if args.scope == "range":
+        # Read instructions and project changes from the same committed snapshot.
         base, head = [
             git(root, "rev-parse", "--verify", "--end-of-options", ref + "^{commit}").strip()
             for ref in (args.base, args.head)

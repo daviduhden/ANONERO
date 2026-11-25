@@ -56,8 +56,8 @@ UNBOUND_SHA256=d8ee7aa6bbb3ff1be7d9e57637d0d0ec2f18273a8efff1a0afe2c665858b96f7
 
 # Pinned to the external/polyseed and external/utf8proc commits added to the
 # official Monero tree by the ANONERO API patch series.  They must match the
-# submodules Monero builds against.  Do not bump independently: the patch series
-# records the matching submodule commits and is absent from this checkout.
+# submodules Monero builds against. The checked-in patch series records the
+# matching gitlinks. Update the paired pins together.
 POLYSEED_COMMIT=bd79f5014c331273357277ed8a3d756fb61b9fa1
 UTF8PROC_COMMIT=3de4596fbe28956855df2ecb3c11c0bbc3535838
 
@@ -243,6 +243,8 @@ dep_openssl() {
     get "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz" "openssl-$OPENSSL_VERSION.tar.gz" "$OPENSSL_SHA256"
     cd "$WORK/openssl-$OPENSSL_VERSION"
     if android; then
+        # Select the API-suffixed NDK compiler. That compiler defines
+        # __ANDROID_API__, so Configure must leave the macro to the toolchain.
         git apply "$BUILD_SCRIPT_DIR/openssl-android-api.patch"
         ANDROID_NDK_ROOT=$NDK OPENSSL_ANDROID_API_LEVEL=$API ./Configure "$OPENSSL_TARGET" -fPIC -static \
             no-shared no-tests --with-zlib-include="$WORK/zlib/include" --with-zlib-lib="$WORK/zlib/lib" \
@@ -373,7 +375,8 @@ step_monero() {
     find . -path ./lib -prune -o -name '*.a' -exec cp '{}' lib \;
 }
 
-# `find -exec cp` exits 0 even when it copied nothing, so check the archives explicitly.
+# Stage dependency and wallet2 archives separately for the app's CMake imports.
+# Check required files directly because find succeeds when it matches nothing.
 step_collect() {
     mkdir -p "$OUT/monero"
     find "$PREFIX/lib" -maxdepth 1 -name '*.a' -exec cp -a {} "$OUT"/ \; 2>/dev/null || true

@@ -15,6 +15,10 @@
 # limitations under the License.
 #
 
+ # These rules accompany the release build configuration. Release minification is
+ # currently disabled in app/build.gradle.kts.
+
+ # Preserve the companion field used to find a generated serializer.
  -if @kotlinx.serialization.Serializable class **
  -keepclassmembers class <1> {
      static <1>$Companion Companion;
@@ -45,8 +49,7 @@
  -dontnote kotlinx.serialization.**
 
  # Serialization core uses `java.lang.ClassValue` for caching inside these specified classes.
- # If there is no `java.lang.ClassValue` (for example, in Android), then R8/ProGuard will print a warning.
- # However, since in this case they will not be used, we can disable these warnings
+ # Suppress missing-class warnings for the optional cache implementation.
  -dontwarn kotlinx.serialization.internal.ClassValueReferences
 
  # disable optimisation for descriptor field because in some versions of ProGuard, optimization generates incorrect bytecode that causes a verification error

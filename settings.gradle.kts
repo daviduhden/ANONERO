@@ -29,6 +29,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+// Centralize dependency repositories so modules share the same resolution sources.
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

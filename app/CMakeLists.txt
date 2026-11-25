@@ -18,6 +18,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(anonero LANGUAGES C CXX)
 
+# Gradle supplies ANDROID_ABI. The desktop build passes the archive directory
+# name explicitly through ANON_ABI. Both consume prebuilt wallet2 archives.
 if(NOT DEFINED ANON_ABI)
     set(ANON_ABI ${ANDROID_ABI})
 endif()
@@ -317,4 +319,6 @@ target_link_libraries(  anonero
                        ${PLATFORM_LIBS}
                        "-Wl,--end-group"
                        )
+# Keep symbols pulled from static dependencies out of the shared library's
+# exported interface. Kotlin enters through the adapter's JNI symbols.
 target_link_options( anonero PRIVATE "-Wl,--exclude-libs,ALL" ${PLATFORM_LINK_OPTS} )

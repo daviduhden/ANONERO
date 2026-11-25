@@ -86,6 +86,8 @@ def fail(message: str) -> None:
 
 
 def parse_catalog(paths: list[Path]) -> tuple[dict[str, str], dict[str, list[str]]]:
+    # Flatten each plural quantity into a separate key for placeholder checks.
+    # Keep the quantity list separately for locale-specific validation.
     strings: dict[str, str] = {}
     plurals: dict[str, list[str]] = {}
     for path in paths:
@@ -120,6 +122,7 @@ def placeholders(text: str) -> set[str]:
 def android_escape_errors(path: Path) -> list[str]:
     """AAPT rejects unescaped apostrophes and unknown backslash escapes in string text."""
     errors: list[str] = []
+    # Inspect the original XML spelling because XML parsing resolves entity references.
     text = path.read_text(encoding="utf-8")
     element = re.compile(r"<(?:string|item)\b[^>]*>(.*?)</(?:string|item)>", re.DOTALL)
     for match in element.finditer(text):

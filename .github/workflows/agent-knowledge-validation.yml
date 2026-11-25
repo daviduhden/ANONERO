@@ -56,6 +56,7 @@ jobs:
         shell: bash
         run: python3 scripts/validate-agent-knowledge.py --scope worktree
 
+      # A clean checkout has no worktree diff. Supply a base to assess committed changes.
       - name: Validate committed changes when a base is supplied
         if: inputs.base != ''
         shell: bash

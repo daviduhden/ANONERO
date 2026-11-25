@@ -33,6 +33,8 @@ SPEC.loader.exec_module(JNI)
 
 class ConstructorContractTest(unittest.TestCase):
     def setUp(self):
+        # Apply source mutations to isolated copies so each case starts with the
+        # current Kotlin/JNI pair.
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         root = Path(self.directory.name)

@@ -81,6 +81,8 @@ RUN ./build.sh utf8proc
 # external-libs/Makefile applies the pinned ANONERO API patch series on the host
 # first; the tree copied here is official Monero v0.18.5.4 plus those patches.
 COPY monero/ /src/
+# These API names are an early check for a missing wallet API patch set. The
+# host patch step also checks the TLS-specific marker before this copy.
 RUN grep -q "struct CoinsInfo" /src/src/wallet/api/wallet2_api.h \
  && grep -q "viewOnlyBalance" /src/src/wallet/api/wallet2_api.h \
  || { echo "Monero API patches are missing; run 'make patches' first" >&2; exit 1; }

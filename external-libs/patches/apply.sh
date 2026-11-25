@@ -76,6 +76,8 @@ EOF
     echo "Applying ANONERO wallet-API patches to official Monero v0.18.5.4..."
     # `apply --index` keeps the submodule at the tagged v0.18.5.4 commit, so
     # `git describe`/VERSION stay deterministic; no local commits are created.
+    # Numeric filename prefixes define application order. The nested gitlinks
+    # from the series must be present before the recursive submodule update.
     for patch in "$PWD"/*.patch; do
         git -C "$MONERO" apply --index --3way "$patch"
     done

@@ -145,6 +145,18 @@ and review AK004 warnings against the actual change. Range mode validates the co
 head snapshot; local instruction edits cannot satisfy a committed-range review.
 The regression module `scripts/tests/test_agent_knowledge.py` runs only in CI.
 
+## Comment-only changes
+
+Start from the index and worktree status so existing edits can be distinguished from
+documentation changes. Review every diff hunk for syntax-sensitive contexts such as
+raw strings, shell heredocs, YAML block scalars, Make recipes, and C++ preprocessor
+continuations. Preserve directives, legal headers, and generated block markers.
+Where possible, compare parsed content before and after (for example Python ASTs,
+TOML values, workflow YAML including embedded scripts, and XML including resource
+text). Use the release synchronizer to confirm that workflow comments outside the
+shared block preserve its source-of-truth relationship. Static equivalence checks
+cover the parsers and sources inspected. Build and device behavior still require CI.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

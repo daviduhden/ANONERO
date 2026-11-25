@@ -1179,6 +1179,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  # Signing runners receive only their flavor's unsigned artifacts. The protected
+  # environment scopes the key, and instrumentation is a separate prerequisite.
   sign-anon:
     name: Sign ANON
     needs: [authorize, build, instrumented]
@@ -1399,6 +1401,7 @@ jobs:
           retention-days: 30
 
 
+  # Combine the signed inventories only after both isolated signing jobs succeed.
   prepare:
     name: Prepare verified release assets
     needs: [authorize, build, sign-anon, sign-nero]

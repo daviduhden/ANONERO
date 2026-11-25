@@ -44,6 +44,7 @@ def require_manual_dispatch(text: str, name: str) -> None:
 
 
 def shared_jobs(source: str) -> tuple[str, list[str]]:
+    # Unit is the boundary between Tests-specific authorization and the shared jobs.
     if source.count("\n  unit:\n") != 1:
         raise ValueError("test.yml: expected one unit job starting the shared suite")
     jobs = "  unit:\n" + source.split("\n  unit:\n", 1)[1]
@@ -106,6 +107,8 @@ def generated_block(source: str) -> str:
     refs = jobs.count(f"          ref: {SOURCE_REF}\n")
     if not checkouts or refs != checkouts:
         raise ValueError("Unsupported shared job cache/ref format")
+    # Bind every release checkout to the dispatched commit and avoid artifacts
+    # from a Gradle cache populated outside the release run.
     jobs = jobs.replace(SOURCE_REF, RELEASE_REF)
     jobs = jobs.replace("cache-provider: basic", "cache-disabled: true")
     if (

@@ -29,7 +29,7 @@ buildscript {
     }
 }
 
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+// Declare the Android plugin version here so the app module can apply the catalog alias.
 plugins {
     alias(libs.plugins.androidApplication) apply false
 }
