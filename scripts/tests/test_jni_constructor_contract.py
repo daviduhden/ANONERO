@@ -24,7 +24,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("jni_contract", ROOT / "scripts/check-jni-contract.py")
+SPEC = importlib.util.spec_from_file_location(
+    "jni_contract", ROOT / "scripts/check-jni-contract.py"
+)
 assert SPEC is not None and SPEC.loader is not None
 JNI = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(JNI)
@@ -41,7 +43,9 @@ class ConstructorContractTest(unittest.TestCase):
         self.models.mkdir(parents=True)
         for name in (*JNI.MODEL_CONSTRUCTORS, "WalletListener"):
             source = JNI.KOTLIN_ROOT / "io/anonero/model" / f"{name}.kt"
-            (self.models / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            (self.models / source.name).write_text(
+                source.read_text(encoding="utf-8"), encoding="utf-8"
+            )
         self.cpp = root / "adapter.cpp"
         self.cpp.write_text(JNI.CPP.read_text(encoding="utf-8"), encoding="utf-8")
         self.kotlin_patch = patch.object(JNI, "KOTLIN_ROOT", root)
@@ -69,11 +73,15 @@ class ConstructorContractTest(unittest.TestCase):
 
     def test_primitive_boxing_requires_review(self):
         self.mutate(self.models / "CoinsInfo.kt", "val amount: Long,", "val amount: Long?,")
-        self.assertTrue(any("nullable primitive" in error for error in JNI.model_constructor_errors()))
+        self.assertTrue(
+            any("nullable primitive" in error for error in JNI.model_constructor_errors())
+        )
 
     def test_native_descriptor_drift_is_rejected(self):
         self.mutate(self.cpp, '"(JLjava/lang/String;)V"', '"(ILjava/lang/String;)V"')
-        self.assertTrue(any("expected JNI constructor" in error for error in JNI.model_constructor_errors()))
+        self.assertTrue(
+            any("expected JNI constructor" in error for error in JNI.model_constructor_errors())
+        )
 
     def test_wallet_callbacks_match(self):
         self.assertEqual(JNI.wallet_callback_errors(), [])

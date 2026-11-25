@@ -39,7 +39,9 @@ def main() -> int:
         if missing_cancellation_import(path.read_text(encoding="utf-8"))
     ]
     if failures:
-        print("Unqualified cancellation catches require an explicit import:\n" + "\n".join(failures))
+        print(
+            "Unqualified cancellation catches require an explicit import:\n" + "\n".join(failures)
+        )
         return 1
     print("Kotlin cancellation catch imports: OK (static pattern check only)")
     return 0

@@ -30,15 +30,21 @@ SPEC.loader.exec_module(POLICY)
 
 class CancellationImportTest(unittest.TestCase):
     def test_unqualified_catch_needs_import(self):
-        self.assertTrue(POLICY.missing_cancellation_import("catch (cancelled: CancellationException) {}"))
+        self.assertTrue(
+            POLICY.missing_cancellation_import("catch (cancelled: CancellationException) {}")
+        )
 
     def test_canonical_import_and_qualified_catch_are_supported(self):
-        self.assertFalse(POLICY.missing_cancellation_import(
-            "import kotlinx.coroutines.CancellationException\ncatch (e: CancellationException) {}"
-        ))
-        self.assertFalse(POLICY.missing_cancellation_import(
-            "catch (e: kotlinx.coroutines.CancellationException) {}"
-        ))
+        self.assertFalse(
+            POLICY.missing_cancellation_import(
+                "import kotlinx.coroutines.CancellationException\ncatch (e: CancellationException) {}"
+            )
+        )
+        self.assertFalse(
+            POLICY.missing_cancellation_import(
+                "catch (e: kotlinx.coroutines.CancellationException) {}"
+            )
+        )
 
     def test_unrelated_exception_does_not_require_import(self):
         self.assertFalse(POLICY.missing_cancellation_import("catch (e: Exception) {}"))

@@ -43,6 +43,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RES = ROOT / "app/src/main/res"
 
+
 def string_catalogs(directory: Path) -> list[Path]:
     # Keep the primary catalog mandatory; discover feature catalogs in every locale
     # so a new resource file cannot evade parity/placeholder/reference checks.

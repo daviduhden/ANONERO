@@ -251,11 +251,15 @@ def model_constructor_errors() -> list[str]:
                 errors.append(f"{model}.{name}: nullable primitive requires explicit ABI review")
                 break
             descriptor += (
-                "Ljava/util/List;" if parameter_type == "List<Transfer>" else descriptors[parameter_type]
+                "Ljava/util/List;"
+                if parameter_type == "List<Transfer>"
+                else descriptors[parameter_type]
             )
         descriptor += ")V"
         if names != expected_names.split():
-            errors.append(f"{model}: constructor parameter order changed; review native argument order")
+            errors.append(
+                f"{model}: constructor parameter order changed; review native argument order"
+            )
         lookups = re.findall(
             rf'GetMethodID\(\s*{native_class}\s*,\s*"<init>"\s*,\s*"([^"\n]+)"\s*\)',
             native,
@@ -271,7 +275,9 @@ WALLET_CALLBACKS = {"updated", "refreshed", "newBlock", "unconfirmedMoneyReceive
 def wallet_callback_errors() -> list[str]:
     """Check Java method descriptors used by the four delivered wallet callbacks."""
     native = CPP.read_text(encoding="utf-8")
-    kotlin = strip_non_code((KOTLIN_ROOT / "io/anonero/model/WalletListener.kt").read_text(encoding="utf-8"))
+    kotlin = strip_non_code(
+        (KOTLIN_ROOT / "io/anonero/model/WalletListener.kt").read_text(encoding="utf-8")
+    )
     lookups = re.findall(
         r'GetMethodID\(\s*class_WalletListener\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)',
         native,
@@ -297,7 +303,9 @@ def wallet_callback_errors() -> list[str]:
             arguments.append("J" if match[1] == "Long" else "Ljava/lang/String;")
         expected = "(" + "".join(arguments) + ")V"
         if actual != expected:
-            errors.append(f"WalletListener.{name}: expected JNI callback {expected}, found {actual}")
+            errors.append(
+                f"WalletListener.{name}: expected JNI callback {expected}, found {actual}"
+            )
     return errors
 
 

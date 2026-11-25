@@ -35,14 +35,21 @@ class CatalogDiscoveryTest(unittest.TestCase):
             root = Path(directory)
             primary = root / "strings.xml"
             feature = root / "strings_feature.xml"
-            primary.write_text('<resources><string name="base">Base</string></resources>', encoding="utf-8")
-            feature.write_text('<resources><string name="new_feature">Feature</string></resources>', encoding="utf-8")
+            primary.write_text(
+                '<resources><string name="base">Base</string></resources>', encoding="utf-8"
+            )
+            feature.write_text(
+                '<resources><string name="new_feature">Feature</string></resources>',
+                encoding="utf-8",
+            )
             catalogs = I18N.string_catalogs(root)
             self.assertEqual(catalogs, [primary, feature])
             strings, _ = I18N.parse_catalog(catalogs)
             self.assertEqual(strings["new_feature"], "Feature")
 
     def test_missing_primary_catalog_cannot_silently_pass(self):
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(SystemExit, "missing resource file"):
-                I18N.parse_catalog(I18N.string_catalogs(Path(directory)))
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            self.assertRaisesRegex(SystemExit, "missing resource file"),
+        ):
+            I18N.parse_catalog(I18N.string_catalogs(Path(directory)))
