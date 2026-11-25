@@ -39,7 +39,7 @@ class ConstructorContractTest(unittest.TestCase):
         root = Path(self.directory.name)
         self.models = root / "io/anonero/model"
         self.models.mkdir(parents=True)
-        for name in JNI.MODEL_CONSTRUCTORS:
+        for name in (*JNI.MODEL_CONSTRUCTORS, "WalletListener"):
             source = JNI.KOTLIN_ROOT / "io/anonero/model" / f"{name}.kt"
             (self.models / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
         self.cpp = root / "adapter.cpp"
@@ -74,6 +74,17 @@ class ConstructorContractTest(unittest.TestCase):
     def test_native_descriptor_drift_is_rejected(self):
         self.mutate(self.cpp, '"(JLjava/lang/String;)V"', '"(ILjava/lang/String;)V"')
         self.assertTrue(any("expected JNI constructor" in error for error in JNI.model_constructor_errors()))
+
+    def test_wallet_callbacks_match(self):
+        self.assertEqual(JNI.wallet_callback_errors(), [])
+
+    def test_wallet_callback_wrong_native_lookup_is_rejected(self):
+        self.mutate(self.cpp, '"newBlock", "(J)V"', '"newBlock", "(I)V"')
+        self.assertTrue(any("newBlock" in error for error in JNI.wallet_callback_errors()))
+
+    def test_wallet_callback_boxing_requires_review(self):
+        self.mutate(self.models / "WalletListener.kt", "height: Long", "height: Long?")
+        self.assertTrue(any("newBlock" in error for error in JNI.wallet_callback_errors()))
 
     def test_unsupported_constructor_type_is_rejected(self):
         self.mutate(self.models / "CoinsInfo.kt", "val amount: Long,", "val amount: Double,")

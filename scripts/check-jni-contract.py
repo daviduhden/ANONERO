@@ -265,9 +265,46 @@ def model_constructor_errors() -> list[str]:
     return errors
 
 
+WALLET_CALLBACKS = {"updated", "refreshed", "newBlock", "unconfirmedMoneyReceived"}
+
+
+def wallet_callback_errors() -> list[str]:
+    """Check Java method descriptors used by the four delivered wallet callbacks."""
+    native = CPP.read_text(encoding="utf-8")
+    kotlin = strip_non_code((KOTLIN_ROOT / "io/anonero/model/WalletListener.kt").read_text(encoding="utf-8"))
+    lookups = re.findall(
+        r'GetMethodID\(\s*class_WalletListener\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)',
+        native,
+    )
+    errors = []
+    if sorted(name for name, _ in lookups) != sorted(WALLET_CALLBACKS):
+        errors.append("WalletListener: expected one JNI lookup for each delivered callback")
+    for name, actual in lookups:
+        if name not in WALLET_CALLBACKS:
+            continue
+        declarations = re.findall(rf"\bfun\s+{name}\s*\(([^()]*)\)\s*(?::\s*(\w+))?", kotlin)
+        if len(declarations) != 1 or declarations[0][1] not in {"", "Unit"}:
+            errors.append(f"WalletListener.{name}: expected one Unit callback")
+            continue
+        arguments = []
+        for parameter in declarations[0][0].split(","):
+            if not parameter.strip():
+                continue
+            match = re.fullmatch(r"\s*\w+\s*:\s*(Long|String\??)\s*", parameter)
+            if match is None:
+                errors.append(f"WalletListener.{name}: unsupported callback parameter type")
+                break
+            arguments.append("J" if match[1] == "Long" else "Ljava/lang/String;")
+        expected = "(" + "".join(arguments) + ")V"
+        if actual != expected:
+            errors.append(f"WalletListener.{name}: expected JNI callback {expected}, found {actual}")
+    return errors
+
+
 def main() -> int:
     external, errors = kotlin_external_symbols()
     errors.extend(model_constructor_errors())
+    errors.extend(wallet_callback_errors())
     exports = native_exports()
     missing = sorted(set(external) - exports)
     orphans = sorted(exports - set(external))
@@ -292,7 +329,7 @@ def main() -> int:
             print(f"  - {symbol} ({marker})")
     if errors or missing or unexpected:
         return 1
-    print("JNI symbol parity and four model constructor contracts: OK")
+    print("JNI symbol parity, four model constructors, and four wallet callbacks: OK")
     print("Export signatures, bytecode and linkage still require a real build/link check")
     return 0
 
