@@ -188,15 +188,14 @@ data class LwsConfig(
             profile: WalletProfile = WalletSession.profile,
         ) {
             val keys = preferenceKeys(profile)
-            check(
-                prefs
-                    .edit()
-                    .putBoolean(keys[0], config.enabled)
-                    .putString(keys[1], config.host)
-                    .putInt(keys[2], config.port)
-                    .putBoolean(keys[3], config.useTls)
-                    .commit(),
-            ) { "Could not persist LWS configuration" }
+            val saved =
+                prefs.commitEdit {
+                    putBoolean(keys[0], config.enabled)
+                    putString(keys[1], config.host)
+                    putInt(keys[2], config.port)
+                    putBoolean(keys[3], config.useTls)
+                }
+            check(saved) { "Could not persist LWS configuration" }
         }
 
         /*

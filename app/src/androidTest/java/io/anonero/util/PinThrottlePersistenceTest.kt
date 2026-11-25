@@ -46,6 +46,8 @@ class PinThrottlePersistenceTest {
         try {
             val result = runCatching { PinThrottle.tryAttempt(failing, now = 60_000L) }
             assertTrue(result.exceptionOrNull() is IllegalStateException)
+            // A reboot now requires a new durable timestamp even below the normal lockout threshold.
+            assertEquals(30_000L, PinThrottle.waitLeft(failing, now = 1L))
             assertEquals(0L, PinThrottle.tryAttempt(prefs, now = 60_001L))
         } finally {
             context.deleteSharedPreferences(name)

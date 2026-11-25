@@ -22,6 +22,7 @@ import io.anonero.model.node.NodeFields
 import io.anonero.util.WALLET_PROXY
 import io.anonero.util.WALLET_PROXY_PORT
 import io.anonero.util.WALLET_USE_TOR
+import io.anonero.util.commitEdit
 
 /**
  * Destination network of a Monero RPC endpoint, not the P2P network.
@@ -248,32 +249,30 @@ data class TransportConfig(
             customNodeNetwork != next.customNodeNetwork
 
     fun save(prefs: SharedPreferences): Boolean =
-        prefs
-            .edit()
-            .apply {
-                putString(PREFS_TRANSPORT_MODE, mode.name)
-                putString(PREFS_TRANSPORT_HOST, proxyHost)
-                putInt(PREFS_TRANSPORT_PORT, proxyPort)
-                putString(PREFS_TRANSPORT_NETWORK, customNodeNetwork.name)
-                putBoolean(PREFS_NODE_AUTO_SELECT, autoSelectNode)
-                putBoolean(PREFS_NODE_PREFER_TRUSTED, preferTrustedNode)
+        prefs.commitEdit {
+            putString(PREFS_TRANSPORT_MODE, mode.name)
+            putString(PREFS_TRANSPORT_HOST, proxyHost)
+            putInt(PREFS_TRANSPORT_PORT, proxyPort)
+            putString(PREFS_TRANSPORT_NETWORK, customNodeNetwork.name)
+            putBoolean(PREFS_NODE_AUTO_SELECT, autoSelectNode)
+            putBoolean(PREFS_NODE_PREFER_TRUSTED, preferTrustedNode)
 
-                // Keep the legacy keys coherent for older readers and downgrade safety.
-                putBoolean(WALLET_USE_TOR, mode.usesEmbeddedTor)
-                when {
-                    mode.usesEmbeddedTor || mode == TransportMode.SYSTEM_VPN -> {
-                        remove(WALLET_PROXY)
-                        remove(WALLET_PROXY_PORT)
-                    }
+            // Keep the legacy keys coherent for older readers and downgrade safety.
+            putBoolean(WALLET_USE_TOR, mode.usesEmbeddedTor)
+            when {
+                mode.usesEmbeddedTor || mode == TransportMode.SYSTEM_VPN -> {
+                    remove(WALLET_PROXY)
+                    remove(WALLET_PROXY_PORT)
+                }
 
-                    else -> {
-                        proxyEndpoint?.let {
-                            putString(WALLET_PROXY, it.host)
-                            putInt(WALLET_PROXY_PORT, it.port)
-                        }
+                else -> {
+                    proxyEndpoint?.let {
+                        putString(WALLET_PROXY, it.host)
+                        putInt(WALLET_PROXY_PORT, it.port)
                     }
                 }
-            }.commit()
+            }
+        }
 
     companion object {
         fun load(prefs: SharedPreferences): TransportConfig {

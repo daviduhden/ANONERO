@@ -39,6 +39,7 @@ import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
 import io.anonero.util.WalletSession
+import io.anonero.util.commitEdit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -612,16 +613,15 @@ class AnonWalletHandler(
         )
 
     private fun persistNode(node: Node): Boolean =
-        prefs
-            .edit()
-            .putString(NodeFields.RPC_HOST.value, node.host)
-            .putBoolean(NodeFields.NODE_TLS.value, node.useTls)
-            .putInt(NodeFields.RPC_PORT.value, node.rpcPort)
-            .putString(NodeFields.RPC_USERNAME.value, node.username)
-            .putString(NodeFields.RPC_PASSWORD.value, node.password)
-            .putString(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
-            .putString(NodeFields.NODE_NAME.value, node.name)
-            .commit()
+        prefs.commitEdit {
+            putString(NodeFields.RPC_HOST.value, node.host)
+            putBoolean(NodeFields.NODE_TLS.value, node.useTls)
+            putInt(NodeFields.RPC_PORT.value, node.rpcPort)
+            putString(NodeFields.RPC_USERNAME.value, node.username)
+            putString(NodeFields.RPC_PASSWORD.value, node.password)
+            putString(NodeFields.RPC_NETWORK.value, AnonConfig.getNetworkType().toString())
+            putString(NodeFields.NODE_NAME.value, node.name)
+        }
 
     private fun updateDaemon(
         node: Node?,

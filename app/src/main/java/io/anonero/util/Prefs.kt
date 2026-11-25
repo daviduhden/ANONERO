@@ -18,6 +18,8 @@
 
 package io.anonero.util
 
+import android.content.SharedPreferences
+
 /*
  * Keys stored in the `AnonConfig.PREFS` file (actual name `anonPref`).
  *
@@ -59,3 +61,10 @@ const val PREFS_DECOY_LWS_ENABLED = "decoyLwsEnabled"
 const val PREFS_DECOY_LWS_HOST = "decoyLwsHost"
 const val PREFS_DECOY_LWS_PORT = "decoyLwsPort"
 const val PREFS_DECOY_LWS_TLS = "decoyLwsTls"
+
+/** Commits one editor batch and returns Android's disk-write result to the caller. */
+internal inline fun SharedPreferences.commitEdit(update: SharedPreferences.Editor.() -> Unit): Boolean {
+    val editor = edit()
+    editor.update()
+    return editor.commit()
+}

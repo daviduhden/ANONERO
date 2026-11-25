@@ -44,7 +44,11 @@ Do not use for pure Compose layout changes (use `jetpack-compose`) or C++/JNI ch
 - Do not introduce `GlobalScope`, `runBlocking`, `Thread.sleep`, or a second wallet
   state cache.
 - Catch `CancellationException` and rethrow it before generic `Exception` handling.
-- Use `commit = true` for security-relevant preference writes.
+- When correctness depends on a successful disk write, use `SharedPreferences.commitEdit`
+  and handle its Boolean result. Android can update in-memory preferences before reporting
+  disk failure. The AndroidX Unit-returning edit extension cannot report that failure.
+  Commit the same editor that received the mutations, including when a wrapper delegates
+  fluent setter calls to another editor.
 - Never log seeds, passphrases, PINs, wallet passwords, Keystore material, or node
   credentials. `Timber` output is persisted.
 - No analytics, telemetry, crash reporting, remote config, tracking IDs, or new

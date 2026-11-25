@@ -50,7 +50,7 @@ object PinThrottle {
         if (now < last) {
             last = now
             // Keep the gate closed for at least one step if rebasing cannot be saved.
-            if (!prefs.edit().putLong(LAST, now).commit()) {
+            if (!prefs.commitEdit { putLong(LAST, now) }) {
                 return waitFor(prefs.getInt(ATTEMPTS, 0)).coerceAtLeast(STEP_MS)
             }
         }
@@ -65,10 +65,12 @@ object PinThrottle {
     ): Long {
         val left = waitLeft(prefs, now)
         if (left > 0) return left
-        val editor = prefs.edit()
-        editor.putInt(ATTEMPTS, prefs.getInt(ATTEMPTS, 0) + 1)
-        editor.putLong(LAST, now)
-        check(editor.commit()) { "PIN attempt persistence failed" }
+        val recorded =
+            prefs.commitEdit {
+                putInt(ATTEMPTS, prefs.getInt(ATTEMPTS, 0) + 1)
+                putLong(LAST, now)
+            }
+        check(recorded) { "PIN attempt persistence failed" }
         return 0
     }
 
@@ -76,11 +78,10 @@ object PinThrottle {
     @Synchronized
     fun reset(prefs: SharedPreferences) {
         val cleared =
-            prefs
-                .edit()
-                .remove(ATTEMPTS)
-                .remove(LAST)
-                .commit()
+            prefs.commitEdit {
+                remove(ATTEMPTS)
+                remove(LAST)
+            }
         if (!cleared) {
             Timber.w("PIN throttle reset failed")
         }
