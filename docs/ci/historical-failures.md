@@ -2,63 +2,75 @@
 
 ## Run inventory
 
-| Run | Commit | Event | Result | Failed jobs | Notes |
-| --- | --- | --- | --- | --- | --- |
-| [`44932222747`](https://github.com/daviduhden/ANONERO/actions/runs/44932222747) | `81f17ef` | `workflow_dispatch` | success | none | Owner authorization and nine agent-knowledge Python regressions passed. |
-| [`44932222742`](https://github.com/daviduhden/ANONERO/actions/runs/44932222742) | `81f17ef` | `workflow_dispatch` | success | none | All nine jobs passed. Hardware-accelerated API 35 boot took about 45 s. Archived reports show 113 JVM tests and four instrumented tests per flavor, all passing. Kotlin source warnings absent; lint retains 11 warnings per flavor. |
-| [`44927810481`](https://github.com/daviduhden/ANONERO/actions/runs/44927810481) | `75939ea` | `workflow_dispatch` | success | none | Owner authorization and agent-knowledge Python checks passed. No Android build or device execution in this workflow. |
-| [`44927810332`](https://github.com/daviduhden/ANONERO/actions/runs/44927810332) | `75939ea` | `workflow_dispatch` | cancelled | Instrumented tests (API 35), cancelled | The eight other jobs passed, including both flavors and ARM native/assemble. The software emulator started with TCG and was cancelled during boot polling after about one minute, before tests. See CI-037. |
-| [`44924483639`](https://github.com/daviduhden/ANONERO/actions/runs/44924483639) | `0a44b76` | `workflow_dispatch` | success | none | Owner authorization and agent-knowledge Python checks passed. No Android build or device execution in this workflow. |
-| [`44924483602`](https://github.com/daviduhden/ANONERO/actions/runs/44924483602) | `0a44b76` | `workflow_dispatch` | cancelled | Instrumented tests (API 35), cancelled | Eight jobs passed. Emulator 37.3.10 refused software startup, then the action polled for boot until cancellation. See CI-036. |
-| [`43640612517`](https://github.com/daviduhden/ANONERO/actions/runs/43640612517) | `dff2ecb` | `workflow_dispatch` | success | none | Full suite passed. The archived XML reports record four API 35 tests per flavor, all passing. Kotlin warnings remained. See W-007. |
-| [`43632817394`](https://github.com/daviduhden/ANONERO/actions/runs/43632817394) | `1faa159` | `workflow_dispatch` | cancelled | JVM unit tests | Kotlin compilation passes; `NodeSelectionPolicyTest` fails in both flavors because `Node()` loads `WalletManager`, which initializes the unavailable `libanonero` in JVM tests. Android Lint passes; native/assemble were cancelled by the superseding run `43633496677`. |
-| [`43633496677`](https://github.com/daviduhden/ANONERO/actions/runs/43633496677) | `a2c9cfb` | `workflow_dispatch` | failure | Instrumented tests (API 35) | All JVM, lint, JNI, i18n, architecture, native and assemble jobs pass. The API 35 emulator fails before the test script with adb exit 224 and produces no reports; the same KVM-less runner instability as CI-032/035. |
-| [`43606679969`](https://github.com/daviduhden/ANONERO/actions/runs/43606679969) | `f5e43a5` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; Assemble | Native archives (including TLS patch `0008`) succeed; Kotlin compile fails on nullable host/credentials, a removed `wallet` reference, and a missing Koin import; instrumented skipped |
-| [`43528256395`](https://github.com/daviduhden/ANONERO/actions/runs/43528256395) | `0cf9db0` | `workflow_dispatch` | success | none | All jobs pass; instrumented anon and nero each ran 1 test with 0 failures; boot 919 s; 62 JVM tests per flavor; lint 0/0; no adapter warnings under `-Werror` |
-| [`43521054641`](https://github.com/daviduhden/ANONERO/actions/runs/43521054641) | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
-| [`43122308945`](https://github.com/daviduhden/ANONERO/actions/runs/43122308945) | `381d8ab` | `workflow_dispatch` | failure | instrumented | All code gates plus native and assemble pass; `system_server` SIGABRT while Gradle dexed the test APKs; both XML `tests=0`; health gate failed closed |
-| [`43108046671`](https://github.com/daviduhden/ANONERO/actions/runs/43108046671) | `02b97b8` | `workflow_dispatch` | failure | instrumented | Guest lost `system_server` during install/uninstall; both XML `tests=0`; all other jobs pass |
-| [`43058769285`](https://github.com/daviduhden/ANONERO/actions/runs/43058769285) | `76fcb79` | `workflow_dispatch` | failure | instrumented | Gradle ran both flavors successfully and XML validation passed; the inline retry loop failed because the emulator runner executes `script` line by line |
-| [`43045996049`](https://github.com/daviduhden/ANONERO/actions/runs/43045996049) | `452f4b6` | `workflow_dispatch` | failure | instrumented | 3 GB + 60 s settle: first flavor (anon) still failed to attach; XML validation correctly failed the job |
-| [`43034549647`](https://github.com/daviduhden/ANONERO/actions/runs/43034549647) | `9fa5c8e` | `workflow_dispatch` | failure | instrumented | All code gates, native, and assemble pass; the first instrumented flavor (anon) failed to attach, the second (nero) passed |
-| [`42874760135`](https://github.com/daviduhden/ANONERO/actions/runs/42874760135) | `c228e36` | `workflow_dispatch` | success | none | All jobs pass; instrumented XML validation confirms anon and nero each ran 1 test with 0 failures; lint 1 external Gradle advisory, suppressed afterwards |
-| [`42862824199`](https://github.com/daviduhden/ANONERO/actions/runs/42862824199) | `30075de` | `workflow_dispatch` | success (masked failure) | none | All jobs reported success, but the NERO XML contained `failures=1` with `failed to attach`; the runner returned 0. XML validation added afterwards |
-| [`42854503254`](https://github.com/daviduhden/ANONERO/actions/runs/42854503254) | `578bd38` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots after 16m then dies with `Broken pipe`/adb 224 (no KVM, software x86_64) |
-| [`42847493558`](https://github.com/daviduhden/ANONERO/actions/runs/42847493558) | `27c0987` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots; runner treated the `\` continuation as a Gradle task named `\` |
-| [`42841238523`](https://github.com/daviduhden/ANONERO/actions/runs/42841238523) | `1044ec8` | `workflow_dispatch` | failure | assemble | Native, tests, and lint pass; APK produced as `app-anon-debug.apk`; minSdk extraction returned empty |
-| [`42750259391`](https://github.com/daviduhden/ANONERO/actions/runs/42750259391) | `c059214` | `workflow_dispatch` | failure | assemble | Native passes; Gradle produces `app-<flavor>-debug.apk` but the workflow still expected `<flavor>-debug.apk` |
-| [`42746361128`](https://github.com/daviduhden/ANONERO/actions/runs/42746361128) | `f4b6d6d` | `workflow_dispatch` | failure | assemble | Native and code gates passed. Assemble expected `anon-debug.apk` after the build succeeded. See CI-022. |
-| [`42743643959`](https://github.com/daviduhden/ANONERO/actions/runs/42743643959) | `a80dbe7` | `workflow_dispatch` | failure | assemble | Native archives built successfully; the adapter failed to compile because `Get*ArrayRegion` returns void in C++ JNI |
-| [`42741706801`](https://github.com/daviduhden/ANONERO/actions/runs/42741706801) | `de7fbb6` | `workflow_dispatch` | failure | native | JVM tests and lint pass; native compiled for 15m and failed in `wallet_rpc_server.cpp` after the coin-control signature change |
-| [`42740103758`](https://github.com/daviduhden/ANONERO/actions/runs/42740103758) | `f99ade3` | `workflow_dispatch` | failure | JVM unit tests (SDK download); native (translations tool) | Patches applied; Monero tried to run an ARM64 translations binary on the host; Android SDK download timed out |
-| [`42708047372`](https://github.com/daviduhden/ANONERO/actions/runs/42708047372) | `7fe1daa` | `workflow_dispatch` | failure | native | Patch preflight and all five patches pass; Debian snapshot 503 persisted through five apt retries |
-| [`42707311457`](https://github.com/daviduhden/ANONERO/actions/runs/42707311457) | `ba3b3f6` | `workflow_dispatch` | failure | native | Patch series applied cleanly; Debian snapshot 503 blocked the container base stage |
-| [`42700250719`](https://github.com/daviduhden/ANONERO/actions/runs/42700250719) | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native failed before the series was restored |
-| [`42699227920`](https://github.com/daviduhden/ANONERO/actions/runs/42699227920) | `0006659` | `workflow_dispatch` | failure | native | Lint 0 errors / 0 warnings; native blocked |
-| [`42698560608`](https://github.com/daviduhden/ANONERO/actions/runs/42698560608) | `2788e92` | `workflow_dispatch` | failure | native | Lint had 2 warnings left; fixed afterwards |
-| [`42697719108`](https://github.com/daviduhden/ANONERO/actions/runs/42697719108) | `dda6cde` | `workflow_dispatch` | failure | native | Lint clean except icon/vector warnings; fixed afterwards |
-| [`42695062606`](https://github.com/daviduhden/ANONERO/actions/runs/42695062606) | `746ecf4` | `workflow_dispatch` | failure | native | Lint errors cleared; structural warnings reduced |
-| [`42694063725`](https://github.com/daviduhden/ANONERO/actions/runs/42694063725) | `dd692a8` | `workflow_dispatch` | failure | native | JVM tests and lint pass; compiler fixes validated |
-| [`42693644972`](https://github.com/daviduhden/ANONERO/actions/runs/42693644972) | `47f4a5e` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; native | Regression introduced by the first lint fix; corrected in `dd692a8` |
-| [`42692380022`](https://github.com/daviduhden/ANONERO/actions/runs/42692380022) | `672a1cc` | `workflow_dispatch` | failure | Android Lint; native | First lint run: 35 errors, 92 warnings |
-| [`42692271873`](https://github.com/daviduhden/ANONERO/actions/runs/42692271873) | `672a1cc` | `workflow_dispatch` | cancelled | none recorded | Authorization succeeded. The other jobs were cancelled. Full-run logs unavailable for a cancelled assemble job. |
-| [`42686398569`](https://github.com/daviduhden/ANONERO/actions/runs/42686398569) | `52d67d4` | `workflow_dispatch` | failure | JVM unit tests; native | Manual owner run; architecture policy, JNI contract, localization passed; instrumented skipped |
-| [`42552892586`](https://github.com/daviduhden/ANONERO/actions/runs/42552892586) | `ed8b097` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
-| [`42547686992`](https://github.com/daviduhden/ANONERO/actions/runs/42547686992) | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
+| Run | Workflow | Commit | Event | Result | Failed jobs | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| [`45679643727`](https://github.com/daviduhden/ANONERO/actions/runs/45679643727) | Agent Knowledge Validation | `2ca0edb` | `workflow_dispatch` | success | none | Owner authorization, nine Python regressions, and worktree and committed-range checks passed. |
+| [`45679643013`](https://github.com/daviduhden/ANONERO/actions/runs/45679643013) | Tests | `2ca0edb` | `workflow_dispatch` | success | none | All nine jobs passed. Archived XML confirms 130 JVM and nine API 35 tests per flavor, with no failures, errors, or skips. Lint: 0 errors, 13 warnings per flavor. Maven retry was not exercised. |
+| [`45677087065`](https://github.com/daviduhden/ANONERO/actions/runs/45677087065) | Agent Knowledge Validation | `b85919b` | `workflow_dispatch` | success | none | Owner authorization and Python and committed-range checks passed. |
+| [`45677086262`](https://github.com/daviduhden/ANONERO/actions/runs/45677086262) | Tests | `b85919b` | `workflow_dispatch` | cancelled | JVM unit tests; native, assemble and instrumented cancelled | Maven Central HTTP 429 blocked Gradle classpath configuration before test execution. Lint and static gates passed. See CI-039. |
+| [`44949188473`](https://github.com/daviduhden/ANONERO/actions/runs/44949188473) | Agent Knowledge Validation | `27ea36b` | `workflow_dispatch` | success | none | Owner authorization and Python validation passed. |
+| [`44949185924`](https://github.com/daviduhden/ANONERO/actions/runs/44949185924) | Tests | `27ea36b` | `workflow_dispatch` | success | none | All nine jobs passed, including native ARM archives, debug assembly and API 35 instrumentation. |
+| [`44946813106`](https://github.com/daviduhden/ANONERO/actions/runs/44946813106) | Agent Knowledge Validation | `7207f08` | `workflow_dispatch` | success | none | Owner authorization and Python validation passed. |
+| [`44946813069`](https://github.com/daviduhden/ANONERO/actions/runs/44946813069) | Tests | `7207f08` | `workflow_dispatch` | success | none | All nine jobs passed, including native ARM archives, debug assembly and API 35 instrumentation. |
+| [`44932222747`](https://github.com/daviduhden/ANONERO/actions/runs/44932222747) | Agent Knowledge Validation | `81f17ef` | `workflow_dispatch` | success | none | Owner authorization and nine agent-knowledge Python regressions passed. |
+| [`44932222742`](https://github.com/daviduhden/ANONERO/actions/runs/44932222742) | Tests | `81f17ef` | `workflow_dispatch` | success | none | All nine jobs passed. Hardware-accelerated API 35 boot took about 45 s. Archived reports show 113 JVM tests and four instrumented tests per flavor, all passing. Kotlin source warnings absent; lint retains 11 warnings per flavor. |
+| [`44927810481`](https://github.com/daviduhden/ANONERO/actions/runs/44927810481) | Agent Knowledge Validation | `75939ea` | `workflow_dispatch` | success | none | Owner authorization and agent-knowledge Python checks passed. No Android build or device execution in this workflow. |
+| [`44927810332`](https://github.com/daviduhden/ANONERO/actions/runs/44927810332) | Tests | `75939ea` | `workflow_dispatch` | cancelled | Instrumented tests (API 35), cancelled | The eight other jobs passed, including both flavors and ARM native/assemble. The software emulator started with TCG and was cancelled during boot polling after about one minute, before tests. See CI-037. |
+| [`44924483639`](https://github.com/daviduhden/ANONERO/actions/runs/44924483639) | Agent Knowledge Validation | `0a44b76` | `workflow_dispatch` | success | none | Owner authorization and agent-knowledge Python checks passed. No Android build or device execution in this workflow. |
+| [`44924483602`](https://github.com/daviduhden/ANONERO/actions/runs/44924483602) | Tests | `0a44b76` | `workflow_dispatch` | cancelled | Instrumented tests (API 35), cancelled | Eight jobs passed. Emulator 37.3.10 refused software startup, then the action polled for boot until cancellation. See CI-036. |
+| [`43640612517`](https://github.com/daviduhden/ANONERO/actions/runs/43640612517) | Tests | `dff2ecb` | `workflow_dispatch` | success | none | Full suite passed. The archived XML reports record four API 35 tests per flavor, all passing. Kotlin warnings remained. See W-007. |
+| [`43632817394`](https://github.com/daviduhden/ANONERO/actions/runs/43632817394) | Tests | `1faa159` | `workflow_dispatch` | cancelled | JVM unit tests | Kotlin compilation passes; `NodeSelectionPolicyTest` fails in both flavors because `Node()` loads `WalletManager`, which initializes the unavailable `libanonero` in JVM tests. Android Lint passes; native/assemble were cancelled by the superseding run `43633496677`. |
+| [`43633496677`](https://github.com/daviduhden/ANONERO/actions/runs/43633496677) | Tests | `a2c9cfb` | `workflow_dispatch` | failure | Instrumented tests (API 35) | All JVM, lint, JNI, i18n, architecture, native and assemble jobs pass. The API 35 emulator fails before the test script with adb exit 224 and produces no reports; the same KVM-less runner instability as CI-032/035. |
+| [`43606679969`](https://github.com/daviduhden/ANONERO/actions/runs/43606679969) | Tests | `f5e43a5` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; Assemble | Native archives (including TLS patch `0008`) succeed; Kotlin compile fails on nullable host/credentials, a removed `wallet` reference, and a missing Koin import; instrumented skipped |
+| [`43528256395`](https://github.com/daviduhden/ANONERO/actions/runs/43528256395) | Tests | `0cf9db0` | `workflow_dispatch` | success | none | All jobs pass; instrumented anon and nero each ran 1 test with 0 failures; boot 919 s; 62 JVM tests per flavor; lint 0/0; no adapter warnings under `-Werror` |
+| [`43521054641`](https://github.com/daviduhden/ANONERO/actions/runs/43521054641) | Tests | `feb985e` | `workflow_dispatch` | failure | instrumented | All code/native/assemble/lint/JNI gates pass (62 tests per flavor, lint 0/0, `-Werror` clean); boot took 630 s, then `adb`/input/overlay services broke before the test script; no reports |
+| [`43122308945`](https://github.com/daviduhden/ANONERO/actions/runs/43122308945) | Tests | `381d8ab` | `workflow_dispatch` | failure | instrumented | All code gates plus native and assemble pass; `system_server` SIGABRT while Gradle dexed the test APKs; both XML `tests=0`; health gate failed closed |
+| [`43108046671`](https://github.com/daviduhden/ANONERO/actions/runs/43108046671) | Tests | `02b97b8` | `workflow_dispatch` | failure | instrumented | Guest lost `system_server` during install/uninstall; both XML `tests=0`; all other jobs pass |
+| [`43058769285`](https://github.com/daviduhden/ANONERO/actions/runs/43058769285) | Tests | `76fcb79` | `workflow_dispatch` | failure | instrumented | Gradle ran both flavors successfully and XML validation passed; the inline retry loop failed because the emulator runner executes `script` line by line |
+| [`43045996049`](https://github.com/daviduhden/ANONERO/actions/runs/43045996049) | Tests | `452f4b6` | `workflow_dispatch` | failure | instrumented | 3 GB + 60 s settle: first flavor (anon) still failed to attach; XML validation correctly failed the job |
+| [`43034549647`](https://github.com/daviduhden/ANONERO/actions/runs/43034549647) | Tests | `9fa5c8e` | `workflow_dispatch` | failure | instrumented | All code gates, native, and assemble pass; the first instrumented flavor (anon) failed to attach, the second (nero) passed |
+| [`42874760135`](https://github.com/daviduhden/ANONERO/actions/runs/42874760135) | Tests | `c228e36` | `workflow_dispatch` | success | none | All jobs pass; instrumented XML validation confirms anon and nero each ran 1 test with 0 failures; lint 1 external Gradle advisory, suppressed afterwards |
+| [`42862824199`](https://github.com/daviduhden/ANONERO/actions/runs/42862824199) | Tests | `30075de` | `workflow_dispatch` | success (masked failure) | none | All jobs reported success, but the NERO XML contained `failures=1` with `failed to attach`; the runner returned 0. XML validation added afterwards |
+| [`42854503254`](https://github.com/daviduhden/ANONERO/actions/runs/42854503254) | Tests | `578bd38` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots after 16m then dies with `Broken pipe`/adb 224 (no KVM, software x86_64) |
+| [`42847493558`](https://github.com/daviduhden/ANONERO/actions/runs/42847493558) | Tests | `27c0987` | `workflow_dispatch` | failure | instrumented | Native and assemble pass; emulator boots; runner treated the `\` continuation as a Gradle task named `\` |
+| [`42841238523`](https://github.com/daviduhden/ANONERO/actions/runs/42841238523) | Tests | `1044ec8` | `workflow_dispatch` | failure | assemble | Native, tests, and lint pass; APK produced as `app-anon-debug.apk`; minSdk extraction returned empty |
+| [`42750259391`](https://github.com/daviduhden/ANONERO/actions/runs/42750259391) | Tests | `c059214` | `workflow_dispatch` | failure | assemble | Native passes; Gradle produces `app-<flavor>-debug.apk` but the workflow still expected `<flavor>-debug.apk` |
+| [`42746361128`](https://github.com/daviduhden/ANONERO/actions/runs/42746361128) | Tests | `f4b6d6d` | `workflow_dispatch` | failure | assemble | Native and code gates passed. Assemble expected `anon-debug.apk` after the build succeeded. See CI-022. |
+| [`42743643959`](https://github.com/daviduhden/ANONERO/actions/runs/42743643959) | Tests | `a80dbe7` | `workflow_dispatch` | failure | assemble | Native archives built successfully; the adapter failed to compile because `Get*ArrayRegion` returns void in C++ JNI |
+| [`42741706801`](https://github.com/daviduhden/ANONERO/actions/runs/42741706801) | Tests | `de7fbb6` | `workflow_dispatch` | failure | native | JVM tests and lint pass; native compiled for 15m and failed in `wallet_rpc_server.cpp` after the coin-control signature change |
+| [`42740103758`](https://github.com/daviduhden/ANONERO/actions/runs/42740103758) | Tests | `f99ade3` | `workflow_dispatch` | failure | JVM unit tests (SDK download); native (translations tool) | Patches applied; Monero tried to run an ARM64 translations binary on the host; Android SDK download timed out |
+| [`42708047372`](https://github.com/daviduhden/ANONERO/actions/runs/42708047372) | Tests | `7fe1daa` | `workflow_dispatch` | failure | native | Patch preflight and all five patches pass; Debian snapshot 503 persisted through five apt retries |
+| [`42707311457`](https://github.com/daviduhden/ANONERO/actions/runs/42707311457) | Tests | `ba3b3f6` | `workflow_dispatch` | failure | native | Patch series applied cleanly; Debian snapshot 503 blocked the container base stage |
+| [`42700250719`](https://github.com/daviduhden/ANONERO/actions/runs/42700250719) | Tests | `e0afc7f` | `workflow_dispatch` | failure | native | JVM tests, lint (0/0), JNI, i18n, policy pass; zero Kotlin warnings; native failed before the series was restored |
+| [`42699227920`](https://github.com/daviduhden/ANONERO/actions/runs/42699227920) | Tests | `0006659` | `workflow_dispatch` | failure | native | Lint 0 errors / 0 warnings; native blocked |
+| [`42698560608`](https://github.com/daviduhden/ANONERO/actions/runs/42698560608) | Tests | `2788e92` | `workflow_dispatch` | failure | native | Lint had 2 warnings left; fixed afterwards |
+| [`42697719108`](https://github.com/daviduhden/ANONERO/actions/runs/42697719108) | Tests | `dda6cde` | `workflow_dispatch` | failure | native | Lint clean except icon/vector warnings; fixed afterwards |
+| [`42695062606`](https://github.com/daviduhden/ANONERO/actions/runs/42695062606) | Tests | `746ecf4` | `workflow_dispatch` | failure | native | Lint errors cleared; structural warnings reduced |
+| [`42694063725`](https://github.com/daviduhden/ANONERO/actions/runs/42694063725) | Tests | `dd692a8` | `workflow_dispatch` | failure | native | JVM tests and lint pass; compiler fixes validated |
+| [`42693644972`](https://github.com/daviduhden/ANONERO/actions/runs/42693644972) | Tests | `47f4a5e` | `workflow_dispatch` | failure | JVM unit tests; Android Lint; native | Regression introduced by the first lint fix; corrected in `dd692a8` |
+| [`42692380022`](https://github.com/daviduhden/ANONERO/actions/runs/42692380022) | Tests | `672a1cc` | `workflow_dispatch` | failure | Android Lint; native | First lint run: 35 errors, 92 warnings |
+| [`42692271873`](https://github.com/daviduhden/ANONERO/actions/runs/42692271873) | Tests | `672a1cc` | `workflow_dispatch` | cancelled | none recorded | Authorization succeeded. The other jobs were cancelled. Full-run logs unavailable for a cancelled assemble job. |
+| [`42686398569`](https://github.com/daviduhden/ANONERO/actions/runs/42686398569) | Tests | `52d67d4` | `workflow_dispatch` | failure | JVM unit tests; native | Manual owner run; architecture policy, JNI contract, localization passed; instrumented skipped |
+| [`42552892586`](https://github.com/daviduhden/ANONERO/actions/runs/42552892586) | Tests | `ed8b097` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
+| [`42547686992`](https://github.com/daviduhden/ANONERO/actions/runs/42547686992) | Tests | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
-No release, sanitizer, or fuzz run exists. The native archives build, and instrumented
-passed on `42874760135`, `43528256395`, `43640612517` and `44932222742`, with inconsistent results without usable KVM. The two
-historical `push` triggers are no longer present; workflows are manual-only.
+No release, sanitizer, or fuzz run is recorded in the API history. Current full Tests
+evidence is on `2ca0edb`. Earlier green and cancelled runs remain historical baselines.
+The two historical `push` triggers are no longer present.
 
 ### Provenance and platform coverage
 
-The paginated API returned 41 runs in this repository on 2026-11-21: 38 Tests runs
-(29 failed, five succeeded, four cancelled) and three successful Agent Knowledge
-Validation runs. All returned run records are listed above. The separate
-`Build and publish APKs` workflow has no returned runs. GitHub CLI retrieved complete
-run logs for 39 runs and returned `log not found` on missing jobs in the cancelled
-runs `42692271873` and `43632817394`. The latter's JVM failure log was available
-by job ID. The API lists 86 artifacts, all marked unexpired at the time of review.
+The paginated API returned 49 runs on 2026-11-25: 42 Tests runs (29 failed,
+eight succeeded and five cancelled) and seven successful Agent Knowledge
+Validation runs. Every returned record is listed above, including the two
+historical push events. All records show attempt 1. The release workflow has no
+returned runs. The API supplied job inventories and readable log archives for
+all 49 records, but archives cannot supply steps that were skipped, cancelled
+before logging, or never uploaded. During the prior audit `gh run view --log`
+could not retrieve particular cancelled job logs for `42692271873` and
+`43632817394`. The JVM failure in the latter was available by job ID. As of this
+refresh the API lists 49 artifacts, none flagged expired. Previously listed
+artifacts absent from this snapshot are unavailable via the current listing.
 Logs and selected reports were kept outside the repository.
 
 The two Tests push runs at the bottom of the table pinned Gradle 9.7.0, AGP 9.3.3,
@@ -72,13 +84,18 @@ floor is API 29, while guest execution evidence comes from the API 35 x86_64 AVD
 There is no x86_64 release ABI. Older skipped or cancelled emulator jobs are not
 device evidence.
 
-The [latest Tests log](https://github.com/daviduhden/ANONERO/actions/runs/44932222742)
-records Clang 21.0.0 in native compiler identification and both API 29 ARM target
-wrappers. Individual run dependencies are reproducible from the linked SHA via
-`gradle/libs.versions.toml`, `external-libs/build.sh` and the Monero gitlink. For the
-latest run the native recipe includes Boost 1.92.0, OpenSSL 3.5.9 and libsodium
-1.0.22. Agent Knowledge Validation executes Python checks only, so Android and
-native toolchain coverage does not apply to those three rows.
+The two older source configurations also differ in native build dependencies:
+the push-era revisions use CMake 3.31.12, Boost 1.86.0 and zlib 1.3.2, and manually
+dispatched Tests revisions use CMake 4.4.5, Boost 1.92.0 and zlib 1.4. Both pin
+OpenSSL 3.5.9. The individual run's exact inputs can be resolved from the linked
+SHA using `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties`,
+`app/build.gradle.kts`, `external-libs/build.sh` and the Monero gitlink.
+The [latest Tests log](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
+records Clang 21.0.0 for native compilation and API 29 ARM target wrappers. The
+emulator used API 35 `google_apis` x86_64 and completed boot in 30.9 seconds.
+Agent Knowledge Validation has two jobs and runs Python only, so Android and
+native toolchain coverage does not apply. Job results belong to the linked
+runs and cannot establish that a configured tool was reached in a cancelled job.
 
 ## Failure records
 
@@ -943,8 +960,11 @@ to select its compiler API level. Removing it without replacing that selection
 could silently target the NDK's highest API. The local fix adds a
 separate API selector to the pinned OpenSSL configuration and checks that
 Configure selected the exact NDK wrapper without redefining the built-in
-macro. The proposed correction is statically checked and pending native CI
-for both ABIs. See [configuration and rollback](openssl-android-api.md).
+macro. [Tests 45679643013](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
+confirms the effective OpenSSL targets `android-arm64` and `android-arm`, the
+`aarch64-linux-android29-clang` and `armv7a-linux-androideabi29-clang` wrappers,
+and no duplicate Android API definition in the compiler log. Both archives
+built and linked in the debug APKs. See [configuration and rollback](openssl-android-api.md).
 
 ### W-009 — Lint findings from a successful job
 
@@ -965,7 +985,7 @@ the archived lint XML contains zero errors and 11 warnings per flavor, all from
 the eight dependency notices and the three checked editor calls. The unused
 resource and URI warnings are absent. See the [preventive audit](preventive-audit.md).
 
-### Maven Central throttled Gradle configuration on b85919b
+### CI-039 — Maven Central throttled Gradle configuration on b85919b
 
 - [Tests 45677086262](https://github.com/daviduhden/ANONERO/actions/runs/45677086262)
   returned HTTP 429 when resolving the Kotlin Gradle plugin from Maven Central
@@ -997,3 +1017,71 @@ resource and URI warnings are absent. See the [preventive audit](preventive-audi
   autotools and libtool. It has no completed JNI link evidence. Upstream
   diagnostics need comparison against a completed build and are outside this
   Gradle failure fix.
+
+
+### W-010 — Boost Histogram shared-install diagnostic in static ARM builds
+
+- **Evidence:** [native job 139436525653](https://github.com/daviduhden/ANONERO/actions/runs/45679643013/job/139436525653)
+  on `2ca0edb` logs `No best alternative` for
+  `libs/histogram/install-libraries-shared` under `link=static` for ARM32 and
+  ARM64. The earlier cancelled `b85919b` run shows the same diagnostic for its
+  ARM64 build. The completed run produced both ARM archives and the two debug
+  APKs successfully linked.
+- **Attribution:** The [pinned Histogram build definition](https://github.com/boostorg/histogram/blob/boost-1.92.0/build.jam)
+  registers the module with Boost.Build despite providing a header-only alias.
+  ANONERO requests selected compiled components in `dep_boost` and does not
+  select Histogram. This is emitted by the dependency's install graph rather
+  than the ANONERO JNI compiler. [Boost.Build #784](https://github.com/boostorg/build/issues/784)
+  contains the same diagnostic on a different toolset.
+- **Status:** Keep static linkage and the required archive checks. No validated
+  Android fix for the pinned dependency was found in the material reviewed.
+  A candidate upstream change needs successful native and assemble jobs for
+  both ABIs and archive/link comparison. Do not suppress the diagnostic.
+
+### W-011 — Emulator action SDK XML parser mismatch
+
+- **Evidence:** [instrumented job 139452383333](https://github.com/daviduhden/ANONERO/actions/runs/45679643013/job/139452383333)
+  on `2ca0edb` warns that its SDK XML reader supports version 3 while reading
+  version 4. The warning accompanies `sdkmanager --licenses`, package installs
+  and `avdmanager create avd`, before Gradle runs the instrumented tests.
+- **Attribution:** The [pinned SDK installer](https://github.com/ReactiveCircus/android-emulator-runner/blob/a421e43855164a8197daf9d8d40fe71c6996bb0d/src/sdk-installer.ts)
+  reuses the existing command-line tools directory and prepends its
+  `latest/bin` path. The preceding SDK setup logs identify the preinstalled
+  `latest` as 12.0 and invoke the downloaded sibling 22.0 explicitly, without
+  the XML mismatch. Reselecting the stale alias explains the warning, but the
+  emulator step does not print its resolved executables. This is a runner
+  SDK metadata warning, not Android Lint. The separate deprecation message
+  from the SDK 22.0 CLI is W-001.
+- **Status:** Verify the effective executable and command-line tools revision
+  before changing the installer or a pin. Any update needs both APK assembly
+  and nonzero passing XML and exit codes for both flavors. The tested job
+  passed with nine tests per flavor despite the diagnostic.
+
+### W-012 — Artifact action Node.js Buffer deprecation
+
+- **Evidence:** [assemble job 139448814102](https://github.com/daviduhden/ANONERO/actions/runs/45679643013/job/139448814102)
+  and the instrumented job on `2ca0edb` emit Node `DEP0005` during native
+  artifact download. Both jobs completed and consumed the native artifact.
+- **Attribution:** The warning comes from the download action runtime, outside
+  the Android and native compilation steps. [Actions Toolkit #2003](https://github.com/actions/toolkit/issues/2003)
+  tracks that warning in the action's ZIP extraction path.
+- **Status:** Compare a future pinned action with the existing artifact
+  verification and both platform jobs before replacing it. Keep the warning
+  visible and do not skip integrity checks.
+
+### CI-039 follow-up — Latest report and regressions on 2ca0edb
+
+[Tests 45679643013](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
+passed with the new Gradle wrapper. The JNI job ran 36 Python regressions,
+including the synthetic rate-limit case. No live Maven throttle or retry
+appears in the job log. Archived lint XML confirms that the unused strings
+were removed across the variants. The 13 remaining warnings are eight
+dependency update advisories and five explicit preference editor calls that
+preserve Boolean commit results. The Android and native jobs contain no
+project Kotlin compiler warning or adapter source diagnostic. The five
+`UseKtx` positions are four files: two calls in `PinThrottle.kt` and one
+each in `AnonWalletHandler.kt`, `PrivacySettings.kt` and `TransportModels.kt`.
+The existing Unit-returning extension cannot observe write failure.
+This does not establish warning-free third-party builds. Native ASan/UBSan/TSan/LSan,
+fuzzing, ARM hardware execution, API 29 device execution and production
+signing remain without positive Actions evidence.

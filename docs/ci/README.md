@@ -43,15 +43,18 @@ validation.
 - [Seed and key JNI containment](seed-jni-boundary.md)
 - [QR frame ownership and received transaction details](qr-frame-and-transaction-detail.md)
 - [PIN persistence and transaction Parcel](pin-throttle-and-transaction-parcel.md)
+- [Managed wallet lifetime](managed-wallet-lifetime.md)
+- [UI session boundaries and animated QR lifecycle](ui-session-boundaries.md)
+- [JNI review snapshots](jni-review-snapshot.md)
 
 ## Evidence limits
 
 GitHub Actions logs show the state of a specific commit and workflow definition. They do
 not prove the current working tree. Fixes described as “implemented, CI pending” have been
-reviewed statically only. Native and instrumented behavior remains unverified: the patch
-series is checked in and applies to the pinned commit, but the local Monero submodule is
-uninitialized locally; CI builds the archives and APKs, while the instrumented smoke test
-is unstable on the KVM-less runner.
+reviewed statically only. The local Monero submodule is uninitialized. GitHub Actions
+evidence confirms native compilation and instrumented behavior only for the recorded
+revisions and runner configuration. The instrumented smoke test has previously been
+unstable on runners without usable KVM.
 
 
 ## Read-only evidence refresh, 2026-11-14
@@ -65,6 +68,19 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
 
 ## Latest evidence
 
+- [Tests 45679643013](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
+  on `2ca0edb` passed all nine jobs. Both debug APKs linked against the ARM
+  archives. The API 35 x86_64 guest completed boot in 30.9 seconds. Each flavor
+  has 130 JVM and nine instrumented cases with zero failures, errors or skips.
+  Lint is zero errors and 13 warnings per flavor. The build did not exercise a
+  live Maven retry. The static CI suite passed its 36 Python regressions.
+- [Agent Knowledge Validation 45679643727](https://github.com/daviduhden/ANONERO/actions/runs/45679643727)
+  on the same commit passed its two jobs and nine Python regressions, including
+  committed-range validation.
+- [Tests 45677086262](https://github.com/daviduhden/ANONERO/actions/runs/45677086262)
+  on `b85919b` was cancelled overall after the JVM job hit Maven Central HTTP
+  429 before test execution. Native archive creation, debug assembly and instrumentation remained
+  incomplete. See [CI-039](historical-failures.md#ci-039--maven-central-throttled-gradle-configuration-on-b85919b).
 - [Tests 44932222742](https://github.com/daviduhden/ANONERO/actions/runs/44932222742)
   on `81f17ef` passed all nine jobs. The API 35 emulator used hardware acceleration
   and booted in about 45 seconds. Archived XML confirms 113 JVM tests and four
@@ -88,9 +104,20 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
 - [Agent Knowledge Validation 44927810481](https://github.com/daviduhden/ANONERO/actions/runs/44927810481)
   on `75939ea` passed the Python regression and knowledge checks. It did not
   execute Android tests.
-- The [historical inventory](historical-failures.md) covers all 41 API records,
+- The [historical inventory](historical-failures.md) covers all 49 API records,
   including successful runs with warnings, incomplete logs and artifact evidence.
   No production signing, sanitizer, fuzz or device-farm execution was found.
+
+## Verified platform coverage
+
+| Area | Evidence at `2ca0edb` | Remaining validation |
+| --- | --- | --- |
+| Android floor and toolchain | API 29 manifest floor verified for both debug APKs. Compile SDK 37.2, target 37, Kotlin 2.4.21, AGP 9.5.1 and Gradle 9.9.0 are pinned. | API 29 runtime behavior was not tested in this run. |
+| Native compile and link | Monero ARM archives and the JNI adapter built for `arm64-v8a` and `armeabi-v7a`. Debug ANON and NERO linked with NDK r30. | ARM device execution, JNI fault injection and dedicated CheckJNI coverage remain open. |
+| Android instrumentation | API 35 `google_apis` x86_64 guest ran nine tests per debug flavor. This is a test guest, with no x86_64 production ABI. | No ARM hardware report or other API level report in the current run. |
+| Wallet and transport | JVM test XML and API 35 XML cover the cases shipped in this revision, including LWS profile isolation and transport persistence failure. | Live Tor bridges, real LWS/daemon routing and full wallet2 flows require dedicated environment and device coverage. |
+| Release and signing | Manual workflow configuration is present. | No release workflow run, production signing result or signed APK artifact is recorded. |
+| Sanitizers and fuzzing | Archived jobs were reviewed for diagnostic patterns. | No sanitizer or fuzz suite execution is recorded, so these diagnostics have no test verdict. |
 
 ## Preventive source regressions in this audit
 

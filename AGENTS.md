@@ -264,6 +264,9 @@ threat models, regression requirements and remaining boundaries.
   3. a fail-closed fix;
   4. a regression test or static check;
   5. an entry in `docs/ci/` for historical or recurring failures.
+  Compare the resolved toolchain and reports against the exact tested SHA. Record
+  cancellation and unavailable or missing artifacts separately from test failures.
+  A successful job does not clear a compiler warning or sanitizer finding.
   A disappearing original diagnostic is not completion. Do not hide warnings with
   `continue-on-error`, `|| true`, blanket suppressions, or removed checks. A type/import
   error after a refactor is a pattern signal: check every call site, nullable preference

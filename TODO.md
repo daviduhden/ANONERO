@@ -5,6 +5,9 @@ the rationale to `ROADMAP.md`.
 
 ## Critical
 
+- [ ] Validate managed-wallet close/replacement and incomplete profile deletion with
+      the JVM and device cases in [MW-001](docs/ci/managed-wallet-lifetime.md).
+
 - [ ] Review the LGPL-3.0 licensing implications of the restored `monero_c` patch series
       before redistribution; see `external-libs/patches/README.md` and
       `LICENSE-LGPL-3.0`.

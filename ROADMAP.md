@@ -10,8 +10,9 @@ required constraints, alongside correctness, compatibility and maintainability.
   credential set may survive a failed create/restore.
 - Add tests for failed creation, interrupted Keystore migration, restore-target rejection,
   and profile switching.
-- Audit every `WalletManager` handle path for zero-handle, close-failure, and stale-listener
-  behavior.
+- Exercise managed slot reservation and failed-close retention in both flavors.
+  Continue JNI handle-consumer and stale-listener audits, including raw wrappers
+  captured before a session closes.
 - Keep transaction review tied to the loaded unsigned object; do not reintroduce advisory
   destination data as a review source. The NERO signed-file binding API is still missing:
   do not claim the airgapped broadcast is verified until it can compare signed txids/outputs

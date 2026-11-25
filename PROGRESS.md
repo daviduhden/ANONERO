@@ -3,6 +3,16 @@
 Baseline: `ed8b097`, followed by the hardening commits through `52d67d4`. This file
 records progress; it is not a release note and does not claim CI validation.
 
+## November 25 CI and preventive follow-up
+
+- Tests `45679643013` passed on `2ca0edb` with Android API 35 instrumentation, and
+  `45679643727` passed the agent-knowledge checks at the same SHA. The archived
+  reports record 130 JVM tests and nine instrumented tests per flavor.
+- Local follow-up protects managed wallet reservations and profile cleanup through
+  native close failures, checks JNI callback descriptors, contains native transaction
+  review exceptions, and binds sensitive UI actions to their wallet session. See
+  [CI findings and coverage](docs/ci/README.md). New regressions require authorized CI.
+
 ## Completed in the current cycle
 
 ### Funds and lifecycle correctness
