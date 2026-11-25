@@ -882,11 +882,12 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
     const auto listenerField = getHandleField(env, walletInstance, "listenerHandle");
     if (walletField == nullptr || listenerField == nullptr)
         return JNI_FALSE;
-    auto *wallet = reinterpret_cast<Monero::Wallet *>(env->GetLongField(walletInstance, walletField));
+    auto *wallet =
+        reinterpret_cast<Monero::Wallet *>(env->GetLongField(walletInstance, walletField));
     if (wallet == nullptr)
         return JNI_FALSE;
-    auto *listener = reinterpret_cast<MyWalletListener *>(
-        env->GetLongField(walletInstance, listenerField));
+    auto *listener =
+        reinterpret_cast<MyWalletListener *>(env->GetLongField(walletInstance, listenerField));
 
     try {
         if (!Monero::WalletManagerFactory::getWalletManager()->closeWallet(wallet, false)) {
@@ -912,14 +913,18 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
 
 /* Wallet */
 
-static void throwWalletSeedFailure(JNIEnv *env) {
+static void throwWalletOperationFailure(JNIEnv *env, const char *message) {
     if (env->ExceptionCheck())
         return;
     jclass failure = env->FindClass("java/lang/IllegalStateException");
     if (failure == nullptr)
         return;
     ScopedLocalRef failureRef(env, failure);
-    env->ThrowNew(failure, "Native wallet seed or key operation failed");
+    env->ThrowNew(failure, message);
+}
+
+static void throwWalletSeedFailure(JNIEnv *env) {
+    throwWalletOperationFailure(env, "Native wallet seed or key operation failed");
 }
 
 // Prefer the wallet's Polyseed. When wallet2 cannot provide one, return its
@@ -2405,6 +2410,10 @@ JNIEXPORT jobject JNICALL Java_io_anonero_model_TransactionHistory_refreshJ(JNIE
     }
 }
 
+static void throwTransactionReviewFailure(JNIEnv *env) {
+    throwWalletOperationFailure(env, "Native transaction review failed");
+}
+
 JNIEXPORT jint JNICALL Java_io_anonero_model_PendingTransaction_getStatusJ(JNIEnv *env,
                                                                            jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
@@ -2418,7 +2427,12 @@ Java_io_anonero_model_PendingTransaction_getErrorString(JNIEnv *env, jobject ins
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
     if (tx == nullptr)
         return nullptr;
-    return env->NewStringUTF(tx->errorString().c_str());
+    try {
+        return env->NewStringUTF(tx->errorString().c_str());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return nullptr;
+    }
 }
 
 // commit transaction or save to file if filename is provided.
@@ -2443,19 +2457,34 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_PendingTransaction_commit(JNIEn
 JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getAmount(JNIEnv *env,
                                                                            jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
-    return tx == nullptr ? 0 : static_cast<jlong>(tx->amount());
+    try {
+        return tx == nullptr ? 0 : static_cast<jlong>(tx->amount());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return 0;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getDust(JNIEnv *env,
                                                                          jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
-    return tx == nullptr ? 0 : static_cast<jlong>(tx->dust());
+    try {
+        return tx == nullptr ? 0 : static_cast<jlong>(tx->dust());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return 0;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getFee(JNIEnv *env,
                                                                         jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
-    return tx == nullptr ? 0 : static_cast<jlong>(tx->fee());
+    try {
+        return tx == nullptr ? 0 : static_cast<jlong>(tx->fee());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return 0;
+    }
 }
 
 // Unsigned transaction objects are loaded for review and released through
@@ -2474,7 +2503,12 @@ Java_io_anonero_model_UnsignedTransaction_getErrorString(JNIEnv *env, jobject in
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
     if (tx == nullptr)
         return nullptr;
-    return env->NewStringUTF(tx->errorString().c_str());
+    try {
+        return env->NewStringUTF(tx->errorString().c_str());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_UnsignedTransaction_getAddress(JNIEnv *env,
@@ -2483,11 +2517,16 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_UnsignedTransaction_getAddress(J
     if (tx == nullptr)
         return env->NewStringUTF("");
 
-    std::vector<std::string> arr = tx->recipientAddress();
-    if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
-        return env->NewStringUTF("");
+    try {
+        std::vector<std::string> arr = tx->recipientAddress();
+        if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
+            return env->NewStringUTF("");
 
-    return env->NewStringUTF(arr[0].c_str());
+        return env->NewStringUTF(arr[0].c_str());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return nullptr;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getAmount(JNIEnv *env,
@@ -2495,10 +2534,15 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getAmount(JNIE
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
     if (tx == nullptr)
         return 0;
-    std::vector<uint64_t> arr = tx->amount();
-    if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
+    try {
+        std::vector<uint64_t> arr = tx->amount();
+        if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
+            return 0;
+        return static_cast<jlong>(arr[0]);
+    } catch (...) {
+        throwTransactionReviewFailure(env);
         return 0;
-    return static_cast<jlong>(arr[0]);
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getFee(JNIEnv *env,
@@ -2506,10 +2550,15 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getFee(JNIEnv 
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
     if (tx == nullptr)
         return 0;
-    std::vector<uint64_t> arr = tx->fee();
-    if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
+    try {
+        std::vector<uint64_t> arr = tx->fee();
+        if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
+            return 0;
+        return static_cast<jlong>(arr[0]);
+    } catch (...) {
+        throwTransactionReviewFailure(env);
         return 0;
-    return static_cast<jlong>(arr[0]);
+    }
 }
 
 // Despite the historical JNI name, this accessor returns the first payment ID.
@@ -2518,17 +2567,27 @@ Java_io_anonero_model_UnsignedTransaction_getFirstTxIdJ(JNIEnv *env, jobject ins
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
     if (tx == nullptr)
         return nullptr;
-    std::vector<std::string> txids = tx->paymentId();
-    if (!txids.empty())
-        return env->NewStringUTF(txids.front().c_str());
-    else
+    try {
+        std::vector<std::string> txids = tx->paymentId();
+        if (!txids.empty())
+            return env->NewStringUTF(txids.front().c_str());
+        else
+            return nullptr;
+    } catch (...) {
+        throwTransactionReviewFailure(env);
         return nullptr;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getTxCount(JNIEnv *env,
                                                                              jobject instance) {
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
-    return tx == nullptr ? 0 : static_cast<jlong>(tx->txCount());
+    try {
+        return tx == nullptr ? 0 : static_cast<jlong>(tx->txCount());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return 0;
+    }
 }
 
 // wallet2 builds this summary at load time from splitted_dsts, the outputs
@@ -2538,7 +2597,12 @@ Java_io_anonero_model_UnsignedTransaction_confirmationMessageJ(JNIEnv *env, jobj
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
     if (tx == nullptr)
         return env->NewStringUTF("");
-    return env->NewStringUTF(tx->confirmationMessage().c_str());
+    try {
+        return env->NewStringUTF(tx->confirmationMessage().c_str());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return nullptr;
+    }
 }
 
 // Sign the object retained for review. Reloading the path at confirmation
@@ -2575,17 +2639,27 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_PendingTransaction_getFirstTxIdJ
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
     if (tx == nullptr)
         return nullptr;
-    std::vector<std::string> txids = tx->txid();
-    if (!txids.empty())
-        return env->NewStringUTF(txids.front().c_str());
-    else
+    try {
+        std::vector<std::string> txids = tx->txid();
+        if (!txids.empty())
+            return env->NewStringUTF(txids.front().c_str());
+        else
+            return nullptr;
+    } catch (...) {
+        throwTransactionReviewFailure(env);
         return nullptr;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getTxCount(JNIEnv *env,
                                                                             jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
-    return tx == nullptr ? 0 : static_cast<jlong>(tx->txCount());
+    try {
+        return tx == nullptr ? 0 : static_cast<jlong>(tx->txCount());
+    } catch (...) {
+        throwTransactionReviewFailure(env);
+        return 0;
+    }
 }
 
 // Kotlin groups process-wide wallet2 logging controls under WalletManager.

@@ -132,6 +132,11 @@ wallet2 returns normally with false. Secret display callers must surface the
 localized failure without logging material or treating the failed read as an
 unlock. See [seed JNI failure paths](../../../docs/ci/seed-jni-boundary.md).
 
+Keep allocating transaction review accessors inside a native exception boundary.
+A failed read must raise a fixed Java error rather than collapse into an ordinary
+zero, empty string, or empty summary. Publish review ownership only after the
+review model is built from the authoritative transaction data.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

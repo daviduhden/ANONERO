@@ -166,6 +166,28 @@ for operation, calls in (
     ):
         failures.append("Wallet.getSeed: legacy fallback requires a normal false Polyseed result")
 
+# Transaction review reads wallet2 summaries and totals before publishing a
+# signable or broadcastable model. Allocation failures must propagate as Java errors.
+for owner, operations in (
+    ("PendingTransaction", {
+        "getErrorString": "errorString", "getAmount": "amount", "getDust": "dust",
+        "getFee": "fee", "getFirstTxIdJ": "txid", "getTxCount": "txCount",
+    }),
+    ("UnsignedTransaction", {
+        "getErrorString": "errorString", "getAddress": "recipientAddress",
+        "getAmount": "amount", "getFee": "fee", "getFirstTxIdJ": "paymentId",
+        "getTxCount": "txCount", "confirmationMessageJ": "confirmationMessage",
+    }),
+):
+    for operation, method in operations.items():
+        start = code.index(f"Java_io_anonero_model_{owner}_{operation}(")
+        end = code.index("\n}\n", start)
+        preamble, _, implementation = code[start:end].partition("try {")
+        native, _, failure = implementation.partition("catch (...)")
+        call = f"->{method}("
+        if call in preamble or call not in native or "throwTransactionReviewFailure(env);" not in failure:
+            failures.append(f"{owner}.{operation}: review read must fail through the Java error path")
+
 # wallet2 does not serialize listener pointer swaps against callback delivery.
 listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")
 listener_end = code.index("\n}\n", listener_start)

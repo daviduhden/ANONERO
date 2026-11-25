@@ -184,6 +184,9 @@ class ReviewTransactionViewModel : ViewModel() {
     val broadCastError get() = _broadcastError
     val getBroadcastingTxState get() = broadcastingTx
     val reviewModelLive: LiveData<ReviewModel?> get() = reviewModel
+    val reviewLoadFailed: LiveData<Boolean> get() = _reviewLoadFailed
+
+    private val _reviewLoadFailed = MutableLiveData(false)
 
     var pendingTransaction: PendingTransaction? = null
     var unsignedTransaction: UnsignedTransaction? = null
@@ -195,50 +198,55 @@ class ReviewTransactionViewModel : ViewModel() {
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            val wallet = WalletManager.instance?.wallet ?: return@launch
-            val session = ReviewOwner(wallet, WalletSession.profile, wallet.getAccountIndex())
-            val pendingTransaction = wallet.getPendingTx()
-            val unsignedTransaction = wallet.getUnsginedTx()
-
-            if (unsignedTransaction != null) {
-                this@ReviewTransactionViewModel.unsignedTransaction = unsignedTransaction
-                owner = session
-                // Rows come from wallet2's own summary of the outputs sign() will construct,
-                // never from the set's advisory destination list. If the sentence cannot be
-                // parsed it is shown raw; the advisory getters are not a fallback.
-                val message = unsignedTransaction.confirmationMessage
-                val summary = SigningSummary.parse(message)
-                reviewModel.postValue(
-                    ReviewModel(
-                        address = summary?.destinations?.firstOrNull()?.address ?: "",
-                        amount = summary?.amount ?: 0L,
-                        fee = summary?.fee ?: 0L,
-                        total = summary?.let { it.amount + it.fee } ?: 0L,
-                        txId = unsignedTransaction.firstTxId,
-                        summary = summary,
-                        confirmationMessage = if (summary == null) message else null,
-                    ),
-                )
-            } else if (pendingTransaction != null) {
-                val txId = pendingTransaction.getFirstTxIdJ()
-                // A multi-destination set can be valid before wallet2 assigns the first txid;
-                // the amount/fee are still authoritative, and the reviewed destinations come
-                // from the navigation route. Do not blank the review screen in that case.
-                if (txId != null || pendingTransaction.getAmount() > 0L) {
-                    this@ReviewTransactionViewModel.pendingTransaction = pendingTransaction
-                    owner = session
-                    reviewModel.postValue(
+            try {
+                val wallet = checkNotNull(WalletManager.instance?.wallet)
+                val session = ReviewOwner(wallet, WalletSession.profile, wallet.getAccountIndex())
+                val pending = wallet.getPendingTx()
+                val unsigned = wallet.getUnsginedTx()
+                val snapshot =
+                    if (unsigned != null) {
+                        // Use wallet2's actual signing summary. Preserve a nonempty raw
+                        // sentence when parsing fails, but never attach an empty review.
+                        val message = unsigned.confirmationMessage
+                        check(message.isNotBlank())
+                        val summary = SigningSummary.parse(message)
+                        ReviewModel(
+                            address = summary?.destinations?.firstOrNull()?.address ?: "",
+                            amount = summary?.amount ?: 0L,
+                            fee = summary?.fee ?: 0L,
+                            total = summary?.let { Math.addExact(it.amount, it.fee) } ?: 0L,
+                            txId = unsigned.firstTxId,
+                            summary = summary,
+                            confirmationMessage = if (summary == null) message else null,
+                        )
+                    } else {
+                        checkNotNull(pending)
+                        val txId = pending.getFirstTxIdJ()
+                        val amount = pending.getAmount()
+                        val fee = pending.getFee()
+                        check(txId != null || amount > 0L)
                         ReviewModel(
                             address = null,
-                            amount = pendingTransaction.getAmount(),
-                            fee = pendingTransaction.getFee(),
-                            total = pendingTransaction.getFee() + pendingTransaction.getAmount(),
+                            amount = amount,
+                            fee = fee,
+                            total = Math.addExact(amount, fee),
                             txId = txId ?: "",
-                        ),
-                    )
-                } else {
-                    Timber.tag(TAG).e("Pending transaction has no txId")
-                }
+                        )
+                    }
+                check(
+                    WalletManager.instance?.wallet === wallet &&
+                        WalletSession.profile == session.profile &&
+                        wallet.getAccountIndex() == session.account &&
+                        !walletState.backgroundSync,
+                )
+                unsignedTransaction = unsigned
+                pendingTransaction = if (unsigned == null) pending else null
+                owner = session
+                reviewModel.postValue(snapshot)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _reviewLoadFailed.postValue(true)
             }
         }
     }
@@ -315,6 +323,7 @@ fun ReviewTransactionScreen(
     var qrScannerParam by remember { mutableStateOf<SpendQRExchangeParam?>(null) }
     val viewModel = viewModel<ReviewTransactionViewModel>()
     val reviewModel by viewModel.reviewModelLive.observeAsState()
+    val reviewLoadFailed by viewModel.reviewLoadFailed.observeAsState(false)
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val broadcastState by viewModel.getBroadcastingTxState.observeAsState(BroadcastState.STAGING)
@@ -396,6 +405,13 @@ fun ReviewTransactionScreen(
                     .padding(it)
                     .padding(bottom = 0.dp),
         ) {
+            if (reviewLoadFailed) {
+                Text(
+                    text = stringResource(R.string.wallet_operation_failed),
+                    color = DangerColor,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
             if (reviewModel != null) {
                 AnimatedVisibility(
                     visible = broadcastState == BroadcastState.ERROR,
