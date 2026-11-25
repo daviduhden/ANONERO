@@ -102,6 +102,12 @@ catch disposal cleanup refusals without crashing the UI. Updated back buttons us
 
 Derive send readiness from the validated recipient and current balance, spend mode, and coin selection. Keep an unresolved explicit selection distinct from an empty selection, and bind NERO preflight to the same request as review.
 
+Close each CameraX image proxy in a `finally` block that covers format checks, image
+access and detection callbacks. Keep decoded payloads out of diagnostics. In receipt
+details, use the transaction's own account and subaddress indices. Validate the
+history entry against the current wallet session before resolving addresses and
+again before publishing results from the IO dispatcher.
+
 ## Maintenance & Continuous Learning
 
 When this subsystem changes, reconcile this procedure with the implementation and

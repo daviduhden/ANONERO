@@ -33,15 +33,12 @@ import com.google.zxing.Result
 import timber.log.Timber
 import java.nio.ByteBuffer
 
-private const val TAG = "QrCodeAnalyzerBoofcv"
-
 /**
- * CameraX analyzer that converts YUV/JPEG frames to a BoofCV gray image and decodes QR
- * codes with the BoofCV detector.
+ * BoofCV QR decoder for CameraX frames. The camera path uses the YUV luminance
+ * plane directly, including its row padding.
  *
- * Analysis runs on CameraX's executor, not the main thread. The callback may fire more than
- * once per frame or for the same code; callers must de-duplicate and close over their own
- * cancellation/lifecycle state.
+ * Calls back on the camera analysis executor. Callers can receive several detections
+ * per frame and repeated detections across frames.
  */
 class QrCodeAnalyzerBoofcv(
     private val onQrCodesDetected: (qrCode: Result) -> Unit,
@@ -68,29 +65,17 @@ class QrCodeAnalyzerBoofcv(
     private val detector = FactoryFiducial.qrcode(null, GrayU8::class.java)
 
     fun imageToGrayU8(image: Image?): GrayU8 {
-        // Get the image's planes
         val planes = image?.planes
-
-        // Retrieve the data from the Y plane (the first plane in YUV format)
         val yBuffer = planes?.get(0)?.buffer
-
-        // Create a ByteArray to hold the Y plane data
         val yData = ByteArray(yBuffer?.remaining() ?: 0)
-
-        // Copy the Y plane data from the buffer into the ByteArray
         yBuffer?.get(yData)
 
-        // Get the image's width and height
         val width = image?.width ?: 0
         val height = image?.height ?: 0
-
-        // Create a GrayU8 image with the Y plane data, width, and height
         val grayU8 = GrayU8(width, height)
         grayU8.data = yData
+        // BoofCV must advance by the camera row stride to skip alignment padding.
         grayU8.stride = planes?.get(0)?.rowStride ?: 0
-
-        // Close the ImageProxy to release resources
-        // imageProxy.close()
 
         return grayU8
     }
@@ -101,19 +86,12 @@ class QrCodeAnalyzerBoofcv(
         val width = inputImage.width
         val height = inputImage.height
 
-        // Create a new GrayU8 image to store the inverted result
         val invertedImage = GrayU8(width, height)
 
-        // Invert the colors of the grayscale image
         for (y in 0 until height) {
             for (x in 0 until width) {
-                // Get the pixel intensity value at (x, y)
                 val intensity = inputImage.get(x, y)
-
-                // Invert the intensity value by subtracting it from 255
                 val invertedIntensity = 255 - intensity
-
-                // Set the inverted intensity value at (x, y) in the output image
                 invertedImage.set(x, y, invertedIntensity)
             }
         }
@@ -123,65 +101,41 @@ class QrCodeAnalyzerBoofcv(
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        if (debugI % 100 == 10) {
-            Timber.tag("QrCodeAnalyzerBoofcv.kt").d("$debugI analyze(image: ImageProxy)")
-        }
-        debugI++
-        // We are using YUV format because, ImageProxy internally uses ImageReader to get the image
-        // by default ImageReader uses YUV format unless changed.
-        if (imageProxy.format !in yuvFormats) {
-            return
-        }
-        // val data = image.planes[0].buffer.toByteArray()
-
-        /*
-        val source = PlanarYUVLuminanceSource(
-            data,
-            image.width,
-            image.height,
-            0,
-            0,
-            image.width,
-            image.height,
-            false
-        )
-         */
-        if (imageProxy.image == null) {
-            return
-        }
-        val image: Image? = imageProxy.image
-        val imgGrayU8: GrayU8 = imageToGrayU8(image)
-
         try {
-            detector.process(imgGrayU8)
-        } catch (e: NotFoundException) {
-//            Timber.tag(TAG).e(e)
-        } catch (e: ChecksumException) {
-//            Timber.tag(TAG).e(e)
-        } catch (e: Exception) {
-//            Timber.tag(TAG).e(e)
-        }
-        for (det in detector.detections) {
-            onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
-        }
+            if (debugI % 100 == 10) {
+                Timber.tag("QrCodeAnalyzerBoofcv.kt").d("$debugI analyze(image: ImageProxy)")
+            }
+            debugI++
+            if (imageProxy.format !in yuvFormats) return
+            val image = imageProxy.image ?: return
+            val imgGrayU8: GrayU8 = imageToGrayU8(image)
 
-        val invImgGrayU8: GrayU8 = invertGrayU8Image(imgGrayU8)
+            try {
+                detector.process(imgGrayU8)
+            } catch (e: NotFoundException) {
+            } catch (e: ChecksumException) {
+            } catch (e: Exception) {
+            }
+            for (det in detector.detections) {
+                onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
+            }
 
-        try {
-            detector.process(invImgGrayU8)
-            // result = reader.decode(binaryBitmap)
-        } catch (e: NotFoundException) {
-//            Timber.tag(TAG).e(e)
-        } catch (e: ChecksumException) {
-//            Timber.tag(TAG).e(e)
-        } catch (e: Exception) {
-//            Timber.tag(TAG).e(e)
-        }
+            // Accept light-on-dark QR codes as well as standard dark-on-light codes.
+            val invImgGrayU8: GrayU8 = invertGrayU8Image(imgGrayU8)
 
-        for (det in detector.detections) {
-            Timber.tag(TAG).d(det.message)
-            onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
+            try {
+                detector.process(invImgGrayU8)
+            } catch (e: NotFoundException) {
+            } catch (e: ChecksumException) {
+            } catch (e: Exception) {
+            }
+
+            for (det in detector.detections) {
+                onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
+            }
+        } finally {
+            // CameraX needs the proxy released even if an early return or a callback aborts analysis.
+            imageProxy.close()
         }
-        imageProxy.close()
     }
 }
