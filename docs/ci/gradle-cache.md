@@ -31,6 +31,22 @@ the dependencies and save the cache after success. A subsequent run with the
 same inputs should restore it and complete both jobs. Cold runners, cache
 eviction and dependency changes can still require Maven Central.
 
+## APK-001 — Debug package ABI coverage
+
+Both Debug packaging jobs previously accepted the first path matching
+`lib/*/libanonero.so`. A universal APK missing one supported architecture
+could therefore pass. A short-circuiting grep could also close unzip's output
+before it finished under pipefail. Both jobs now read the ZIP directory and
+check for exactly one adapter at each required path, with matching little-endian
+ELF class, machine and shared-object type. CI mutations cover an absent ABI and
+a mislabeled library. This checks packaging and leaves device linkage and
+execution to their respective gates. The release-specific checks still verify
+the split and universal packages separately.
+
+Static inspection of the downloaded ANON and NERO Debug APKs from run
+45691880945 passed the entry and ELF checks for both ABIs. That result belongs
+to `bf1cf25`. The updated workflow and its regression module await execution.
+
 The owner gate resolves the requested ref once with the pinned checkout action.
 Each job consumes its commit output, including jobs that wait for native
 artifacts. This keeps a branch move during the build from mixing an archive

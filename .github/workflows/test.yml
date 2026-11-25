@@ -506,10 +506,7 @@ jobs:
               echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
               exit 1
             }
-            unzip -l "$apk" | grep -q 'lib/.*/libanonero\.so' || {
-              echo "::error::$apk has no libanonero.so"
-              exit 1
-            }
+            python3 scripts/check-debug-apk.py "$apk"
           done
 
       - name: Upload debug APKs
@@ -534,7 +531,7 @@ jobs:
       matrix:
         include:
           # API 35 Google APIs x86_64 includes ARM64 translation, so the
-          # arm64-v8a-only ANONERO APK can run on a hosted x86_64 emulator.
+          # ARM-only ANONERO APK can run on a hosted x86_64 emulator.
           # API 29 has no equivalent ARM translation on these images; API 29
           # compile/manifest coverage is in the assemble step below.
           - api-level: 35
@@ -655,10 +652,7 @@ jobs:
               echo "::error::$apk reports minSdk '$min_sdk', expected '$ANDROID_MIN_SDK'"
               exit 1
             }
-            unzip -l "$apk" | grep -q 'lib/.*/libanonero\.so' || {
-              echo "::error::$apk has no libanonero.so"
-              exit 1
-            }
+            python3 scripts/check-debug-apk.py "$apk"
             test_apk="$(find app/build/outputs/apk -type f \
               -path "*${flavor}*" -name "*androidTest*.apk" | head -n 1)"
             [[ -s "$test_apk" ]] || {

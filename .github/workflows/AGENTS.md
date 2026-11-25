@@ -198,3 +198,12 @@ Keep the original output and return the final invocation's failure status. Never
 retry through this wrapper once Gradle has started tasks. Connected instrumentation
 has its own device-health and attach retry rules. The wrapper regression uses a stub
 and runs in the shared CI Python suite.
+
+Only a successful Tests job on the default branch at the dispatched revision
+may save the shared Gradle dependency cache. Preserve wrapper verification and
+keep Release independent of Tests caches. Inspect post-job cache creation on
+failed runs when an exact cache hit still needs a root classpath download.
+
+For each unsplit Debug APK, verify the packaged adapter for both supported
+ABIs. Test its ELF class and machine as well as the entry name. A successful
+ARM archive build alone cannot establish what was copied into the APK.
