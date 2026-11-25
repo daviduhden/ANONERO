@@ -54,9 +54,17 @@ class ReleaseSuiteSynchronizationTest(unittest.TestCase):
             SYNC.synchronize(source, self.release)
 
     def test_unsupported_cache_policy_is_rejected(self):
-        source = self.source.replace("cache-provider: basic", "cache-provider: other")
+        source = self.source.replace("cache-jdk: false", "cache-jdk: true")
         with self.assertRaisesRegex(ValueError, "cache/ref format"):
             SYNC.synchronize(source, self.release)
+
+    def test_release_excludes_gradle_dependency_caches(self):
+        block = SYNC.generated_block(self.source)
+        self.assertNotIn("cache: gradle", block)
+        self.assertNotIn("cache-path:", block)
+        self.assertEqual(
+            block.count("cache-disabled: true"), block.count("uses: gradle/actions/setup-gradle@")
+        )
 
     def test_unbound_checkout_reference_is_rejected(self):
         source = self.source.replace(SYNC.SOURCE_REF, "${{ github.ref }}")
@@ -72,7 +80,6 @@ class ReleaseSuiteSynchronizationTest(unittest.TestCase):
         release = self.release.replace(SYNC.END, "")
         with self.assertRaisesRegex(ValueError, "exactly one generated block"):
             SYNC.synchronize(self.source, release)
-
 
     def test_signing_rejects_missing_instrumented_dependency(self):
         release = self.release.replace("[authorize, build, instrumented]", "[authorize, build]", 1)

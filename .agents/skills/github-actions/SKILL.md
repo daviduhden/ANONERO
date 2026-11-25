@@ -203,3 +203,10 @@ Keep the original output and return the final invocation's failure status. Never
 retry through this wrapper once Gradle has started tasks. Connected instrumentation
 has its own device-health and attach retry rules. The wrapper regression uses a stub
 and runs in the shared CI Python suite.
+
+Compare the cache key restored by each affected job with the job that first
+saved it. An exact hit on an immutable cache created after a failed dependency
+resolution can keep every later job dependent on the same remote download.
+Tests uses the pinned setup-java success-only save for Gradle modules and its
+separate wrapper cache. Only the default branch testing its dispatched commit
+may write. Release keeps both setup actions free of Gradle dependency caches.

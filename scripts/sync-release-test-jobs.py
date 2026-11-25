@@ -30,8 +30,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 START = "  # BEGIN GENERATED TEST JOBS\n"
 END = "  # END GENERATED TEST JOBS\n"
-SOURCE_REF = "${{ inputs.ref || github.ref }}"
+SOURCE_REF = "${{ needs.authorize.outputs.commit }}"
 RELEASE_REF = "${{ github.sha }}"
+
+
+TEST_JAVA_CACHE = """          cache: gradle
+          cache-path: ~/.gradle/caches/modules-2
+          cache-jdk: false
+          cache-read-only: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) || needs.authorize.outputs.commit != github.sha }}
+"""
 
 
 def require_manual_dispatch(text: str, name: str) -> None:
@@ -49,11 +56,21 @@ def shared_jobs(source: str) -> tuple[str, list[str]]:
     jobs = "  unit:\n" + source.split("\n  unit:\n", 1)[1]
     names = re.findall(r"^  ([\w-]+):$", jobs, re.MULTILINE)
     required = {
-        "unit", "lint", "jni-contract", "i18n", "native-language-policy",
-        "native", "assemble", "instrumented",
+        "unit",
+        "lint",
+        "jni-contract",
+        "i18n",
+        "native-language-policy",
+        "native",
+        "assemble",
+        "instrumented",
     }
     reserved = {"authorize", "test", "build", "sign-anon", "sign-nero", "prepare", "publish"}
-    if not required.issubset(names) or len(names) != len(set(names)) or reserved.intersection(names):
+    if (
+        not required.issubset(names)
+        or len(names) != len(set(names))
+        or reserved.intersection(names)
+    ):
         raise ValueError("test.yml: missing, duplicate or reserved shared job names")
     return jobs.rstrip() + "\n", names
 
@@ -109,10 +126,18 @@ def generated_block(source: str) -> str:
     # Bind every release checkout to the dispatched commit and avoid artifacts
     # from a Gradle cache populated outside the release run.
     jobs = jobs.replace(SOURCE_REF, RELEASE_REF)
-    jobs = jobs.replace("cache-provider: basic", "cache-disabled: true")
+    java_steps = jobs.count("uses: actions/setup-java@")
+    if not java_steps or jobs.count(TEST_JAVA_CACHE) != java_steps:
+        raise ValueError("Unsupported shared job cache/ref format")
+    jobs = jobs.replace(TEST_JAVA_CACHE, "")
     if (
-        "cache-provider:" in jobs or SOURCE_REF in jobs
-        or "cache-disabled: false" in jobs or "uses: actions/cache@" in jobs
+        re.search(
+            r"^ +cache[\w-]*:", jobs.replace("          cache-disabled: true\n", ""), re.MULTILINE
+        )
+        or jobs.count("          cache-disabled: true\n")
+        != jobs.count("uses: gradle/actions/setup-gradle@")
+        or SOURCE_REF in jobs
+        or "uses: actions/cache@" in jobs
     ):
         raise ValueError("Unsupported shared job cache/ref format")
     return START + jobs + aggregate_job(names) + END
@@ -177,10 +202,16 @@ def main() -> int:
         release_path.write_text(updated, encoding="utf-8")
         print("Regenerated embedded release test jobs (no workflow executed)")
     elif updated != release:
-        print("".join(difflib.unified_diff(
-            release.splitlines(keepends=True), updated.splitlines(keepends=True),
-            fromfile=str(release_path), tofile="expected generated jobs",
-        )))
+        print(
+            "".join(
+                difflib.unified_diff(
+                    release.splitlines(keepends=True),
+                    updated.splitlines(keepends=True),
+                    fromfile=str(release_path),
+                    tofile="expected generated jobs",
+                )
+            )
+        )
         return 1
     else:
         print("Manual workflow shared jobs are synchronized (static check only)")
