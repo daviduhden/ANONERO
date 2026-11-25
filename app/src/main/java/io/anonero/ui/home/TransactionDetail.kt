@@ -47,6 +47,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -74,10 +76,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import io.anonero.R
 import io.anonero.model.TransactionInfo
+import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.util.Formats
 import io.anonero.util.SecureClipboard
+import io.anonero.util.WalletProfile
 import io.anonero.util.WalletSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -107,16 +111,22 @@ fun TransactionDetailScreen(
     var transactionKey by remember { mutableStateOf("") }
     val view = LocalView.current
 
+    var transactionOwner by remember { mutableStateOf<Pair<Wallet, WalletProfile>?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    val noteFailure = stringResource(R.string.wallet_operation_failed)
+
     fun saveNote() {
-        if (transactionInfo == null) {
-            return
-        }
-        scope.launch(Dispatchers.IO) {
-            notesDialog = false
-            view.performHapticFeedback(
-                HapticFeedbackConstants.CONTEXT_CLICK,
-            )
-            walletState.setTransactionNote(notes.text, transactionInfo!!)
+        val transaction = transactionInfo ?: return
+        val (wallet, profile) = transactionOwner ?: return
+        val note = notes.text
+        notesDialog = false
+        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+        scope.launch {
+            val saved =
+                withContext(Dispatchers.IO) {
+                    walletState.setTransactionNote(wallet, profile, transaction, note)
+                }
+            if (!saved) snackbar.showSnackbar(noteFailure)
         }
     }
 
@@ -152,12 +162,15 @@ fun TransactionDetailScreen(
                 null
             }
         if (details == null || !isCurrent()) {
+            transactionOwner = null
+            notesDialog = false
             transactionInfo = null
             destinations = ""
             transactionKey = ""
             notes = TextFieldValue("")
             return@LaunchedEffect
         }
+        transactionOwner = checkNotNull(wallet) to profile
         transactionInfo = found
         destinations = details.first
         transactionKey = details.second
@@ -283,7 +296,8 @@ fun TransactionDetailScreen(
         )
     }
 
-    Scaffold(topBar = {
+    val currentTransaction = transactionInfo
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
         TopAppBar(navigationIcon = {
             IconButton(
                 onClick = onBackPress,
@@ -294,20 +308,20 @@ fun TransactionDetailScreen(
             Text("")
         })
     }) { paddingValues ->
-        if (transactionInfo != null) {
+        if (currentTransaction != null) {
             LazyColumn(
                 contentPadding = paddingValues,
             ) {
                 item {
                     with(sharedTransitionScope) {
                         TransactionItem(
-                            tx = transactionInfo!!,
+                            tx = currentTransaction,
                             modifier =
                                 Modifier
                                     .clickable {
                                     }.sharedElement(
                                         sharedTransitionScope.rememberSharedContentState(
-                                            key = "${transactionInfo!!.hash}",
+                                            key = "${currentTransaction.hash}",
                                         ),
                                         animatedVisibilityScope = animatedContentScope,
                                     ),
@@ -340,19 +354,14 @@ fun TransactionDetailScreen(
                 item {
                     DetailItem(
                         title = stringResource(R.string.transaction_id),
-                        subtitle = transactionInfo?.hash ?: "____",
+                        subtitle = currentTransaction.hash ?: "____",
                         copyable = true,
                     )
                 }
                 item {
                     DetailItem(
                         title = stringResource(R.string.transaction_fee),
-                        subtitle =
-                            if (transactionInfo?.fee != null) {
-                                Formats.getExactDisplayAmount(transactionInfo?.fee!!)
-                            } else {
-                                "____"
-                            },
+                        subtitle = Formats.getExactDisplayAmount(currentTransaction.fee),
                     )
                 }
                 item {
@@ -365,7 +374,7 @@ fun TransactionDetailScreen(
                 item {
                     DetailItem(
                         title = stringResource(R.string.confirmation_block),
-                        subtitle = "${transactionInfo?.blockheight ?: "____"}",
+                        subtitle = "${currentTransaction.blockheight}",
                     )
                 }
                 item {
@@ -374,7 +383,7 @@ fun TransactionDetailScreen(
                         title = stringResource(R.string.time),
                         subtitle =
                             Formats.formatTransactionTime(
-                                transactionInfo!!.timestamp,
+                                currentTransaction.timestamp,
                                 "HH:mm dd/MM/yyy",
                             ),
                     )

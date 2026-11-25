@@ -529,16 +529,29 @@ class WalletState {
         return true
     }
 
-    fun setTransactionNote(
-        note: String,
+    @Synchronized
+    internal fun setTransactionNote(
+        wallet: Wallet,
+        profile: WalletProfile,
         transactionInfo: TransactionInfo,
+        note: String,
     ): Boolean {
-        val wallet = getWallet ?: return false
-        wallet.setUserNote(transactionInfo.hash, note)
-        if (!wallet.store()) return false
-        wallet.refreshHistory()
-        update()
-        return true
+        val hash = transactionInfo.hash ?: return false
+        if (backgroundSync || backgroundSyncRunning || getWallet !== wallet ||
+            WalletSession.profile != profile || _transactions.value.none { it === transactionInfo }
+        ) {
+            return false
+        }
+        return try {
+            if (!wallet.setUserNote(hash, note) || !wallet.store()) return false
+            wallet.refreshHistory()
+            if (getWallet === wallet && WalletSession.profile == profile) update()
+            true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun updateAddressLabel(
