@@ -83,6 +83,36 @@ class ManagedWalletSlotTest {
     }
 
     @Test
+    fun deletionRunsUnderTheSlotMonitorOnlyAfterSuccessfulClose() {
+        val path = File(folder.root, "anon")
+        val wallet = slot.open(path) { Any() }
+
+        assertFalse(slot.close(wallet, afterClose = { error("deleted after failed close") }) { false })
+        var deleted = false
+        assertTrue(
+            slot.close(wallet, afterClose = {
+                assertTrue(Thread.holdsLock(slot))
+                deleted = slot.withPathClosed(path) { true }
+            }) {
+                assertFalse(Thread.holdsLock(slot))
+                true
+            },
+        )
+        assertTrue(deleted)
+    }
+
+    @Test
+    fun deletionFailureDoesNotRepublishTheClosedHandle() {
+        val path = File(folder.root, "anon")
+        val wallet = slot.open(path) { Any() }
+        assertThrows(IllegalStateException::class.java) {
+            slot.close(wallet, afterClose = { error("profile deletion failed") }) { true }
+        }
+        assertNull(slot.visible)
+        assertTrue(slot.isIdle())
+    }
+
+    @Test
     fun failedAcquisitionReleasesTheReservation() {
         val path = File(folder.root, "anon")
         assertThrows(IllegalArgumentException::class.java) {

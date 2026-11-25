@@ -280,8 +280,13 @@ class WalletManager {
 
     private fun closeNativeWallet(wallet: Wallet): Boolean = wallet.withListenerLifecycle { closeJ(wallet) }
 
-    fun close(wallet: Wallet): Boolean =
-        managedWallet.close(wallet) {
+    fun close(wallet: Wallet): Boolean = close(wallet) {}
+
+    internal fun close(
+        wallet: Wallet,
+        afterClose: () -> Unit,
+    ): Boolean =
+        managedWallet.close(wallet, afterClose) {
             wallet.disposePendingTransaction()
             closeNativeWallet(wallet)
         }

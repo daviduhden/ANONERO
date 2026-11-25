@@ -53,6 +53,7 @@ internal class ManagedWalletSlot<T : Any> {
 
     fun close(
         wallet: T,
+        afterClose: () -> Unit = {},
         release: () -> Boolean,
     ): Boolean {
         synchronized(this) {
@@ -66,7 +67,13 @@ internal class ManagedWalletSlot<T : Any> {
             return closed
         } finally {
             synchronized(this) {
-                if (closed) path = null else visible = wallet
+                if (closed) {
+                    path = null
+                    // Keep replacement opens outside the authenticated deletion interval.
+                    afterClose()
+                } else {
+                    visible = wallet
+                }
             }
         }
     }
