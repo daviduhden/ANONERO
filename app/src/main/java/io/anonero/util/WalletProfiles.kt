@@ -21,6 +21,8 @@ package io.anonero.util
 import android.content.Context
 import android.content.SharedPreferences
 import io.anonero.AnonConfig
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
 import timber.log.Timber
 import java.io.File
 
@@ -71,6 +73,8 @@ object WalletSession {
  * passphrase hashes. No key or secret is shared between them.
  */
 object WalletProfileStore {
+    internal val mainProvisioning = Mutex()
+
     private const val TAG = "WalletProfileStore"
     private const val DECOY_RESTORE_HEIGHT = "decoyRestoreHeight"
 
@@ -111,13 +115,16 @@ object WalletProfileStore {
     fun walletFiles(
         context: Context,
         profile: WalletProfile,
-    ): List<File> {
-        val dir = AnonConfig.getDefaultWalletDir(context)
+    ): List<File> = listProfileEntries(AnonConfig.getDefaultWalletDir(context), profile).orEmpty().filter { it.isFile }
+
+    private fun listProfileEntries(
+        directory: File,
+        profile: WalletProfile,
+    ): List<File>? {
         val name = profile.walletName
-        return dir
+        return directory
             .listFiles()
-            ?.filter { it.isFile && (it.name == name || it.name.startsWith("$name.")) }
-            ?: emptyList()
+            ?.filter { it.name == name || it.name.startsWith("$name.") }
     }
 
     // True if the legitimate wallet, a usable decoy, or both exist.
@@ -139,7 +146,7 @@ object WalletProfileStore {
         profile: WalletProfile,
     ): Boolean {
         val manager = io.anonero.model.WalletManager.instance ?: return false
-        return manager.withUnmanagedPathClosed(walletFile(context, profile).path) {
+        return manager.withWalletPathClosed(walletFile(context, profile).path) {
             removeClosedProfile(context, prefs, profile)
         }
     }
@@ -149,20 +156,23 @@ object WalletProfileStore {
         prefs: SharedPreferences,
         profile: WalletProfile,
     ): Boolean {
-        val target = walletFile(context, profile)
-        var ok = true
-        val keyName = target.name
-        walletFiles(context, profile).forEach { file ->
-            if (!file.delete() && file.exists()) {
-                Timber.tag(TAG).w("could not delete %s", file.name)
-                ok = false
-            }
+        val directory = AnonConfig.getDefaultWalletDir(context)
+        val files = listProfileEntries(directory, profile) ?: return false
+        if (files.any { !it.isFile }) return false
+        files.forEach { it.delete() }
+        // A failed file deletion must not strand a remaining wallet without its gate.
+        if (listProfileEntries(directory, profile)?.isEmpty() != true) {
+            Timber.tag(TAG).w("Wallet profile files could not be removed")
+            return false
         }
-        runCatching { WalletKey.remove(context, keyName) }
-            .onFailure {
-                Timber.tag(TAG).e(it, "could not remove wallet key")
-                ok = false
-            }
+        try {
+            WalletKey.remove(context, profile.walletName)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Timber.tag(TAG).e("Wallet profile secret could not be removed")
+            return false
+        }
         val editor = prefs.edit()
         LwsConfig.preferenceKeys(profile).forEach { editor.remove(it) }
         if (profile.isDecoy) {
@@ -176,10 +186,10 @@ object WalletProfileStore {
             editor.remove(RESTORE_HEIGHT)
         }
         if (!editor.commit()) {
-            Timber.tag(TAG).e("could not commit profile removal for %s", profile.walletName)
-            ok = false
+            Timber.tag(TAG).e("Wallet profile preferences could not be removed")
+            return false
         }
-        return ok
+        return true
     }
 
     /*

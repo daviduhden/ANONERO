@@ -489,6 +489,9 @@ Rules for documentation:
 
 ### Continued-development contracts (2026-11-14)
 
+The managed slot stays reserved through native close and profile deletion checks
+both managed and auxiliary ownership. Never treat the absence of a visible
+wallet during close as authorization to reopen or delete its files.
 Auxiliary wallets remain owned until native close explicitly succeeds. Use the retained
 registry and its deletion guard; never discard a failed-close wrapper, delete its backing
 files/credentials or publish backup/decoy success first. Backup export rejects NERO and

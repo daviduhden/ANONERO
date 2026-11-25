@@ -135,6 +135,10 @@ missing, duplicate, or unavailable outputs and overflowing totals before JNI. A 
 lookup must never turn into an unrestricted sweep. Snapshot validation does not replace
 wallet2 selection or native lifecycle synchronization.
 
+A managed path is reserved from acquisition through successful native close.
+Callbacks see no active owner during close. Profile removal must check the managed
+and auxiliary reservations and preserve credentials on incomplete file deletion.
+
 Normalize only the payment URI scheme boundary. Reject duplicate recognized fields and
 keep wallet2 address validation. Before publishing a spend export, remove stale artifacts
 and verify the new file is nonempty and regular. Bound QR reads independently from the

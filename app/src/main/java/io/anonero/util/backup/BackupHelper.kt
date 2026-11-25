@@ -408,7 +408,7 @@ object BackupHelper {
         walletFile: File,
         credential: String,
     ): Wallet? {
-        check(manager.wallet == null) { "Another wallet is already managed" }
+        check(manager.isManagedWalletIdle()) { "Another wallet is already managed" }
         return try {
             manager.openWallet(walletFile.path, credential)
         } catch (e: CancellationException) {
@@ -503,12 +503,14 @@ object BackupHelper {
         passPhrase: String,
         pin: String,
     ): Boolean =
-        backupMutex.withLock {
-            // A newer preview can replace the staged files between preview and restore.
-            val preview = activePreview ?: return false
-            if (preview.second.get() !== backupPayload) return false
-            preview.first.ensureActive()
-            restoreBackupLocked(backupPayload, passPhrase, pin)
+        WalletProfileStore.mainProvisioning.withLock {
+            backupMutex.withLock {
+                // A newer preview can replace the staged files between preview and restore.
+                val preview = activePreview ?: return false
+                if (preview.second.get() !== backupPayload) return false
+                preview.first.ensureActive()
+                restoreBackupLocked(backupPayload, passPhrase, pin)
+            }
         }
 
     private suspend fun restoreBackupLocked(
@@ -519,7 +521,7 @@ object BackupHelper {
         try {
             val context = requireNotNull(AnonConfig.context)
             val manager = checkNotNull(WalletManager.instance) { "Wallet manager unavailable" }
-            if (manager.wallet != null) return false
+            if (!manager.isManagedWalletIdle()) return false
             RestoreTarget.requireEmpty(
                 directory = File(context.filesDir, "wallets"),
                 walletName = WalletProfile.MAIN.walletName,
@@ -589,7 +591,7 @@ object BackupHelper {
                         restored.isWatchOnly() == AnonConfig.viewOnly
                 if (!identityMatches) {
                     Timber.tag(TAG).e("restore: restored wallet identity does not match backup")
-                    if (closeRestoredWallet(manager, restored) && manager.wallet == null) {
+                    if (closeRestoredWallet(manager, restored) && manager.isManagedWalletIdle()) {
                         WalletProfileStore.removeProfile(context, walletPrefs, WalletProfile.MAIN)
                     }
                     return false
@@ -629,7 +631,7 @@ object BackupHelper {
             }
             // A failed close leaves the native wallet owned. Keep its backing files
             // and any recorded credentials so a later close can complete.
-            if (manager.wallet == null) {
+            if (manager.isManagedWalletIdle()) {
                 WalletProfileStore.removeProfile(context, walletPrefs, WalletProfile.MAIN)
             }
             return false

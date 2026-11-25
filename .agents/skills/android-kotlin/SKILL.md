@@ -107,7 +107,17 @@ Use immutable snapshots across IO dispatch, bind asynchronous validation to chec
 and discard results after wallet/input changes. `scripts/check-kotlin-cancellation.py`
 guards unqualified catch imports; it is not Kotlin compilation.
 
+Serialize MAIN onboarding and backup restore from the empty-target check through
+wallet/credential setup. When nested, take the MAIN provisioning mutex before the
+backup mutex. Do not treat a temporarily hidden closing wallet as an empty slot.
+
 Bind send and startup inputs to the captured wallet/profile before suspending. Recheck eligibility before using snapshots for a native operation. Parse saved node configuration using the build network without initializing JNI.
+
+Sensitive UI work must authenticate against an explicit profile and call only the captured
+wallet after checking it still owns that profile's path. Recheck before publishing a
+secret result or starting destructive work. Scope secure wipe to the authenticated
+path and stop shared cleanup when a new or closing managed wallet has reserved the slot.
+Snapshot guards complement native lifetime checks. They do not provide JNI quiescence.
 
 ## Maintenance & Continuous Learning
 

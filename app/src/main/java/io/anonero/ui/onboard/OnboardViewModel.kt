@@ -35,8 +35,9 @@ import io.anonero.util.RestoreTarget
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -87,6 +88,7 @@ class OnboardViewModel(
     }
 
     private fun requireEmptyMainTarget(context: Context) {
+        check(WalletManager.instance?.isManagedWalletIdle() == true) { "Managed wallet slot unavailable" }
         RestoreTarget.requireEmpty(
             directory = File(context.filesDir, "wallets"),
             walletName = WalletProfile.MAIN.walletName,
@@ -103,10 +105,21 @@ class OnboardViewModel(
      * another provisioning attempt.
      */
     private fun cleanupFailedMain(context: Context) {
-        runCatching { WalletManager.instance?.wallet?.close() }
-            .onFailure { Timber.tag(TAG).w(it, "Unable to close partial wallet") }
-        runCatching { WalletProfileStore.removeProfile(context, prefs, WalletProfile.MAIN) }
-            .onFailure { Timber.tag(TAG).w(it, "Unable to remove partial MAIN profile") }
+        val manager = WalletManager.instance ?: return
+        val wallet = manager.managedWalletAt(AnonConfig.getDefaultWalletFile(context))
+        if (wallet != null) {
+            try {
+                if (!wallet.close()) return
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Timber.tag(TAG).w("Unable to close partial wallet")
+                return
+            }
+        }
+        if (!WalletProfileStore.removeProfile(context, prefs, WalletProfile.MAIN)) {
+            Timber.tag(TAG).w("Unable to remove partial MAIN profile")
+        }
     }
 
     private fun commitCredentials(action: android.content.SharedPreferences.Editor.() -> Unit) {
@@ -120,108 +133,108 @@ class OnboardViewModel(
     fun getSeed() = walllet?.getSeed(passPhrase) ?: ""
 
     suspend fun create(pin: String) {
-        if (AnonConfig.context == null) return
-        withContext(Dispatchers.IO) {
-            requirePinNotDuress(pin)
-            requirePassphraseNotDecoy(passPhrase)
-            val context = AnonConfig.context!!.applicationContext
-            requireEmptyMainTarget(context)
-            val walletFile = AnonConfig.getDefaultWalletFile(context)
-            AnonConfig.getDefaultWalletDir(context).mkdirs()
-            // The wallet2 password is a random Keystore-wrapped secret, not the PIN.
-            // The PIN gates access to it (PinHash) but never encrypts the wallet.
-            val walletKey = WalletKey.newSecret()
-            // store the key and the hashes before the wallet is written
-            try {
-                WalletKey.store(context, walletFile.name, walletKey)
-                val crazyPass: String = KeyStoreHelper.getCrazyPass(context, passPhrase)
-                commitCredentials {
-                    putString(PREFS_PASSPHRASE_HASH, crazyPass)
-                    putString(PREFS_PIN_HASH, PinHash.hash(pin))
-                }
-            } catch (e: Exception) {
-                cleanupFailedMain(context)
-                throw e
-            }
-            val anonWallet =
+        WalletProfileStore.mainProvisioning.withLock {
+            if (AnonConfig.context == null) return
+            withContext(Dispatchers.IO) {
+                requirePinNotDuress(pin)
+                requirePassphraseNotDecoy(passPhrase)
+                val context = AnonConfig.context!!.applicationContext
+                requireEmptyMainTarget(context)
+                val walletFile = AnonConfig.getDefaultWalletFile(context)
+                AnonConfig.getDefaultWalletDir(context).mkdirs()
+                // The wallet2 password is a random Keystore-wrapped secret, not the PIN.
+                // The PIN gates access to it (PinHash) but never encrypts the wallet.
+                val walletKey = WalletKey.newSecret()
+                // store the key and the hashes before the wallet is written
                 try {
-                    WalletManager.instance
-                        ?.createWallet(
-                            walletFile,
-                            walletKey,
-                            passPhrase,
-                            "English",
-                            1,
-                        )?.also {
-                            if (!it.store()) throw IllegalStateException("wallet store failed")
-                        }
+                    WalletKey.store(context, walletFile.name, walletKey)
+                    val crazyPass: String = KeyStoreHelper.getCrazyPass(context, passPhrase)
+                    commitCredentials {
+                        putString(PREFS_PASSPHRASE_HASH, crazyPass)
+                        putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                    }
                 } catch (e: Exception) {
                     cleanupFailedMain(context)
                     throw e
                 }
-            delay(100)
-            if (anonWallet?.status?.isOk != true) {
-                cleanupFailedMain(context)
-                throw IllegalStateException("Wallet creation failed")
+                val anonWallet =
+                    try {
+                        WalletManager.instance
+                            ?.createWallet(
+                                walletFile,
+                                walletKey,
+                                passPhrase,
+                                "English",
+                                1,
+                            )?.also {
+                                if (!it.store()) throw IllegalStateException("wallet store failed")
+                            }
+                    } catch (e: Exception) {
+                        cleanupFailedMain(context)
+                        throw e
+                    }
+                if (anonWallet?.status?.isOk != true) {
+                    cleanupFailedMain(context)
+                    throw IllegalStateException("Wallet creation failed")
+                }
+                walllet = anonWallet
             }
-            walllet = anonWallet
-            delay(500)
         }
     }
 
     suspend fun createViewOnly(pin: String) {
-        val payload =
-            neroKeyPayload
-                ?: throw IllegalStateException("view-only key payload missing")
-        if (payload.restoreHeight !in 0..io.anonero.util.MAX_RESTORE_HEIGHT) {
-            throw IllegalArgumentException("restore height must be within the supported range")
-        }
-        if (AnonConfig.context == null) return
-        withContext(Dispatchers.IO) {
-            requirePinNotDuress(pin)
-            requirePassphraseNotDecoy(passPhrase)
-            val context = AnonConfig.context!!.applicationContext
-            requireEmptyMainTarget(context)
-            val walletFile = AnonConfig.getDefaultWalletFile(context)
-            AnonConfig.getDefaultWalletDir(context).mkdirs()
-            val walletKey = WalletKey.newSecret()
-            // store the key and the hashes before the wallet is written
-            try {
-                WalletKey.store(context, walletFile.name, walletKey)
-                val crazyPass: String = KeyStoreHelper.getCrazyPass(context, passPhrase)
-                commitCredentials {
-                    putString(PREFS_PASSPHRASE_HASH, crazyPass)
-                    putString(PREFS_PIN_HASH, PinHash.hash(pin))
-                }
-            } catch (e: Exception) {
-                cleanupFailedMain(context)
-                throw e
+        WalletProfileStore.mainProvisioning.withLock {
+            val payload =
+                neroKeyPayload
+                    ?: throw IllegalStateException("view-only key payload missing")
+            if (payload.restoreHeight !in 0..io.anonero.util.MAX_RESTORE_HEIGHT) {
+                throw IllegalArgumentException("restore height must be within the supported range")
             }
-            val anonWallet =
+            if (AnonConfig.context == null) return
+            withContext(Dispatchers.IO) {
+                requirePinNotDuress(pin)
+                requirePassphraseNotDecoy(passPhrase)
+                val context = AnonConfig.context!!.applicationContext
+                requireEmptyMainTarget(context)
+                val walletFile = AnonConfig.getDefaultWalletFile(context)
+                AnonConfig.getDefaultWalletDir(context).mkdirs()
+                val walletKey = WalletKey.newSecret()
+                // store the key and the hashes before the wallet is written
                 try {
-                    WalletManager.instance
-                        ?.createWalletWithKeys(
-                            walletFile,
-                            walletKey,
-                            language = "English",
-                            restoreHeight = payload.restoreHeight,
-                            viewKeyString = payload.privateViewKey,
-                            addressString = payload.primaryAddress,
-                            spendKeyString = "",
-                        )?.also {
-                            if (!it.store()) throw IllegalStateException("wallet store failed")
-                        }
+                    WalletKey.store(context, walletFile.name, walletKey)
+                    val crazyPass: String = KeyStoreHelper.getCrazyPass(context, passPhrase)
+                    commitCredentials {
+                        putString(PREFS_PASSPHRASE_HASH, crazyPass)
+                        putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                    }
                 } catch (e: Exception) {
                     cleanupFailedMain(context)
                     throw e
                 }
-            delay(100)
-            if (anonWallet?.status?.isOk != true) {
-                cleanupFailedMain(context)
-                throw IllegalStateException("Wallet creation failed")
+                val anonWallet =
+                    try {
+                        WalletManager.instance
+                            ?.createWalletWithKeys(
+                                walletFile,
+                                walletKey,
+                                language = "English",
+                                restoreHeight = payload.restoreHeight,
+                                viewKeyString = payload.privateViewKey,
+                                addressString = payload.primaryAddress,
+                                spendKeyString = "",
+                            )?.also {
+                                if (!it.store()) throw IllegalStateException("wallet store failed")
+                            }
+                    } catch (e: Exception) {
+                        cleanupFailedMain(context)
+                        throw e
+                    }
+                if (anonWallet?.status?.isOk != true) {
+                    cleanupFailedMain(context)
+                    throw IllegalStateException("Wallet creation failed")
+                }
+                walllet = anonWallet
             }
-            walllet = anonWallet
-            delay(500)
         }
     }
 
@@ -240,84 +253,82 @@ class OnboardViewModel(
     fun getRestorePayload(): RestorePayload? = restorePayload
 
     suspend fun restoreFromSeed(pin: String) {
-        val payload =
-            restorePayload
-                ?: throw IllegalStateException("restore payload missing")
-        // Reject structural input errors before replacing MAIN files or credentials.
-        // wallet2 remains responsible for mnemonic language and checksum validation.
-        val seedWords = SeedRestoreInput.requireValid(payload.seed, payload.restoreHeight)
+        WalletProfileStore.mainProvisioning.withLock {
+            val payload =
+                restorePayload
+                    ?: throw IllegalStateException("restore payload missing")
+            // Reject structural input errors before replacing MAIN files or credentials.
+            // wallet2 remains responsible for mnemonic language and checksum validation.
+            val seedWords = SeedRestoreInput.requireValid(payload.seed, payload.restoreHeight)
 
-        requirePinNotDuress(pin)
-        requirePassphraseNotDecoy(passPhrase)
-        val context = AnonConfig.context!!.applicationContext
-        requireEmptyMainTarget(context)
-        val walletFile = AnonConfig.getDefaultWalletFile(context)
-        AnonConfig.getDefaultWalletDir(context).mkdirs()
-        delay(100)
-        // wallet2 password is a Keystore-wrapped random secret, not the PIN
-        val walletKey = WalletKey.newSecret()
-        // store the key and the hashes before the wallet is written
-        try {
-            WalletKey.store(context, walletFile.name, walletKey)
-            val crazyPass: String = KeyStoreHelper.getCrazyPass(context, passPhrase)
-            commitCredentials {
-                putString(PREFS_PASSPHRASE_HASH, crazyPass)
-                putString(PREFS_PIN_HASH, PinHash.hash(pin))
-                payload.restoreHeight?.let {
-                    putLong(RESTORE_HEIGHT, it)
-                }
-            }
-        } catch (e: Exception) {
-            cleanupFailedMain(context)
-            throw e
-        }
-        val anonWallet =
+            requirePinNotDuress(pin)
+            requirePassphraseNotDecoy(passPhrase)
+            val context = AnonConfig.context!!.applicationContext
+            requireEmptyMainTarget(context)
+            val walletFile = AnonConfig.getDefaultWalletFile(context)
+            AnonConfig.getDefaultWalletDir(context).mkdirs()
+            // wallet2 password is a Keystore-wrapped random secret, not the PIN
+            val walletKey = WalletKey.newSecret()
+            // store the key and the hashes before the wallet is written
             try {
-                if (seedWords.size == 25) {
-                    WalletManager.instance?.recoveryWallet(
-                        walletFile,
-                        walletKey,
-                        seedWords.joinToString(" "),
-                        passPhrase,
-                        payload.restoreHeight ?: 0,
-                    )
-                } else if (seedWords.size == 16) {
-                    WalletManager.instance?.recoveryWalletPolyseed(
-                        walletFile,
-                        walletKey,
-                        seedWords.joinToString(" "),
-                        passPhrase,
-                    )
-                } else {
-                    null
+                WalletKey.store(context, walletFile.name, walletKey)
+                val crazyPass: String = KeyStoreHelper.getCrazyPass(context, passPhrase)
+                commitCredentials {
+                    putString(PREFS_PASSPHRASE_HASH, crazyPass)
+                    putString(PREFS_PIN_HASH, PinHash.hash(pin))
+                    payload.restoreHeight?.let {
+                        putLong(RESTORE_HEIGHT, it)
+                    }
                 }
             } catch (e: Exception) {
                 cleanupFailedMain(context)
                 throw e
             }
-        if (anonWallet == null) {
-            cleanupFailedMain(context)
-            throw Exception("unable to create wallet from seed, invalid seed length ${seedWords.size}")
-        }
-        try {
-            delay(1000)
-            payload.restoreHeight?.let {
-                anonWallet.setRestoreHeight(it)
-            }
-            if (!anonWallet.store()) throw IllegalStateException("wallet store failed")
-            if (!anonWallet.store(walletFile.path)) throw IllegalStateException("wallet store failed")
-            delay(100)
-            if (anonWallet.status.isOk != true) {
+            val anonWallet =
+                try {
+                    if (seedWords.size == 25) {
+                        WalletManager.instance?.recoveryWallet(
+                            walletFile,
+                            walletKey,
+                            seedWords.joinToString(" "),
+                            passPhrase,
+                            payload.restoreHeight ?: 0,
+                        )
+                    } else if (seedWords.size == 16) {
+                        WalletManager.instance?.recoveryWalletPolyseed(
+                            walletFile,
+                            walletKey,
+                            seedWords.joinToString(" "),
+                            passPhrase,
+                        )
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    cleanupFailedMain(context)
+                    throw e
+                }
+            if (anonWallet == null) {
                 cleanupFailedMain(context)
-                throw IllegalStateException("Wallet recovery failed")
+                throw Exception("unable to create wallet from seed, invalid seed length ${seedWords.size}")
             }
-        } catch (e: Exception) {
-            cleanupFailedMain(context)
-            throw e
+            try {
+                payload.restoreHeight?.let {
+                    anonWallet.setRestoreHeight(it)
+                }
+                if (!anonWallet.store()) throw IllegalStateException("wallet store failed")
+                if (!anonWallet.store(walletFile.path)) throw IllegalStateException("wallet store failed")
+                if (anonWallet.status.isOk != true) {
+                    cleanupFailedMain(context)
+                    throw IllegalStateException("Wallet recovery failed")
+                }
+            } catch (e: Exception) {
+                cleanupFailedMain(context)
+                throw e
+            }
+            // Keep the restored wallet managed; the onboarding flow starts the sync service
+            // immediately after this returns. Closing it here left Home without a wallet.
+            walllet = anonWallet
         }
-        // Keep the restored wallet managed; the onboarding flow starts the sync service
-        // immediately after this returns. Closing it here left Home without a wallet.
-        walllet = anonWallet
-        delay(500)
     }
 }

@@ -35,15 +35,15 @@ private const val TAG = "WalletManager"
  *
  * Native wallet calls can block on disk or network I/O. Call this class off the Android
  * main thread. The singleton is created lazily by [instance] and [AnonConfig] supplies
- * the build's Monero network. Callers must coordinate managed wallet replacement and
- * confirm the previous wallet closed before creating or opening another.
+ * the build's Monero network. Managed creation and open reject a reserved slot
+ * until the previous wallet has closed.
  */
 class WalletManager {
     var networkType = NetworkType.NetworkType_Mainnet
 
-    @Volatile
-    var wallet: Wallet? = null
-        private set
+    private val managedWallet = ManagedWalletSlot<Wallet>()
+    val wallet: Wallet?
+        get() = managedWallet.visible
     private val unmanagedWallets = RetainedWallets<Wallet>(::closeNativeWallet)
     private var daemonAddress: String? = null
     var daemonUsername = ""
@@ -57,42 +57,26 @@ class WalletManager {
         this.networkType = AnonConfig.getNetworkType()
     }
 
-    private fun manageWallet(wallet: Wallet) {
-        Timber.tag(TAG).i("Managing %s", wallet.name)
-        this.wallet = wallet
-    }
-
-    private fun unmanageWallet(wallet: Wallet?) {
-        requireNotNull(wallet) { "Cannot unmanage null!" }
-        checkNotNull(this.wallet) { "No wallet under management!" }
-        check(this.wallet === wallet) { wallet.name + " not under management!" }
-        Timber.tag(TAG).i("Unmanaging ${wallet.name}")
-        this.wallet = null
-    }
-
     fun createWallet(
         aFile: File,
         password: String,
         passphrase: String,
         language: String,
         height: Long,
-    ): Wallet {
-        val walletHandle =
-            createWalletJ(aFile.absolutePath, password, passphrase, language, networkType.value)
-        if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
-        val wallet = Wallet(walletHandle)
-        manageWallet(wallet)
-        if (wallet.status.isOk) {
-            // This rewrites the keys file (which contains the restore height). If it fails,
-            // the caller must not proceed with a wallet whose keys file is inconsistent.
-            if (!wallet.setPassword(password)) {
-                throw IllegalStateException("Wallet password update failed")
-            }
-        } else {
-            throw IllegalStateException("Wallet creation failed: ${wallet.status.errorString}")
-        }
-        return wallet
-    }
+    ): Wallet =
+        managedWallet.open(
+            aFile,
+            acquire = {
+                val handle = createWalletJ(aFile.absolutePath, password, passphrase, language, networkType.value)
+                check(handle != 0L) { "Wallet creation failed" }
+                Wallet(handle)
+            },
+            initialize = { wallet ->
+                check(wallet.status.isOk) { "Wallet creation failed" }
+                // Rewrites the keys file containing the restore height.
+                check(wallet.setPassword(password)) { "Wallet password update failed" }
+            },
+        )
 
     /*
      * Creates a wallet without making it the managed live one. Used to provision the
@@ -129,13 +113,12 @@ class WalletManager {
     fun openWallet(
         path: String,
         password: String,
-    ): Wallet {
-        val walletHandle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
-        if (walletHandle == 0L) throw IllegalStateException("Wallet open failed")
-        val wallet = Wallet(walletHandle)
-        manageWallet(wallet)
-        return wallet
-    }
+    ): Wallet =
+        managedWallet.open(File(path)) {
+            val walletHandle = openWalletJ(path, password, networkType.value, AnonConfig.viewOnly)
+            if (walletHandle == 0L) throw IllegalStateException("Wallet open failed")
+            Wallet(walletHandle)
+        }
 
     /*
      * Opens a second wallet without making it the managed live one -- for working on a
@@ -177,21 +160,20 @@ class WalletManager {
         mnemonic: String,
         offset: String,
         restoreHeight: Long,
-    ): Wallet {
-        val walletHandle =
-            recoveryWalletJ(
-                aFile.absolutePath,
-                password,
-                mnemonic,
-                offset,
-                networkType.value,
-                restoreHeight,
-            )
-        if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
-        val wallet = Wallet(walletHandle)
-        manageWallet(wallet)
-        return wallet
-    }
+    ): Wallet =
+        managedWallet.open(aFile) {
+            val walletHandle =
+                recoveryWalletJ(
+                    aFile.absolutePath,
+                    password,
+                    mnemonic,
+                    offset,
+                    networkType.value,
+                    restoreHeight,
+                )
+            if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
+            Wallet(walletHandle)
+        }
 
     private external fun recoveryWalletJ(
         path: String,
@@ -207,20 +189,19 @@ class WalletManager {
         password: String,
         mnemonic: String,
         offset: String,
-    ): Wallet {
-        val walletHandle =
-            recoveryWalletPolyseedJ(
-                aFile.absolutePath,
-                password,
-                mnemonic,
-                offset,
-                networkType.value,
-            )
-        if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
-        val wallet = Wallet(walletHandle)
-        manageWallet(wallet)
-        return wallet
-    }
+    ): Wallet =
+        managedWallet.open(aFile) {
+            val walletHandle =
+                recoveryWalletPolyseedJ(
+                    aFile.absolutePath,
+                    password,
+                    mnemonic,
+                    offset,
+                    networkType.value,
+                )
+            if (walletHandle == 0L) throw IllegalStateException("Wallet recovery failed")
+            Wallet(walletHandle)
+        }
 
     private external fun recoveryWalletPolyseedJ(
         path: String,
@@ -238,23 +219,22 @@ class WalletManager {
         addressString: String,
         viewKeyString: String,
         spendKeyString: String,
-    ): Wallet {
-        val walletHandle =
-            createWalletFromKeysJ(
-                aFile.absolutePath,
-                password,
-                language,
-                networkType.value,
-                restoreHeight,
-                addressString,
-                viewKeyString,
-                spendKeyString,
-            )
-        if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
-        val wallet = Wallet(walletHandle)
-        manageWallet(wallet)
-        return wallet
-    }
+    ): Wallet =
+        managedWallet.open(aFile) {
+            val walletHandle =
+                createWalletFromKeysJ(
+                    aFile.absolutePath,
+                    password,
+                    language,
+                    networkType.value,
+                    restoreHeight,
+                    addressString,
+                    viewKeyString,
+                    spendKeyString,
+                )
+            if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
+            Wallet(walletHandle)
+        }
 
     private external fun createWalletFromKeysJ(
         path: String,
@@ -272,21 +252,20 @@ class WalletManager {
         password: String,
         restoreHeight: Long,
         deviceName: String,
-    ): Wallet {
-        val walletHandle =
-            createWalletFromDeviceJ(
-                aFile.absolutePath,
-                password,
-                networkType.value,
-                deviceName,
-                restoreHeight,
-                "5:20",
-            )
-        if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
-        val wallet = Wallet(walletHandle)
-        manageWallet(wallet)
-        return wallet
-    }
+    ): Wallet =
+        managedWallet.open(aFile) {
+            val walletHandle =
+                createWalletFromDeviceJ(
+                    aFile.absolutePath,
+                    password,
+                    networkType.value,
+                    deviceName,
+                    restoreHeight,
+                    "5:20",
+                )
+            if (walletHandle == 0L) throw IllegalStateException("Wallet creation failed")
+            Wallet(walletHandle)
+        }
 
     private external fun createWalletFromDeviceJ(
         path: String,
@@ -301,22 +280,20 @@ class WalletManager {
 
     private fun closeNativeWallet(wallet: Wallet): Boolean = wallet.withListenerLifecycle { closeJ(wallet) }
 
-    fun close(wallet: Wallet): Boolean {
-        unmanageWallet(wallet)
-        return try {
-            val closed = closeNativeWallet(wallet)
-            if (!closed) {
-                // in case we could not close it
-                // we manage it again
-                manageWallet(wallet)
-            }
-            closed
-        } catch (e: Exception) {
-            // A native exception must not leave the wallet unmanaged and unreachable.
-            manageWallet(wallet)
-            throw e
+    fun close(wallet: Wallet): Boolean =
+        managedWallet.close(wallet) {
+            wallet.disposePendingTransaction()
+            closeNativeWallet(wallet)
         }
-    }
+
+    fun isManagedWalletIdle(): Boolean = managedWallet.isIdle()
+
+    fun managedWalletAt(file: File): Wallet? = managedWallet.visibleAt(file)
+
+    fun withWalletPathClosed(
+        path: String,
+        action: () -> Boolean,
+    ): Boolean = managedWallet.withPathClosed(File(path)) { withUnmanagedPathClosed(path, action) }
 
     fun walletExists(aFile: File): Boolean = walletExists(aFile.absolutePath)
 
@@ -448,8 +425,10 @@ class WalletManager {
                 NetworkType.NetworkType_Stagenet -> "5-"
             }
 
+        @Synchronized
         fun resetInstance() {
-            check(instance?.wallet == null && instance?.unmanagedWallets?.isEmpty() != false) {
+            val manager = instance
+            check(manager?.isManagedWalletIdle() != false && manager?.unmanagedWallets?.isEmpty() != false) {
                 "Wallets must be closed before resetting their owner"
             }
             instance = null

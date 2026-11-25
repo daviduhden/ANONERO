@@ -217,10 +217,7 @@ class Wallet {
     @Synchronized
     external fun store(path: String?): Boolean
 
-    fun close(): Boolean {
-        disposePendingTransaction()
-        return WalletManager.instance?.close(this) == true
-    }
+    fun close(): Boolean = WalletManager.instance?.close(this) == true
 
     external fun getFilename(): String
 
@@ -360,7 +357,7 @@ class Wallet {
     // TODO virtual int autoRefreshInterval() const = 0;
     // Both transaction wrappers share a review slot. Replacing a draft invalidates
     // any previously loaded unsigned set as well.
-    private fun disposePendingTransaction() {
+    internal fun disposePendingTransaction() {
         pendingTransaction?.let {
             disposeTransaction(it)
             it.invalidate()
