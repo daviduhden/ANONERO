@@ -78,7 +78,9 @@ import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.util.Formats
 import io.anonero.util.SecureClipboard
+import io.anonero.util.WalletSession
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.KoinApplication
@@ -94,7 +96,6 @@ fun TransactionDetailScreen(
     sharedTransitionScope: SharedTransitionScope,
     animatedContentScope: AnimatedContentScope,
 ) {
-//    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var transactionInfo: TransactionInfo? by remember { mutableStateOf(null) }
     val walletState = koinInject<WalletState>()
     val transactions by walletState.transactions.collectAsState(listOf())
@@ -119,36 +120,49 @@ fun TransactionDetailScreen(
         }
     }
 
+    // Routes carry a history ID. Re-resolve it when WalletState updates and read
+    // the details absent from that snapshot through wallet2 on the IO dispatcher.
     LaunchedEffect(transactionId, transactions) {
+        val wallet = WalletManager.instance?.wallet
+        val profile = WalletSession.profile
         val found = transactions.find { it.hash == transactionId }
+
+        // A recomposition can still carry the old history when WalletManager replaces a wallet.
+        suspend fun isCurrent(): Boolean =
+            walletState.transactions.first().any { it === found } &&
+                WalletManager.instance?.wallet === wallet &&
+                WalletSession.profile == profile
+
         val details =
-            withContext(Dispatchers.IO) {
-                val wallet = WalletManager.instance?.wallet
-                var destination = ""
-                var key = "____"
-                if (found != null) {
-                    found.transfers.orEmpty().forEach {
-                        destination = "${it.address}\n$destination"
-                    }
-                    if (wallet != null) {
+            if (wallet != null && found != null) {
+                withContext(Dispatchers.IO) {
+                    if (!isCurrent()) return@withContext null
+                    val destination =
                         if (found.direction == TransactionInfo.Direction.Direction_In) {
-                            destination = wallet.getSubaddress(0, found.addressIndex)
+                            wallet.getSubaddress(found.accountIndex, found.addressIndex)
+                        } else {
+                            found.transfers
+                                .orEmpty()
+                                .asReversed()
+                                .joinToString("\n") { it.address.toString() }
                         }
-                        key = wallet.getTxKey(found.hash) ?: "____"
-                    }
+                    destination.trim() to (wallet.getTxKey(found.hash) ?: "____")
                 }
-                destination.trim() to key
+            } else {
+                null
             }
+        if (details == null || !isCurrent()) {
+            transactionInfo = null
+            destinations = ""
+            transactionKey = ""
+            notes = TextFieldValue("")
+            return@LaunchedEffect
+        }
         transactionInfo = found
         destinations = details.first
         transactionKey = details.second
-        found?.notes?.let {
-            notes =
-                notes.copy(
-                    text = it,
-                    selection = TextRange(it.length),
-                )
-        }
+        val note = found?.notes.orEmpty()
+        notes = TextFieldValue(note, selection = TextRange(note.length))
     }
 
     LaunchedEffect(notesDialog) {

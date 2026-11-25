@@ -39,6 +39,10 @@ validation.
   causes.
 - [`preventive-audit.md`](preventive-audit.md) — current static audit, warning policy,
   and pending CI evidence.
+- [Backup restore ownership and staging](backup-restore.md)
+- [Seed and key JNI containment](seed-jni-boundary.md)
+- [QR frame ownership and received transaction details](qr-frame-and-transaction-detail.md)
+- [PIN persistence and transaction Parcel](pin-throttle-and-transaction-parcel.md)
 
 ## Evidence limits
 
