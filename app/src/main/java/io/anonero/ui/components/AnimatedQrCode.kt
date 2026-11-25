@@ -43,6 +43,10 @@ import io.anonero.ui.components.qr.QrCodeView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * Presents successive UR fragments until the composable leaves the screen. The
+ * receiver assembles the payload across camera frames. [fps] must be positive.
+ */
 @Composable
 fun AnimatedQrCode(
     modifier: Modifier = Modifier,

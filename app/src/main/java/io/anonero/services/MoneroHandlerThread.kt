@@ -10,14 +10,10 @@ import timber.log.Timber
 /**
  * Wallet2 listener and refresh coordinator for the managed wallet.
  *
- * It runs on its own thread because wallet2 callbacks and some wallet operations need more
- * stack than the UI thread provides and must stay off the main thread. [refreshed] decides
- * whether to resume, reconnect, or re-index the wallet for full-node and LWS modes; [updated]
- * re-reads history and publishes state.
- *
- * The thread is a listener, not a general-purpose executor. Do not submit long tasks to it.
- * A reconnect re-initializes the native wallet and, for LWS, logs in again with the trust
- * flag disabled.
+ * JNI invokes the listener on the calling wallet2 thread. This class retains a legacy
+ * [Thread] wrapper whose [run] enqueues no work and does not dispatch the callbacks.
+ * [updated] reloads local history, while [refreshed] can reconnect only for the current
+ * wallet with an applied transport. An LWS reconnect repeats login with daemon trust disabled.
  */
 class MoneroHandlerThread(
     private val wallet: Wallet,
@@ -63,6 +59,7 @@ class MoneroHandlerThread(
         amount: Long,
     ) {}
 
+    // The last observed daemon height is a progress target for full-node scans only.
     override fun newBlock(height: Long) {
         if (!canUseTransport || wallet.isLightWallet) return
         val target = lastDaemonHeight ?: wallet.getDaemonBlockChainHeight().also { lastDaemonHeight = it }

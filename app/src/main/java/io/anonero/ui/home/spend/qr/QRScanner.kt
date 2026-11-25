@@ -73,6 +73,11 @@ enum class ImportEvents {
     IMPORT_UNSIGNED_TX,
 }
 
+/**
+ * Hands decoded UR payloads to wallet2 through type-specific private cache files.
+ * Outputs and key images update the wallet. Unsigned sets go to review, where signing
+ * requires a separate user action. Signed transaction import is disabled.
+ */
 class QRScannerVM : ViewModel() {
     suspend fun processUrCode(urResult: URDecoder.Result): Result<ImportEvents> {
         if (urResult.type == ResultType.SUCCESS) {
@@ -171,7 +176,8 @@ class QRScannerVM : ViewModel() {
                             val unsignedTransaction =
                                 wallet.loadUnsignedTransaction(filePath)
                             if (unsignedTransaction != null && unsignedTransaction.status == UnsignedTransaction.Status.Status_Ok) {
-                                // reject a set that is not exactly one tx
+                                // The signing UI handles a single transaction from an
+                                // imported set. Refuse sets outside that review scope.
                                 val count = unsignedTransaction.txCount
                                 if (count != 1L) {
                                     Timber.tag(TAG).e("Unsigned transaction set has %d transactions", count)

@@ -83,6 +83,9 @@ class AnonWalletHandler(
     private val _scope = CoroutineScope(Dispatchers.IO) + SupervisorJob()
 
     private var handler: MoneroHandlerThread? = null
+
+    // Network transitions may take transportApplyMutex while holding walletNetworkMutex.
+    // Provider-loss observers take only transportApplyMutex.
     private val transportApplyMutex = Mutex()
     private val walletNetworkMutex = Mutex()
 
@@ -425,10 +428,10 @@ class AnonWalletHandler(
         }
     }
 
-    /*
-     * Applies the endpoint selected by TransportController to the manager and live wallet.
-     * Call it before the wallet first talks to a node/LWS, or that traffic goes out
-     * unproxied.
+    /**
+     * Pauses the current wallet before acquiring a route. Publishes an applied
+     * authorization only after both native proxy updates and the session rechecks.
+     * The caller can then initialize the backend and resume refresh on success.
      */
     private suspend fun applyProxy() {
         transportApplyMutex.withLock {

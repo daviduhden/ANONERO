@@ -20,7 +20,12 @@ package io.anonero.model
 
 import java.io.File
 
-/** Owns auxiliary resources until their native close explicitly succeeds. */
+/**
+ * Retains auxiliary wallets by canonical file path until native close succeeds.
+ *
+ * A failed or throwing close leaves ownership intact for a retry. Path aliases share the
+ * same entry and a caller must close the instance actually returned by [open].
+ */
 internal class RetainedWallets<T : Any>(
     private val closeNative: (T) -> Boolean,
 ) {
@@ -54,6 +59,7 @@ internal class RetainedWallets<T : Any>(
     @Synchronized
     fun contains(path: String): Boolean = File(path).canonicalPath in wallets
 
+    /** Holds the same monitor as [open] throughout a guarded file operation. */
     @Synchronized
     fun withPathClosed(
         path: String,

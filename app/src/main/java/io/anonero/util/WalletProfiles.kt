@@ -93,10 +93,9 @@ object WalletProfileStore {
 
     fun restoreHeightKey(profile: WalletProfile): String = if (profile.isDecoy) DECOY_RESTORE_HEIGHT else RESTORE_HEIGHT
 
-    /*
-     * A decoy is usable only when all three pieces are present: the configured flag,
-     * the encrypted wallet file, and the Keystore-wrapped wallet secret. If the file is
-     * missing the duress PIN must not fall through to the legitimate wallet.
+    /**
+     * Checks setup markers, including the duress PIN hash, wallet file and stored
+     * ciphertext. Opening the wallet separately checks that its secret can be unwrapped.
      */
     fun isDecoyConfigured(
         context: Context,

@@ -58,9 +58,9 @@ object VersionAsIntSerializer : KSerializer<Int> {
 }
 
 /**
- * Versioned backup envelope. The version selects how the wallet files inside the archive
- * are keyed: v2 is PIN-keyed, v3 is passphrase-keyed, and v1 is the legacy format detected
- * by its `Salted__` header before this JSON is read.
+ * JSON metadata inside the decrypted backup archive. Version 2 uses PIN-keyed wallet
+ * files and version 3 uses passphrase-keyed files. The file header independently
+ * selects the decryption scheme before this metadata is read.
  */
 @Serializable
 data class BackupPayload(

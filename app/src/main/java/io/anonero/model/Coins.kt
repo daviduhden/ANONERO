@@ -3,10 +3,10 @@ package io.anonero.model
 /**
  * Wallet2 coin-control view for the active wallet.
  *
- * [all] is a snapshot of unspent outputs as reported by the native `Coins` API. The
- * key image (`CoinsInfo.key`) is used for transaction construction; [freeze] and [thaw]
- * use the output public key instead. Both operations re-read the native list so callers
- * never act on a stale freeze flag.
+ * [all] is the latest native output snapshot. Consumers filter spent outputs and scope
+ * the list to the active account. Transaction construction uses the key image
+ * (`CoinsInfo.key`). [freeze] and [thaw] use the output public key and check the refreshed
+ * flag because the JNI mutation returns no result.
  *
  * The [handle] is borrowed from wallet2 and is valid only while the owning wallet is open.
  */

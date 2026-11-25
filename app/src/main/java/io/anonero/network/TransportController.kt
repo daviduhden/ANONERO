@@ -40,6 +40,11 @@ import java.net.Socket
 
 private const val SOCKS_PROBE_TIMEOUT_MS = 3_000
 
+/**
+ * Identifies an acquired route. The generation invalidates old authorizations when
+ * configuration changes or the provider is released. Embedded Tor also checks its
+ * listener revision, and VPN mode checks the Android network handle.
+ */
 internal data class TransportAuthorization(
     val generation: Long,
     val endpoint: TransportEndpoint,
@@ -254,6 +259,8 @@ class TransportController(
         return Result.success(Unit)
     }
 
+    // Acquisition can suspend while probing or bootstrapping. Only a result for the
+    // generation captured before that work may publish route state.
     internal suspend fun authorize(): TransportAuthorization {
         val (current, authorizationGeneration) = synchronized(this) { _config.value to generation }
 

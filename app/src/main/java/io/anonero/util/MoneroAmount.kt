@@ -31,6 +31,7 @@ object MoneroAmount {
     private val PATTERN = Regex("^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,$DECIMALS})?$")
     private val SCALE = BigInteger.TEN.pow(DECIMALS)
 
+    /** Returns positive atomic units, or null for invalid precision, syntax or range. */
     fun parseExact(text: String): Long? {
         val value = text.trim()
         if (!PATTERN.matches(value)) return null
@@ -42,7 +43,7 @@ object MoneroAmount {
                 BigInteger(whole).multiply(SCALE).add(BigInteger(fraction))
             }.getOrNull() ?: return null
         if (atomic.signum() <= 0) return null
-        // Reject anything that cannot be represented by wallet2's uint64_t / jlong path.
+        // The Android transaction path carries amounts in a signed Long across JNI.
         if (atomic.bitLength() > 63) return null
         return atomic.toLong()
     }

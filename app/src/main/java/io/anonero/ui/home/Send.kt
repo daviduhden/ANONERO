@@ -269,7 +269,8 @@ class SendViewModel : ViewModel() {
         _spendType.value = type
     }
 
-    // Computed balance based on selected coins or unlocked balance
+    // null means an explicit selection is unresolved or invalid. An empty set
+    // allows the wallet to select outputs from the account's unlocked balance.
     val balance =
         MediatorLiveData<Long>().apply {
             addSource(_balance) { updateComputedBalance() }
@@ -419,6 +420,7 @@ fun SendScreen(
         }
     }
 
+    // A result can still belong to the previous edit while validation is running.
     val addressValid = checkedAddress?.takeIf { it.first == addressField }?.second
     val amountAtomic = MoneroAmount.parseExact(amountField)
     val validSpend =
@@ -443,6 +445,8 @@ fun SendScreen(
                             if (isSweep) {
                                 wallet.hasUnknownKeyImages()
                             } else {
+                                // Reserve 0.001 XMR for this key-image preflight.
+                                // The pending transaction supplies the actual fee.
                                 val withFee =
                                     runCatching {
                                         Math.addExact(spendAmount, 1_000_000_000L)

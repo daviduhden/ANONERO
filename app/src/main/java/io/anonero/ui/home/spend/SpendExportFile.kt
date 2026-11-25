@@ -15,6 +15,11 @@ internal fun prepareUnsignedExport(
     write: (File) -> Boolean,
 ): Boolean = prepareSpendExport(File(cacheDir, AnonConfig.EXPORT_UNSIGNED_TX_FILE), write)
 
+/**
+ * Replaces a scratch artifact and accepts it only when the writer reports success and
+ * produces a nonempty regular file. Discards incomplete output and preserves the
+ * original exception if cleanup also fails.
+ */
 internal fun prepareSpendExport(
     file: File,
     write: (File) -> Boolean,
@@ -59,6 +64,7 @@ internal fun InputStream.readBoundedQrExport(limit: Int): ByteArray? {
         output.write(buffer, 0, read)
         remaining -= read
     }
+    // Read one extra byte to distinguish an exact fit from a truncated payload.
     if (remaining == 0 && read() != -1) return null
     return output.toByteArray().takeIf { it.isNotEmpty() }
 }

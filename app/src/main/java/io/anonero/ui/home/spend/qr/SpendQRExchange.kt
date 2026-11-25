@@ -116,6 +116,7 @@ enum class ExportType {
 
 private const val TAG = "SpendQRExchange"
 
+/** Scratch export tied to its originating wallet and profile. A null UR allows file export only. */
 internal data class SpendQrArtifact(
     val file: File,
     val wallet: Wallet,
@@ -209,7 +210,7 @@ fun QRExchangeScreen(
         loading = false
     }
 
-    // write the export to the place picked in the system save dialog
+    // The picker can return after the wallet changes, so the callback rechecks the artifact owner.
     val saveExport =
         rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument("application/octet-stream"),

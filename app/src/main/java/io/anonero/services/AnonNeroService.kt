@@ -74,8 +74,9 @@ fun startAnonService(context: Context) {
  * wallet lifecycle. Android may restart a sticky service, so the service must be safe to
  * start without a live wallet; all reads are nullable and notification updates are guarded.
  *
- * Notification text is routed through [StealthMode] so a locked device does not disclose
- * balances, heights, addresses, or the product name.
+ * Both notification builders mark their content private to the lock screen using
+ * Android's SECRET visibility. [StealthMode] also substitutes neutral notification
+ * text when enabled.
  */
 class AnonNeroService : Service() {
     private val tag: String = AnonNeroService::class.java.simpleName
@@ -112,7 +113,8 @@ class AnonNeroService : Service() {
         startForeground(NOTIFICATION_ID, foregroundNotification())
         updateJob =
             scope.launch {
-                // One consumer serializes daemon probes; bursts need only the latest state.
+                // Coalesce notification updates across collectors. Display the latest
+                // cached refresh state without making a separate daemon request.
                 val updates = Channel<Unit>(Channel.CONFLATED)
                 launch {
                     walletState.walletConnectionStatus.collect {
@@ -207,9 +209,8 @@ class AnonNeroService : Service() {
                     } else if (!wallet.isInitialized) {
                         getString(R.string.loading_wallet)
                     } else if (!isNetworkAvailable()) {
-                        // Network is offline — skip the blocking RPC call and mark
-                        // disconnected immediately so the bar shows without waiting
-                        // for a 30-second timeout
+                        // Android reports no validated default network. Publish a
+                        // disconnected status without waiting for another refresh.
                         walletState.setConnectionStatus(Wallet.ConnectionStatus.ConnectionStatus_Disconnected)
                         getString(R.string.disconnected)
                     } else {

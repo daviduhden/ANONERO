@@ -120,15 +120,11 @@ data class OnboardRestorePreviewScreen(
 @Serializable
 data object OnboardImportKeysScreen
 
-// onboarding
-
 /**
- * Navigation graph for first-run setup, seed restore, backup restore, and view-only key
- * import.
- *
- * The graph is entered only when no usable wallet exists. It shares [OnboardViewModel] so
- * the passphrase/seed/restore payload survives screen changes; the final destination is
- * either the home graph or the node setup screen for an offline/airgapped flow.
+ * Coordinates first-run creation, seed and backup restore, and view-only key import.
+ * The activity selects this graph based on wallet file presence. The shared
+ * [OnboardViewModel] carries setup state across destinations without serializing
+ * the passphrase or restore payload into navigation arguments.
  */
 fun NavGraphBuilder.onboardingGraph(
     navController: NavHostController,

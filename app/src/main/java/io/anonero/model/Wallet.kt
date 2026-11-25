@@ -341,6 +341,8 @@ class Wallet {
 
     // TODO virtual void setAutoRefreshInterval(int millis) = 0;
     // TODO virtual int autoRefreshInterval() const = 0;
+    // Both transaction wrappers share a review slot. Replacing a draft invalidates
+    // any previously loaded unsigned set as well.
     private fun disposePendingTransaction() {
         pendingTransaction?.let {
             disposeTransaction(it)
@@ -528,6 +530,8 @@ class Wallet {
     @Throws(java.lang.Exception::class)
     fun getUtxos(): List<CoinsInfo> = coins?.all ?: listOf()
 
+    // Refresh before construction to catch outputs that changed while the UI held
+    // the selection. An empty selection leaves input selection to wallet2.
     private fun checkExplicitSelection(
         keyImages: List<String>,
         account: Int,
@@ -581,7 +585,7 @@ class Wallet {
 
     external fun hasUnknownKeyImages(): Boolean
 
-    // the JNI side returns "Imported" or the wallet error string, like importOutputs
+    // JNI returns "Imported" on success or a fixed status message for failure.
     external fun importKeyImages(filename: String?): String?
 
     fun loadUnsignedTransaction(inputFile: String?): UnsignedTransaction? {

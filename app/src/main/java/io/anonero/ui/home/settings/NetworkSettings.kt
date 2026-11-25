@@ -151,6 +151,11 @@ class NetworkSettingsViewModel(
         }
     }
 
+    /**
+     * Pauses the live wallet before changing the configured transport. A saved
+     * configuration can still leave the wallet disconnected if applying it fails
+     * or the current backend is incompatible with the new network.
+     */
     fun save(config: TransportConfig) {
         if (config.validationError() != null) {
             _error.postValue(NetworkSettingsError.INVALID_CONFIG)

@@ -77,7 +77,7 @@ class EncryptUtilTest {
         }
     }
 
-    // A file produced by the OLD code (v1: Salted__ + 11k CBC) must restore forever.
+    // Construct the legacy CBC fixture independently of the current AEAD writer.
     @Test
     fun `v1 backups still restore`() {
         val payload = "legacy backup content, PKCS5 padded".toByteArray()

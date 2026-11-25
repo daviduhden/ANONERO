@@ -25,9 +25,9 @@ import org.json.JSONObject
 /**
  * View-only key material used by the NERO flavor and by backups.
  *
- * It contains the public address and private view key, never the spend key. The payload is
- * sensitive: the view key reveals all incoming transactions and balances. Do not log it or
- * place it in an unencrypted file.
+ * The exported public address and private view key let the recipient scan for incoming
+ * transfers. The payload carries no spend key or key images. Keep it out of logs and
+ * plaintext files. The JSON field names and [version] are part of the export format.
  */
 @Serializable
 class NeroKeyPayload(

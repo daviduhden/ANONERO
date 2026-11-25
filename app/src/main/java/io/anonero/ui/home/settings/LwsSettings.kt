@@ -71,6 +71,7 @@ fun LwsSettingsScreen(
 ) {
     val prefs = koinInject<android.content.SharedPreferences>(named(WALLET_PREFERENCES))
     val profile = io.anonero.util.WalletSession.profile
+    // Both the editable fields and the consent baseline belong to this profile.
     val loaded = remember(profile) { LwsConfig.load(prefs, profile) }
     var enabled by remember(profile) { mutableStateOf(loaded.enabled) }
     var host by remember(profile) { mutableStateOf(loaded.host) }

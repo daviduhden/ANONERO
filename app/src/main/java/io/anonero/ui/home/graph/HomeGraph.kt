@@ -29,11 +29,10 @@ import io.anonero.ui.home.graph.routes.HomeScreenRoute
 import io.anonero.ui.home.graph.routes.LockScreenRoute
 
 /**
- * Top-level destination chooser for an unlocked process.
+ * Entry graph for an existing wallet. The launch-time status selects Home or PIN entry.
  *
- * A wallet whose status is already OK starts at the home content; otherwise it starts at
- * the lock screen. The lock route is part of the graph so a process that was launched
- * without a wallet can still reach onboarding from the landing graph.
+ * This PIN route opens a wallet. The activity hosts a separate overlay for unlocking
+ * background sync because that lock can cover any destination in the Home graph.
  */
 fun NavGraphBuilder.homeGraph(
     navController: NavHostController,

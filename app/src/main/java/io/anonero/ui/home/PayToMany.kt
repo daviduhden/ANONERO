@@ -91,10 +91,7 @@ import timber.log.Timber
 
 private const val TAG = "PayToMany"
 
-/*
- * Stable error identifiers so the UI can localize failures. The wallet2 error text is
- * still logged for diagnosis, but it is never shown to the user untranslated.
- */
+/** Stable resource IDs keep wallet2 diagnostic text out of user-facing errors. */
 enum class PayToManyError(
     @StringRes val messageRes: Int,
 ) {
@@ -116,6 +113,11 @@ data class RecipientInput(
  */
 fun parseExactAmount(text: String): Long? = MoneroAmount.parseExact(text)
 
+/**
+ * Builds one pending payment from a snapshot of destination and atomic-amount pairs.
+ * Rechecks the wallet, profile, and applied transport after address validation because
+ * those can change before construction. The review screen owns submission.
+ */
 class PayToManyViewModel : ViewModel() {
     private val walletHandler: AnonWalletHandler by inject(AnonWalletHandler::class.java)
     private val walletState: WalletState by inject(WalletState::class.java)
@@ -234,6 +236,8 @@ fun PayToManyScreen(
     val inputSnapshot = recipients.toList()
     val addresses = inputSnapshot.map { it.address }
     val parsed = inputSnapshot.map { parseExactAmount(it.amount) }
+    // Keep the address list beside its results. Adding or removing a row can make
+    // a previous result stale even when the address at a given index is unchanged.
     val validation by produceState<AddressValidationSnapshot?>(initialValue = null, addresses) {
         val checked =
             withContext(Dispatchers.IO) {

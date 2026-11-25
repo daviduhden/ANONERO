@@ -70,14 +70,9 @@ fun QrCodeView(
     }
 }
 
-/*
- * A composable that renders a QR code from a data string with no overlay content.
- *
- * @param data The data to encode into a QR code.
- * @param modifier The Compose modifier to apply to the QR code.
- * @param colors The color palette to use for the QR code - defaults to black and white.
- * @param dotShape The shape of the individual dots in the QR code - defaults to square.
- * @param encoder The encoder to use to encode the data into a QR code. Meant to be able to stub out in tests if needed.
+/**
+ * Draws the encoded module matrix. Finder patterns are drawn separately to retain
+ * their concentric structure when the other modules use a circular shape.
  */
 @Composable
 fun QrCodeView(

@@ -132,10 +132,8 @@ class MainActivity : ComponentActivity() {
                 ) = false
             },
         )
-        // Everything this window ever shows -- seed, balance, addresses, the signing
-        // review -- otherwise lands in the recents thumbnail, which the system writes
-        // to disk, and is capturable by any screen-capture-privileged app. One flag
-        // closes all of it.
+        // Treat the entire activity window as sensitive. Android uses FLAG_SECURE to
+        // suppress ordinary screenshots and task snapshots, including during navigation.
         window.setFlags(
             android.view.WindowManager.LayoutParams.FLAG_SECURE,
             android.view.WindowManager.LayoutParams.FLAG_SECURE,
@@ -340,9 +338,9 @@ class MainActivity : ComponentActivity() {
             super.onDestroy()
             return
         }
-        // Do not kill the process until the wallet has stored and closed. The close runs
-        // off the main thread with a bounded wait; cancellation of the UI scope must not
-        // cancel this job before it finishes.
+        // Use an independent IO scope so activity teardown can attempt a store and close
+        // before process termination. The coroutine timeout is cooperative and cannot
+        // interrupt a blocking wallet2 call.
         val closeScope = CoroutineScope(Dispatchers.IO)
         closeScope
             .launch {

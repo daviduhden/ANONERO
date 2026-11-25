@@ -90,7 +90,6 @@ private val Context.nodeDataStore: DataStore<List<Node>> by dataStore(
 class NodesRepository(
     private val context: Context,
 ) {
-    // Expose a Flow to observe the list of items
     val nodesFlow: Flow<List<Node>> =
         context.nodeDataStore.data
             .catch { exception ->
@@ -112,7 +111,6 @@ class NodesRepository(
                 }
             }
 
-    // Save a list of items
     suspend fun saveItems(items: List<Node>) {
         context.nodeDataStore.updateData { items }
     }

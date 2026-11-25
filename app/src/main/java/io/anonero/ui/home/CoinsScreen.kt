@@ -108,6 +108,8 @@ fun CoinsScreen(
     val snackbar = remember { SnackbarHostState() }
     val failureMessage = stringResource(R.string.wallet_operation_failed)
     var mutating by remember { mutableStateOf(false) }
+    // A refreshed wallet snapshot can invalidate previously selected outputs.
+    // Keep keys for unfrozen, unspent outputs. Send resolves them again before construction.
     LaunchedEffect(coins) {
         selectedCoins = selectedCoins.intersect(coins.filter { !it.frozen && !it.spent }.map { it.pub_key }.toSet())
     }

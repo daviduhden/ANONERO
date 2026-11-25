@@ -90,6 +90,7 @@ fun AccountsScreen(
     var busy by remember { mutableStateOf(false) }
     val failureMessage = stringResource(R.string.wallet_operation_failed)
 
+    // Serialize actions from this screen while WalletState performs the actual mutation.
     fun mutate(operation: () -> Boolean) {
         if (busy || locked) return
         busy = true

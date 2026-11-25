@@ -3,11 +3,11 @@ package io.anonero.model
 /**
  * Callbacks invoked by the native wallet listener.
  *
- * The native adapter attaches the calling wallet2 refresh thread to the JVM and invokes
- * these methods there. They must be short, must not block, and must not assume they run on
- * the Android main thread. The adapter currently delivers [updated], [refreshed],
- * [newBlock], and [unconfirmedMoneyReceived]; [moneySpent] and [moneyReceived] are kept
- * for interface compatibility and are only logged by the C++ side.
+ * The native adapter obtains a JNI environment for the calling wallet2 thread and invokes
+ * [updated], [refreshed], [newBlock], and [unconfirmedMoneyReceived] synchronously there.
+ * Keep work on this path bounded and publish UI updates through the wallet state flows.
+ * The adapter discards the native [moneySpent] and [moneyReceived] events, including their
+ * transaction IDs and amounts.
  */
 interface WalletListener {
     /**

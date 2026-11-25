@@ -113,11 +113,9 @@ import java.io.File
 private const val TAG = "ExportBackUp"
 
 /**
- * Export-state holder for encrypted backups.
- *
- * It validates the passphrase/confirmation, delegates archive creation to [BackupHelper],
- * and exposes progress/error state. Backups are not available for the decoy profile; the
- * decoy is recovered from its seed.
+ * Exposes the encrypted archive or an export error after [BackupHelper] finishes.
+ * The helper enforces profile and flavor eligibility and performs the wallet copy
+ * on the IO dispatcher used here.
  */
 class ExportBackUpViewModel : ViewModel() {
     private val backupFile = MutableLiveData<File?>(null)

@@ -65,15 +65,12 @@ private enum class NativeBackgroundSync {
 /**
  * Process-wide, UI-facing state derived from the managed wallet.
  *
- * [WalletState] is a cache and a synchronization point, not a second wallet implementation.
- * It reads balances, history, accounts, subaddresses, coins, connection status, and sync
- * progress from [WalletManager] and publishes them as flows. Views and ViewModels consume
- * those flows; they must not keep their own copies of wallet state.
+ * It reads balances, history, accounts, subaddresses and outputs from the wallet owned by
+ * [WalletManager]. The service and refresh listener supply transport status and progress.
+ * Views and ViewModels observe the resulting flows as the current session's UI snapshot.
  *
- * Writes that change wallet state (account selection, labels, freeze/thaw, notes, new
- * subaddresses) are serialized here and persisted with `store()`. Background-sync entry and
- * exit are mutually exclusive and the exit path requires the PIN that the lock screen has
- * already verified.
+ * Account and output mutations synchronize with snapshot reads. The lock transitions use
+ * a dedicated mutex because they may suspend, and unlock requires prior PIN verification.
  */
 class WalletState {
     @Volatile
@@ -173,6 +170,8 @@ class WalletState {
                     it.getListKey()
                 }
             _transactions.update { updatedTxs }
+            // Compare against an existing snapshot to avoid treating the initial
+            // history load as a batch of incoming notifications.
             if (oldTxCount > 0 && updatedTxs.size > oldTxCount) {
                 val hasNewIncoming =
                     updatedTxs.take(updatedTxs.size - oldTxCount).any {
@@ -334,7 +333,7 @@ class WalletState {
         }
     }
 
-    // Freeze/thaw a wallet output. The native coin-control layer also enforces this.
+    /** Verifies an active-account output through [io.anonero.model.Coins] before storing. */
     @Synchronized
     fun setOutputFrozen(
         publicKey: String,
@@ -436,9 +435,8 @@ class WalletState {
         bgSyncMutex.withLock {
             if (nativeBackgroundSync == NativeBackgroundSync.FAULT) return false
             val wallet = getWallet ?: return false
-            // Native background sync may never have started (for example, Tor/init failed).
-            // The PIN was already verified by the lock screen; release the overlay without
-            // pretending stopBackgroundSync succeeded.
+            // An overlay can be active without native background sync, such as while a
+            // session is still starting. A recorded native fault is rejected above.
             if (!backgroundSyncRunning) {
                 _backgroundSync.value = false
                 update()

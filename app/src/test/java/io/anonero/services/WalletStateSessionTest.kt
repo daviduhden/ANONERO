@@ -31,6 +31,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Exercises session and lock flow transitions without opening a native wallet. */
 class WalletStateSessionTest {
     @Test
     fun `lock fault rejects unlock profile changes and online state until session reset`() =
@@ -92,6 +93,7 @@ class WalletStateSessionTest {
             assertNull(state.connectionStatus.first())
             assertNull(state.connectionStatusValue)
             assertNull(state.syncProgress.first())
+            // A shortcut queued by the previous session must not reach a new collector.
             assertNull(withTimeoutOrNull(50L) { state.unlockShortcut.first() })
         }
 

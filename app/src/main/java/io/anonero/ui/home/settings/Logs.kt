@@ -106,6 +106,7 @@ class LogViewModel(
 
     private fun logDeviceInfo(): String = "Android API: ${Build.VERSION.SDK_INT}"
 
+    // Export the current diagnostic snapshot to the cache file used by FileProvider.
     fun prePareForShare(): Job =
         viewModelScope.launch(Dispatchers.IO) {
             val logsAsString =

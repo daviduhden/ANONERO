@@ -19,15 +19,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Camera is optional; scanning is one input path, not a requirement. -->
+    <!-- Keep the wallet installable on devices without a camera. -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- POST_NOTIFICATIONS is runtime-gated on API 33+; the foreground-service
-         permissions are required on API 34+, and are harmless/ignored earlier. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- MainActivity requests notification permission when required by Android. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

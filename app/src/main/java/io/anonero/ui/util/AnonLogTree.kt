@@ -63,6 +63,8 @@ class AnonLogTree(
     ) {
         // Timber has already appended throwable text: sanitize before persistence.
         val item = DiagnosticPolicy.sanitize(AnonLog(date = Date().time, message = message, priority = priority, tag = tag ?: "Anon"))
+        // Tie this queued write to the current log generation so a session reset can
+        // discard writes that were scheduled before the log store was cleared.
         val generation = logRepository.generation
         ioScope.launch {
             try {

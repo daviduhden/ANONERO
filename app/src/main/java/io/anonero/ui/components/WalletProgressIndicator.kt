@@ -51,6 +51,10 @@ import io.anonero.util.Formats
 import org.koin.java.KoinJavaComponent.inject
 import java.util.Locale
 
+/**
+ * Observes Android connectivity for the progress display. A validated Android
+ * network supplies a UI hint. Wallet connectivity comes from its own status flow.
+ */
 @Composable
 fun networkConnected(): State<Boolean> {
     val context = LocalContext.current

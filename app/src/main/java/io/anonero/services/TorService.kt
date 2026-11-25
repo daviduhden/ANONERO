@@ -75,6 +75,7 @@ class TorService(
     private val socksLock = Any()
     private var socksGeneration = 0L
 
+    // Read the address and revision together. Tor can reuse an address after a restart.
     internal fun socksSnapshot(): Pair<IPSocketAddress?, Long> = synchronized(socksLock) { _socksState.value to socksGeneration }
 
     private fun setSocks(endpoint: IPSocketAddress?) {

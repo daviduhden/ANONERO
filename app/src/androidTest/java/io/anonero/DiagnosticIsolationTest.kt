@@ -43,6 +43,7 @@ class DiagnosticIsolationTest {
             try {
                 prefs.edit().putBoolean(PREFS_STEALTH_MODE, false).commit()
                 repository.clear()
+                // Simulate a write that obtained its session token before the clear.
                 val staleGeneration = repository.generation
                 repository.clear()
                 repository.addItem(event, staleGeneration)

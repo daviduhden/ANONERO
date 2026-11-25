@@ -98,14 +98,12 @@ class LogRepository(
     val generation: Long get() = epoch.get()
     private val prefs = context.getSharedPreferences(AnonConfig.PREFS, Context.MODE_PRIVATE)
 
-    // Recheck stealth inside the actual mutation, not just when a coroutine is queued.
-    // Expose a Flow to observe the list of items
     val logFlow: Flow<List<AnonLog>> =
         context.logsStore.data
             .map { items -> items.filter { it.priority >= 5 }.map(DiagnosticPolicy::sanitize) }
             .catch { exception ->
                 if (exception is IOException) {
-                    emit(emptyList()) // Handle errors by emitting an empty list
+                    emit(emptyList())
                 } else {
                     throw exception
                 }
@@ -117,7 +115,8 @@ class LogRepository(
         }
     }
 
-    // A clear invalidates every write queued by the previous session.
+    // Check the generation and stealth mode inside the DataStore update. A write
+    // queued before a session clear can no longer publish an old diagnostic.
     suspend fun addItem(
         item: AnonLog,
         expectedGeneration: Long = generation,

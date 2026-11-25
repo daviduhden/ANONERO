@@ -64,6 +64,11 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 
+/**
+ * Delays navigation while the embedded Tor SOCKS endpoint starts. Releasing the splash,
+ * including after its timeout, only releases the UI. The wallet connection still
+ * depends on the selected transport being ready.
+ */
 @Composable
 fun TorSplash(
     modifier: Modifier = Modifier,
@@ -88,14 +93,12 @@ fun TorSplash(
 
     if (walletExist) {
         LaunchedEffect(key1 = walletExist, socks) {
-            // if user disabled tor and uses manual proxy, skip tor splash
             hasNetWork = isNetworkConnected(context)
             if (enableTor.not()) {
                 return@LaunchedEffect
             }
             scope.launch(Dispatchers.IO) {
                 walletExist = WalletProfileStore.anyWalletExists(context, anonPrefs)
-                // if user selected an external transport, skip tor splash
                 if (!TransportConfig.load(anonPrefs).mode.usesEmbeddedTor) {
                     isAppReady = true
                 } else {
@@ -107,7 +110,6 @@ fun TorSplash(
                 }
             }
         }
-        // Timeout: proceed after 20s even if Tor hasn't connected
         LaunchedEffect(Unit) {
             delay(20000)
             if (!isAppReady) {
@@ -116,8 +118,7 @@ fun TorSplash(
         }
     }
 
-    // no need to show tor splash if user disabled tor
-    // if there is no wallet file, skip tor splash
+    // During onboarding or offline use, there is no embedded-Tor wallet connection to wait for.
     val lwsEnabled =
         io.anonero.util.LwsConfig
             .load(anonPrefs)

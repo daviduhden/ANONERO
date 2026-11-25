@@ -142,9 +142,9 @@ private const val TAG = "LockScreen"
  * before a sensitive settings action.
  *
  * The keypad is shuffled and attempts are throttled by [PinThrottle]. In `OPEN_WALLET` the
- * ViewModel resolves the PIN to MAIN or DECOY and starts the wallet; in `LOCK_SCREEN` it
- * only releases the overlay after `stopBackgroundSync` succeeds. [onUnLocked] must not be
- * treated as proof of a successful wallet unlock by itself.
+ * ViewModel resolves the PIN to MAIN or DECOY and opens the wallet. In `LOCK_SCREEN`,
+ * [onUnLocked] hands the PIN to the activity for the background sync exit. The overlay
+ * follows [WalletState.backgroundSyncFlow], which reflects the outcome of that exit.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

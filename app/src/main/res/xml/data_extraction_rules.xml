@@ -16,6 +16,8 @@
   limitations under the License.
 -->
 
+<!-- Android 12+ handles cloud backups and device transfers separately.
+     Exclude the same data in both channels to keep wallet state on its device. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" path="." />

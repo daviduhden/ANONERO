@@ -25,14 +25,12 @@ import java.io.File
 import java.security.SecureRandom
 
 /**
- * The wallet2 password is no longer the PIN. It is a high-entropy random secret W,
- * wrapped by a non-exportable Android Keystore key (KeyStoreHelper's per-wallet key).
- * Extracted keys files are useless without this device's Keystore, since W cannot be
- * brute-forced (256-bit) and cannot be unwrapped off-device.
+ * A bound wallet uses 32 random bytes encoded as its wallet2 password. Android
+ * Keystore wraps that password under a per-wallet key. This protects against copying
+ * wallet files and preferences without also obtaining access to the Keystore key.
  *
- * The PIN gates access to W in software (verified via PinHash) -- app-PIN, not device
- * biometric, by design. This closes the at-rest-extraction threat; it does not defend a
- * live, app-context-compromised device (which could reach W in memory).
+ * Callers enforce the app PIN before loading the password. Code executing in the app's
+ * context can request the unwrap and receive the password in memory.
  */
 object WalletKey {
     private const val LEN = 32 // 256-bit
@@ -53,7 +51,7 @@ object WalletKey {
         wallet: String,
     ): String = KeyStoreHelper.loadWalletSecret(context, wallet)
 
-    // True once a wallet has been bound to the Keystore (created or migrated).
+    // Checks for a stored ciphertext. Only load() verifies that it can be unwrapped.
     fun exists(
         context: Context,
         wallet: String,

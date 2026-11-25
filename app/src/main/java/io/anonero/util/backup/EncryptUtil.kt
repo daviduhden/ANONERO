@@ -50,12 +50,8 @@ object EncryptUtil {
     const val SALT_PREFIX = "Salted__"
     const val BUFFER_SIZE = 4096
 
-    // v2 backups: PBKDF2-HMAC-SHA256 at the OWASP floor and authenticated encryption.
-    // v1 was 11k iterations of the same KDF into unauthenticated AES-CBC -- crackable
-    // at hobbyist cost for weak passphrases, and silently restorable after tampering.
-    // The magic byte-string is the version: files starting Salted__ are v1 and stay
-    // restorable forever, files starting ANONBAK2 are v2. Pure javax.crypto, so this
-    // restores unchanged wherever a backup is carried.
+    // The magic selects the encryption envelope. The archive metadata independently
+    // records the credential used for the enclosed wallet files.
     private const val V2_MAGIC = "ANONBAK2"
     private const val V2_ITERATIONS = 600_000
     private const val V2_SALT_BYTES = 16
@@ -138,7 +134,7 @@ object EncryptUtil {
         return plaintext.toString(Charsets.UTF_8)
     }
 
-    // Writes a v2 backup: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext+tag.
+    // Envelope layout in bytes: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext and tag.
     fun encryptFile(
         key: String,
         inputFile: File,
@@ -160,10 +156,10 @@ object EncryptUtil {
         }
     }
 
-    /*
-     * Restores either format. v2 is authenticated: a tampered or truncated file, or a
-     * wrong passphrase, fails the GCM tag check and throws instead of yielding garbage
-     * -- or worse, plausible garbage. v1 files restore exactly as they always did.
+    /**
+     * Decrypts the envelope selected by its magic. Keep [outputFile] in private staging
+     * and discard it on failure: the destination may be created before the cipher has
+     * finished checking the GCM tag. The legacy CBC format has no authentication tag.
      */
     fun decryptFile(
         key: String,

@@ -42,6 +42,7 @@ enum class AnonUrRegistryTypes(
     companion object {
         fun fromString(type: String): AnonUrRegistryTypes? = AnonUrRegistryTypes.values().find { it.type == type }
 
+        /** Uses the UR type string. Payload validation belongs to the matching decoder. */
         fun fromUrTag(ur: UR): AnonUrRegistryTypes? = AnonUrRegistryTypes.values().find { it.type == ur.type }
     }
 }

@@ -58,7 +58,7 @@ instruction files, and `.agents/skills/`. It is not a substitute for those files
 - Optional LWS with view-key exposure and untrusted-server policy; it uses the selected
   transport and requires TLS for non-loopback clearnet.
 - Keystore-wrapped wallet secret, PIN hash/throttle, legacy PIN migration.
-- Encrypted backups with AEAD v3 writer and v1/v2 readers.
+- Encrypted backups with one AEAD envelope for v2/v3 metadata and a legacy v1 reader.
 - Stealth mode, decoy/duress, secure wipe, sensitive clipboard.
 - English, Spanish (Spain), Russian, Simplified Chinese resources.
 - CI test/release workflows, native archive artifact, signing, checksums.

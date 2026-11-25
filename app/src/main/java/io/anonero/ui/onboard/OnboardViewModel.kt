@@ -51,12 +51,10 @@ private const val TAG = "OnboardViewModel"
 /**
  * Onboarding state and wallet provisioning.
  *
- * Holds the mode (create/restore), the seed passphrase, the newly created wallet, and the
- * restore/view-only payload between screens. Creation and restore are deliberately
- * transactional: credentials and the Keystore secret are written before the wallet file,
- * and a failed wallet creation deletes the partial file. Before writing MAIN, it refuses a
- * PIN that matches the duress PIN, a passphrase that matches the decoy passphrase, or a
- * non-empty MAIN target.
+ * Carries setup state in memory between screens. Provisioning writes the wrapped wallet
+ * password and gate credentials before asking wallet2 to create files, so the password
+ * needed to reopen the wallet has already been saved. On failure it attempts to remove
+ * partial MAIN state through [cleanupFailedMain].
  */
 class OnboardViewModel(
     private val prefs: SharedPreferences,
@@ -100,9 +98,9 @@ class OnboardViewModel(
     }
 
     /*
-     * A failed create/restore must not leave a wrapped secret or credentials behind:
-     * RestoreTarget.requireEmpty treats either as an existing wallet and would block every
-     * later attempt. Close a partially managed native wallet first, then remove only MAIN.
+     * Attempts to close the partial wallet before removing MAIN files and credentials.
+     * A leftover wrapped secret or credential causes the empty-target check to refuse
+     * another provisioning attempt.
      */
     private fun cleanupFailedMain(context: Context) {
         runCatching { WalletManager.instance?.wallet?.close() }

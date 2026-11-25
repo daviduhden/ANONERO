@@ -16,6 +16,8 @@
   limitations under the License.
 -->
 
+<!-- Backup exclusions for Android versions that read fullBackupContent.
+     Keep the Android 12+ cloud and device-transfer rules aligned. -->
 <full-backup-content>
     <exclude domain="root" path="." />
     <exclude domain="file" path="." />

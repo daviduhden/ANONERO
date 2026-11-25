@@ -103,12 +103,12 @@ signer or that the message is truthful. It contributes authenticity, not anonymi
 
 ## 7. Backups
 
-- The current writer exports the active MAIN wallet (never the decoy), re-keys a copy to the
-  seed passphrase, zips the flat wallet layout plus `anon.json`, and encrypts it with the v3
-  AEAD envelope.
-- v1 (`Salted__`, CBC) and v2 (AEAD, PIN-keyed wallet files) remain readable.
-- The archive reader validates every entry before writing, rejects symlinks, duplicate
-  names, traversal, and existing destinations, and removes a failed extraction tree.
+- Export packs the MAIN wallet copy and `anon.json` in the `ANONBAK2` AEAD envelope.
+  A copy of a Keystore-bound wallet uses the seed passphrase (v3). A legacy copy
+  retains its PIN (v2). Restore also reads the v1 `Salted__` CBC envelope.
+- The archive reader checks the flat layout, rejects duplicate names and traversal,
+  and writes regular files in fresh staging without restoring entry attributes.
+  On extraction failure it attempts to remove the staging tree.
 - The backup preview shows metadata and network; a network mismatch aborts the restore.
 - A restored wallet is re-keyed to a fresh device secret and bound to the new PIN. A failed
   bind removes only MAIN, preserving a configured decoy; backup node settings are applied

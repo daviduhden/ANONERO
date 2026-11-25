@@ -18,6 +18,8 @@
 
 <resources>
 
+    <!-- Android's window theme bridges the splash and the first Compose frame.
+         The wallet's light and dark palettes are defined in AnonNeroTheme. -->
     <style name="Theme.Anonnero" parent="android:Theme.Material.NoActionBar" >
         <item name="android:windowBackground">@color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>

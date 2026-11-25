@@ -112,6 +112,8 @@ fun SignVerifyScreen(
         }
     }
 
+    // The form can change while wallet2 is working. Publish a signature only if
+    // the same message and wallet are still active and the session is unlocked.
     fun doSign() {
         if (message.isEmpty() || signing || locked || walletState.backgroundSyncRunning) return
         val requestedMessage = message

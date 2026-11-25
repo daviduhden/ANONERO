@@ -144,6 +144,7 @@ class ReviewTransactionViewModel : ViewModel() {
     @Volatile
     private var owner: ReviewOwner? = null
 
+    // Bind the reviewed native object to the wallet, profile, and account that produced it.
     private fun currentReviewWallet(): Wallet {
         val reviewOwner = checkNotNull(owner) { "No reviewed wallet session" }
         val wallet = reviewOwner.wallet

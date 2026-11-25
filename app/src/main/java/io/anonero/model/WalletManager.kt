@@ -17,8 +17,9 @@ private const val TAG = "WalletManager"
  * must not replace the live wallet: creating the decoy and re-keying a backup copy.
  *
  * Native wallet calls can block on disk or network I/O. Call this class off the Android
- * main thread. The singleton is created lazily by [instance]; [AnonConfig] decides the
- * network type at process start.
+ * main thread. The singleton is created lazily by [instance] and [AnonConfig] supplies
+ * the build's Monero network. Callers must coordinate managed wallet replacement and
+ * confirm the previous wallet closed before creating or opening another.
  */
 class WalletManager {
     var networkType = NetworkType.NetworkType_Mainnet
@@ -65,17 +66,6 @@ class WalletManager {
         val wallet = Wallet(walletHandle)
         manageWallet(wallet)
         if (wallet.status.isOk) {
-//            // (Re-)Estimate restore height based on what we know
-//            val oldHeight = wallet.getRestoreHeight()
-//            // Go back 4 days if we don't have a precise restore height
-//            val restoreDate = Calendar.getInstance()
-//            restoreDate.add(Calendar.DAY_OF_MONTH, 0)
-//            val restoreHeight =
-//                if (height > -1) height else RestoreHeight.instance?.getHeight(restoreDate.time)
-//            if (restoreHeight != null) {
-//                wallet.setRestoreHeight(restoreHeight)
-//            }
-//            Log.d("WalletManager.kt", "Changed Restore Height from $oldHeight to ${wallet.getRestoreHeight()}")
             // This rewrites the keys file (which contains the restore height). If it fails,
             // the caller must not proceed with a wallet whose keys file is inconsistent.
             if (!wallet.setPassword(password)) {
