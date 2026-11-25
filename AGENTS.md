@@ -86,7 +86,8 @@ relying on it after a significant change.
 - Embedded Tor (`io.matthewnelson.kmp-tor`) with a mandatory SOCKS proxy path.
 - Optional Monero Light Wallet Server (LWS) over the selected transport.
 - Android Keystore-bound wallet secret, PBKDF2 PIN gate, legacy PIN migration.
-- Encrypted backups: v3 writer, v1/v2 readers.
+- Encrypted backups: AEAD writer with v3 passphrase-keyed or v2 legacy PIN-keyed wallet files,
+  and a reader for both versions and the legacy v1 envelope.
 - Stealth mode, decoy wallet, duress PIN, secure wipe, sensitive clipboard handling.
 - English, Spanish (Spain), Russian, and Simplified Chinese resources.
 - GitHub Actions test and release pipelines with APK signing and artifact verification.
@@ -118,8 +119,10 @@ Key process facts:
 
 - `WalletManager` is a process-wide singleton that manages exactly one live wallet.
   Decoy creation and backup re-keying use explicitly unmanaged wallets.
-- `MoneroHandlerThread` owns wallet callbacks and runs on a thread with a 5 MB stack.
-  Wallet refreshes and stores must not block the main thread.
+- `MoneroHandlerThread` implements the Kotlin wallet listener. JNI calls it on the
+  calling wallet2 thread. Its own `run()` is empty, so its configured stack size
+  does not determine the callback stack. Wallet refreshes and stores must not
+  block the main thread.
 - `WalletState` is the UI-facing state owner. Do not create a second source of truth.
 - Tor and wallet state are process-scoped Koin singletons (`AppModule.kt`).
 

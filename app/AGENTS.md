@@ -46,8 +46,10 @@ anonymity, privacy, security, language, build, and Git policy. Read it first.
   `createWalletUnmanaged` only for explicit copy/decoy work, and always close them.
 - Never call wallet2 from the main thread. Balance, history, coins, store, refresh,
   init, proxy, login, and transaction methods block on native I/O.
-- `MoneroHandlerThread` callbacks run on a native wallet thread with a 5 MB stack.
-  Keep callbacks short; do not perform UI work or blocking disk I/O there.
+- JNI invokes `MoneroHandlerThread` callbacks synchronously on the calling wallet2
+  thread. The legacy Kotlin thread wrapper has a 5 MB stack hint and an empty
+  `run()`; it does not dispatch callbacks. Keep callback work bounded and publish
+  UI changes through `WalletState`.
 - Use structured concurrency. Do not use `GlobalScope`, `runBlocking`, or
   `Thread.sleep` in application code.
 - Catch `CancellationException` and rethrow it before generic exception handling.

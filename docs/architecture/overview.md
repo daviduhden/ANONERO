@@ -54,9 +54,9 @@ flowchart TB
     Handler --> Files
 ```
 
-The app has one managed wallet per process. `WalletManager` owns it; `WalletState` exposes
-it to the UI; `AnonWalletHandler` controls its lifecycle. `AnonNeroService` only keeps sync
-alive and publishes notifications.
+The process can hold one managed wallet. `WalletManager` owns it, `WalletState` exposes
+its state to the UI and `AnonWalletHandler` coordinates its lifecycle. `AnonNeroService`
+provides the foreground service for ongoing sync and notifications.
 
 ## 2. Module responsibilities
 
@@ -83,15 +83,17 @@ alive and publishes notifications.
 
 `AnonApplication.onCreate` runs before Koin or UI:
 
-1. Sets `AnonConfig.context` and applies the saved locale.
+1. Sets `AnonConfig.context`, attempts to discard previous-session diagnostics before
+   DataStore opens, and applies the saved locale.
 2. Starts the legacy asynchronous wallet-presence flag and initializes the wallet manager.
    The UI decides wallet presence with `WalletProfileStore.anyWalletExists`, not this flag.
 3. Starts Koin with `appModule`.
 4. Installs the log tree and crash handler.
 5. Starts embedded Tor when it is the selected transport and a node host or LWS is
    configured; external providers are not started by ANONERO.
-6. Deletes transient spend/export/backup files from the cache.
-7. Recovers an interrupted Keystore migration before any wallet open.
+6. Attempts to delete transient spend, export and backup files from the cache.
+7. Attempts recovery of an interrupted Keystore migration for the default wallet before
+   the UI can open it.
 
 `MainActivity` then installs the splash screen, sets `FLAG_SECURE`, loads theme/stealth
 preferences, and hosts either the onboarding graph or the home graph. A lock overlay is
@@ -107,7 +109,7 @@ sequenceDiagram
     participant P as WalletProfileStore
     participant K as WalletKey / Keystore
     participant WM as WalletManager
-    participant T as TorService
+    participant T as TransportController
     participant W as Wallet / JNI
     participant N as Daemon or LWS
 
@@ -118,16 +120,23 @@ sequenceDiagram
     H->>K: load wrapped secret, or migrate legacy PIN
     K-->>H: wallet2 password
     H->>WM: openWallet(path, password)
-    H->>T: start and wait for SOCKS (when online)
-    H->>W: init(proxy, daemon, lightWallet)
+    H->>H: suspend refresh and keep the session offline
+    opt Remote endpoint configured
+        H->>T: authorize selected path
+        H->>W: apply endpoint and configure daemon or LWS
+    end
+    H->>W: init(lightWallet)
     alt LWS
-        H->>W: lightWalletLogin()
+        H->>W: setTrustedDaemon(false), login, retain untrusted state
         W->>N: address + view key
     else full node
         H->>W: setTrustedDaemon(true)
         W->>N: wallet RPC
     end
-    H->>W: startRefresh()
+    opt Remote endpoint configured
+        H->>H: activate current wallet and transport binding
+        H->>W: startRefresh()
+    end
     WM-->>UI: wallet state through WalletState
 ```
 
@@ -151,17 +160,20 @@ credential. A native failure leaves the wallet locked rather than showing an unl
   connection state, offline mode, background sync, and unlock shortcuts.
 - `WalletManager` is a lazy process singleton. It holds one managed `Wallet`; unmanaged
   wallets are explicit exceptions for decoy provisioning and backup copies.
-- `MoneroHandlerThread` runs wallet callbacks on a dedicated thread with a 5 MB stack. Its
-  `refreshed` callback decides whether to resume, reconnect, or re-index. It handles LWS
-  and full-node behavior differently.
-- Wallet2 calls can block on disk, network, or refresh work. They are executed on IO or
-  service scopes, never directly from composables.
+- JNI invokes the `MoneroHandlerThread` listener on the calling wallet2 thread. Its
+  own `Thread.run()` is empty. The `refreshed` callback can update wallet state or
+  attempt a reconnect for the current wallet with an applied transport. LWS and full
+  nodes have different reconnect conditions.
+- Wallet2 calls can block on disk or network work. Follow the calling coroutine or
+  native callback when assessing the thread that performs an operation.
 - Security-sensitive operations (open/close, profile switch, proxy change, lock/unlock,
   wipe) are serialized or guarded. `WalletState` uses `@Synchronized` for account and
   output mutations; `AnonWalletHandler` uses the live manager/wallet identity checks to
   reject a result that belongs to a replaced session.
-- `TorService` publishes its SOCKS endpoint through a replaying flow. `AnonWalletHandler`
-  waits for it before applying the proxy and fails closed on timeout.
+- `TransportController` authorizes an endpoint against the current configuration
+  generation. After acquisition, `AnonWalletHandler` rechecks the wallet and profile
+  identity and the authorization before retaining the applied endpoint. A transport
+  change can invalidate the binding between a wallet and its endpoint.
 
 ## 6. Persistence
 
@@ -184,7 +196,8 @@ through `WalletProfileStore`, which maps MAIN/DECOY to distinct names.
 
 The transport policy is implemented in `network/TransportController.kt` and described in
 [`network-transport.md`](network-transport.md). The default is embedded Tor; the user may
-select Orbot, InviZible Tor, system VPN, i2pd, InviZible I2P, or a custom SOCKS5 proxy.
+select Orbot, InviZible Tor, system VPN, i2pd, InviZible I2P, official I2P Java, or a
+custom SOCKS5 proxy.
 
 ```mermaid
 sequenceDiagram
@@ -260,12 +273,14 @@ and error mapping.
 
 - **Localization:** base, Spanish (Spain), Russian, and Simplified Chinese; plural and
   placeholder parity is checked in CI.
-- **Logging:** `Timber` through `AnonLogTree`; release builds persist info and above, debug
-  builds also persist debug. Stealth mode suppresses persistence.
+- **Logging:** `AnonLogTree` accepts warnings and errors from Timber in both build
+  types. The diagnostic policy maps them to fixed events before persistence. Stealth
+  mode suppresses persistence.
 - **Clipboard:** `SecureClipboard` marks text sensitive on API 33+ and clears it after 60
   seconds if it is still the primary clip.
-- **Backups:** v3 writer with passphrase-keyed wallet files; v1/v2 readers retained. The
-  decoy cannot be exported through this path.
+- **Backups:** export uses one authenticated envelope. The payload metadata indicates
+  whether the MAIN wallet files use the seed passphrase (v3) or a legacy PIN (v2).
+  Restore also reads the legacy v1 envelope.
 - **Failure policy:** proxy, Tor, LWS login, Keystore load, wallet init, transport/node
   validation, and transaction review fail closed. A failed daemon update pauses refresh,
   marks the wallet offline/disconnected, and clears the active daemon info. A static review

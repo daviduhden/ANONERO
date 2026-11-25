@@ -23,8 +23,8 @@ by `external-libs/` and linked as static archives. The app does not compile wall
 
 - Every Kotlin `external fun`/`external get` should have a matching export. The static
   checker is `scripts/check-jni-contract.py`.
-- The checker verifies **names only**. It does not verify signatures, argument order,
-  return types, or linkage. A successful check is not a successful build.
+- The checker verifies export names and four model constructor contracts. Full export
+  signatures, return types, bytecode and linkage require CI.
 - Intentional orphans are listed in the checker:
   `Wallet_setSeedLanguage`, `Wallet_getStatusJ`, and `Wallet_isSynchronizedJ`.
 - `JNI_OnLoad` caches global references to:
@@ -48,11 +48,11 @@ remains a code-order invariant, not a runtime assertion.
 
 | Kotlin / JNI | Native representation | Notes |
 | --- | --- | --- |
-| `String` / `jstring` | `std::string` | UTF-8; use `ScopedUtfChars` and check `get()` for null |
+| `String` / `jstring` | `std::string` | JNI modified UTF-8. Use `ScopedUtfChars` and check `get()` for null |
 | `Long` / `jlong` | `int64_t` or pointer | Handles are raw pointers encoded as `jlong` |
 | `Int` / `jint` | `int`/enums | Validate range before casting to unsigned or enum types |
 | `Boolean` / `jboolean` | `bool` | `JNI_TRUE`/`JNI_FALSE` |
-| `ByteArray` / `jbyteArray` | byte buffer | Input arrays use `JNI_ABORT`; output arrays are copied |
+| `ByteArray` / `jbyteArray` | byte buffer | Message helpers copy input. The legacy hash borrows input and releases it with `JNI_ABORT` |
 | `Array<String>` / `jobjectArray` | `std::vector<std::string>` | Validate lengths before pairing with amounts |
 | `ArrayList<String>` / `jobject` | `std::set<std::string>` | Used for key-image selection |
 | `List<...>` / `jobject` | `ArrayList` construction | `newCoinsInfo`, `newTransactionInfo`, `newTransferList` |
@@ -67,7 +67,7 @@ remains a code-order invariant, not a runtime assertion.
 | `Coins` | `Monero::Coins*` | Borrowed from the wallet; valid while the wallet is open |
 | `PendingTransaction` | `Monero::PendingTransaction*` | Created by wallet transaction methods; disposed by `Wallet.disposeTransaction` or when the wallet replaces it |
 | `UnsignedTransaction` | `Monero::UnsignedTransaction*` | Loaded from an unsigned file; disposed through `disposeUnsignedTransaction` and released before `Wallet.close` |
-| `MyWalletListener` | native listener object | Allocated by `setListenerJ`; deleting it requires deleting the global Java reference |
+| `Wallet.listenerHandle` | `MyWalletListener*` | Installed by `setListenerJ`. Successful `closeJ` releases the Java target and deletes the adapter |
 | `CoinsInfo`, `TransactionInfo`, `Transfer` | Kotlin objects constructed from C++ | Owned by Kotlin after construction |
 
 `getHandle` in `anonero.h` performs no lifetime validation. It trusts that Kotlin only
@@ -77,21 +77,26 @@ IPC, or use them after `WalletManager.close`.
 ## 5. Callbacks and threading
 
 - Wallet2 may invoke listener callbacks on its refresh thread.
-- `MyWalletListener` serializes callback delivery with `_listenerMutex`.
+- `_listenerMutex` protects the global Java target and acquisition of a local reference.
+  Callbacks invoke Kotlin outside the mutex, using the target they acquired.
 - `ScopedCallbackEnv` calls `attachJVM`; it detaches the thread only when it was the one that
   attached it. Do not call `DetachCurrentThread` on an already-attached thread.
-- Callbacks must be short and must not block. The Kotlin listener updates state and returns.
+- Callback work runs inline on the calling thread. The Kotlin listener can refresh
+  local state, store the wallet, or restart its connection. Keep that execution context
+  in mind when changing callback work or locks held during close.
 - The current adapter delivers `updated`, `refreshed`, `newBlock`, and
   `unconfirmedMoneyReceived`. `moneySpent`/`moneyReceived` are no-ops in this adapter.
-- `setListenerJ` deletes the previous listener and its global reference before installing a
-  new one, including when the wallet handle is already invalid. Replacing a listener
-  without deleting the old reference leaks a Java object and its callback target.
-- `Wallet.close` invalidates the Kotlin handle after wallet2 releases the object; later
-  adapter calls fail closed instead of dereferencing a dangling pointer.
+- The first `setListenerJ` installs an adapter before refresh starts. Later calls replace
+  or clear its global Java target. A callback holding a local reference can finish against
+  the previous target.
+- Kotlin serializes listener mutation and native close under a dedicated monitor. After
+  wallet2 confirms close, `closeJ` zeros the wallet and listener handles and releases the
+  adapter. Failed close preserves both handles. History and coin handles are still
+  borrowed and must be kept within the owning wallet's lifetime.
 
 ## 6. Error and failure mapping
 
-The boundary has no exception channel. Each export chooses one of these contracts:
+Exports use the following return contracts:
 
 - status enum (`Wallet::Status`, `PendingTransaction::Status`,
   `UnsignedTransaction::Status`);
@@ -102,12 +107,14 @@ The boundary has no exception channel. Each export chooses one of these contract
 - `wallet->errorString()` when wallet2 reports failure without throwing.
 
 Creation, open, recovery, and wallet-init exports return `0`/false when a required Java
-string cannot be converted or when wallet2 returns a null wallet. They never call
-`setupBackgroundSync`/`init` on a null pointer. String/array helpers return an empty result
-or skip an unreadable element instead of constructing a `std::string` from null.
+string cannot be converted or when wallet2 returns a null wallet. They check the pointer
+before invoking `setupBackgroundSync` or `init`. Transaction input conversion rejects the
+batch on an unreadable element. History and coins refresh preserve an existing JVM
+exception or raise a fixed Java failure when snapshot conversion cannot complete.
 
-C++ exceptions are caught at the export and converted to one of those failure values. A
-successful-looking value must never be returned after a caught exception.
+Exports must catch C++ exceptions and use the operation's failure contract. The static
+symbol check covers names and model constructors. Exception containment requires a
+separate review of each export.
 
 Two positional hazards are deliberate checks:
 
@@ -148,10 +155,10 @@ Two positional hazards are deliberate checks:
 
 ## 9. Legacy and intentional exports
 
-- `KeyStoreHelper.slowHash` is the legacy CryptoNight path used by CrAzYpass. The native
-  side uses the ARM32 broken-variant policy for historical compatibility and returns a
-  32-byte hash; Kotlin zeroes the result after encoding. Do not reuse it for new key
-  derivation.
+- `KeyStoreHelper.slowHash` is the legacy CryptoNight path used by CrazyPass. Kotlin
+  selects which historical variant to try, including the ARM32 restriction. Native code
+  checks the buffer length for legacy prehashed modes and returns a 32-byte hash. Kotlin
+  zeroes it after encoding. This path exists for compatibility with stored credentials.
 - `Wallet_setSeedLanguage`, `Wallet_getStatusJ`, and `Wallet_isSynchronizedJ` are intentional
   orphan exports retained for compatibility. They are allowlisted in
   `scripts/check-jni-contract.py`; adding another requires a documented reason.
@@ -160,15 +167,16 @@ Two positional hazards are deliberate checks:
 
 ## 10. Sensitive data
 
-- Key material stays in wallet2. Do not add exports that return seeds, spend keys, view keys,
-  or wallet passwords unless a reviewed Kotlin flow already requires them.
-- Do not log passwords, PINs, Keystore material, node credentials, or proxy credentials.
-  `LOGD` output reaches logcat and may be persisted by `AnonLogTree`.
+- Existing seed and private-key accessors return sensitive values to Kotlin for reviewed
+  flows. Treat any additional export as a change to the secret-handling boundary.
+- Native adapter diagnostics are fixed warning and error literals. Android sends them to
+  logcat and the desktop adapter writes them to stderr. Keep credentials and wallet
+  details out of both streams.
 - Do not interpolate `wallet->errorString()` into logs; it can contain a file path or node
   endpoint. Log the operation and use the structured status for the UI.
 - Do not weaken `setTrustedDaemon(false)` for LWS on the native side.
-- LWS and RPC share `Wallet_initJ`, `setProxyJ`, and `setDaemonAddressJ`; there is no
-  LWS-specific native path or JNI symbol. `https://` depends on
+- LWS and daemon RPC share transport configuration. `Wallet_initJ` passes the mode to
+  wallet2, and `Wallet_lightWalletLogin` performs the LWS login. `https://` depends on
   `0008-enforce-tls-for-https-daemon-address.patch` forcing SSL support in the Monero
   wallet API; do not reintroduce autodetect for a clearnet endpoint.
 - Keep the wallet's proxy and trust state consistent with the Kotlin security policy; the
@@ -181,7 +189,7 @@ Two positional hazards are deliberate checks:
 - [ ] All JNI strings, arrays, and local references are checked and released.
 - [ ] No C++ exception crosses the boundary.
 - [ ] Handle owner and release path are documented.
-- [ ] Callback runs off the main thread and deletes its global reference.
+- [ ] Listener updates and close preserve adapter lifetime, and callbacks release local references.
 - [ ] Failure values are fail-closed.
 - [ ] No secret is logged.
 - [ ] `scripts/check-jni-contract.py` passes; a real native build and instrumented test

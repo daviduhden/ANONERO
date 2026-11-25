@@ -38,8 +38,9 @@ Do not use for pure Compose layout changes (use `jetpack-compose`) or C++/JNI ch
 - Every wallet2 call is off the main thread. This includes `init`, `refresh`,
   `store`, `setPassword`, `setProxy`, `setDaemon`, `lightWalletLogin`, balances,
   history, coins, and transaction construction.
-- `MoneroHandlerThread` callbacks are on a native thread. Keep them short and do not
-  touch UI directly.
+- JNI calls `MoneroHandlerThread` synchronously on the calling wallet2 thread. Its
+  legacy Kotlin `Thread` wrapper has an empty `run()`; its stack hint does not apply
+  to native callbacks. Keep callback work bounded and publish through `WalletState`.
 - Do not introduce `GlobalScope`, `runBlocking`, `Thread.sleep`, or a second wallet
   state cache.
 - Catch `CancellationException` and rethrow it before generic `Exception` handling.

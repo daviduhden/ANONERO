@@ -48,8 +48,11 @@ Do not use for wallet policy (use `monero-wallet`) or pure C++ upstream work
   - `io/anonero/model/CoinsInfo`
 - Handles are opaque `jlong` pointers. Never expose them to UI code or dereference an
   unchecked value.
-- One owner per handle. `setListenerJ` must delete the old global reference and native
-  listener before replacing it.
+- Keep one native listener adapter installed from startup through successful wallet2 close.
+  `setListenerJ` replaces or clears the global Java target under the listener mutex. An
+  in-flight callback retains a local reference to its original target. Kotlin serializes
+  listener updates with close on its listener lifecycle monitor. Failed close preserves
+  both handles.
 - Never let a C++ exception cross into Kotlin. Catch at the boundary and return a
   fail-closed result.
 - Check and release every JNI string/array/local reference; check `ExceptionCheck()`.

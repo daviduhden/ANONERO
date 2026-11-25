@@ -20,8 +20,8 @@ These instructions apply to `app/src/main/cpp/` and `app/CMakeLists.txt`. The ro
 
 - Every Kotlin `external fun` / `external get` must have a matching
   `Java_io_anonero_*` export, and every export should have a Kotlin declaration.
-  `scripts/check-jni-contract.py` checks symbol names only. It does **not** check
-  signatures, types, or linkage.
+  `scripts/check-jni-contract.py` checks export names and four model constructor
+  contracts. Full export signatures, types, and linkage still require CI.
 - Known intentional orphans are listed in `scripts/check-jni-contract.py`
   (`Wallet_setSeedLanguage`, `Wallet_getStatusJ`, `Wallet_isSynchronizedJ`). Do not add
   to that list without a documented reason and a Kotlin-side review.

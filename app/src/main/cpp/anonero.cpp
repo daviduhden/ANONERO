@@ -28,8 +28,6 @@
 #include "anonero.h"
 #include "wallet2_api.h"
 
-//TODO explicit casting jlong, jint, jboolean to avoid warnings
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,20 +61,21 @@ extern "C" {
  * JNI boundary overview
  * ---------------------
  * Kotlin declares the ABI as `external` methods; every declaration must have a matching
- * Java_io_anonero_* export (checked statically by scripts/check-jni-contract.py, but
- * signatures and linkage are verified only by a real build).
+ * Java_io_anonero_* export. The static contract checker verifies export names and
+ * four model constructors. Full signature and linkage checks require CI.
  *
- * - `jlong` handles are raw pointers to wallet2 objects. Kotlin owns the wrapper, while the
- *   native wallet owns the pointed-to object; closing/replacing the wallet invalidates the
- *   handle. Never persist or send a handle.
- * - Local references are per JNI call. The classes cached in JNI_OnLoad and the listener's
- *   jlistener are global references and must live until the process or listener is done.
- * - Wallet2 calls may block on disk, network, or refresh work. Callbacks run on wallet2's
- *   refresh thread; the adapter attaches it to the JVM and serializes callback delivery.
+ * - `jlong` handles encode native pointers. The wallet manager closes wallets, while
+ *   history and coin handles borrow objects from the live wallet. Transaction wrappers
+ *   use their respective disposal entry points. Keep handles in process memory.
+ * - JNI_OnLoad caches global class references for use from native callback threads.
+ *   Callback targets are also global references. Each callback takes a local reference
+ *   under the listener mutex, then calls Kotlin after releasing the mutex.
+ * - Wallet2 calls may block on disk, network, or refresh work. A callback can arrive
+ *   on a wallet2 thread and must use the JNIEnv for that thread.
  * - Errors are returned as status values, null/zero handles, or wallet2 error strings. No
  *   C++ exception may cross the boundary; catch at the export and fail closed.
- * - Key material stays inside wallet2. Do not add logging of passwords, seeds, private
- *   keys, proxy credentials, or Keystore material.
+ * - The seed and private-key accessors return sensitive values to Kotlin. Keep those
+ *   values, passwords, and proxy credentials out of native diagnostics.
  */
 static JavaVM *cachedJVM;
 static jclass class_ArrayList;
@@ -389,7 +388,6 @@ struct MyWalletListener : Monero::WalletListener {
     }
 };
 
-//// helper methods
 class ScopedUtfChars {
   public:
     ScopedUtfChars(JNIEnv *env, jstring value)
@@ -478,9 +476,9 @@ std::vector<std::string> java2cpp_string_array(JNIEnv *env, jobjectArray array) 
     return result;
 }
 
-// Coin control is security-relevant: an unreadable key-image list must not silently
-// become "no exclusions". Returns false on any read failure; a null list is a valid empty
-// selection.
+// A null list is a valid empty selection. Any element read or conversion failure
+// returns false so the caller can reject the operation before passing a partial
+// or empty selection to wallet2.
 bool java2cpp_set(JNIEnv *env, jobject arrayList, std::set<std::string> &result) {
     result.clear();
     if (env->ExceptionCheck())
@@ -516,15 +514,13 @@ bool java2cpp_set(JNIEnv *env, jobject arrayList, std::set<std::string> &result)
     return true;
 }
 
-/// end helpers
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* WalletManager */
-// Creates a Polyseed wallet. `password` unlocks wallet2's keys/cache; `passpharse` (typo is
-// part of the JNI signature) is the seed passphrase. They are intentionally different.
+// The wallet file password protects local storage. The seed passphrase is used
+// by wallet2 to derive the wallet from its Polyseed.
 JNIEXPORT jlong JNICALL Java_io_anonero_model_WalletManager_createWalletJ(
     JNIEnv *env, jobject, jstring path, jstring password, jstring passpharse, jstring language,
     jint networkType) {
@@ -903,6 +899,8 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_WalletManager_closeJ(JNIEnv *en
         return JNI_FALSE;
     }
 
+    // Successful close joins wallet2 refresh work. Only then can the callback
+    // target and adapter be released and the wrapper handles invalidated.
     env->SetLongField(walletInstance, walletField, 0);
     env->SetLongField(walletInstance, listenerField, 0);
     if (listener != nullptr) {
@@ -1311,7 +1309,8 @@ JNIEXPORT jint JNICALL Java_io_anonero_model_Wallet_getDeviceTypeJ(JNIEnv *env, 
     return static_cast<jint>(device_type);
 }
 
-//void cn_slow_hash(const void *data, size_t length, char *hash); // from crypto/hash-ops.h
+// The two legacy modes treat the input as a prehashed state. Check for the
+// full state before borrowing the array, and leave the Java input unchanged.
 JNIEXPORT jbyteArray JNICALL Java_io_anonero_util_KeyStoreHelper_slowHash(JNIEnv *env, jclass,
                                                                           jbyteArray data,
                                                                           jint brokenVariant) {
@@ -1499,6 +1498,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_createTransactionJ(
     }
 }
 
+// Destination and atomic-unit amount arrays are paired by index. Both must
+// convert completely before wallet2 receives the batch.
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_createTransactionMultDestJ(
     JNIEnv *env, jobject instance, jobjectArray dst_addr, jlongArray amounts, jint mixin_count,
     jint priority, jint accountIndex, jobject key_images) {
@@ -1590,6 +1591,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_createSweepTransaction(
         }
         Monero::PendingTransaction::Priority _priority =
             static_cast<Monero::PendingTransaction::Priority>(priority);
+        // An absent amount selects wallet2's sweep path. The key-image set
+        // still scopes the sweep when the caller provides selected outputs.
         Monero::optional<uint64_t> empty;
         Monero::PendingTransaction *tx = wallet->createTransaction(
             dstChars.get(), paymentChars.get(), empty, static_cast<uint32_t>(mixin_count),
@@ -1823,7 +1826,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_loadUnsignedTx(JNIEnv *env,
     return reinterpret_cast<jlong>(tx);
 }
 
-//virtual TransactionHistory * history() const = 0;
+// History and coins are borrowed from the live wallet. Kotlin materializes
+// snapshots through the refresh exports while the owning wallet is still open.
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getHistoryJ(JNIEnv *env, jobject instance) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
@@ -2198,7 +2202,6 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_verifySignedMessageJ(
 //virtual bool parse_uri(const std::string &uri, std::string &address, std::string &payment_id, uint64_t &tvAmount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error) = 0;
 //virtual bool rescanSpent() = 0;
 
-// TransactionHistory
 JNIEXPORT jint JNICALL Java_io_anonero_model_TransactionHistory_getCount(JNIEnv *env,
                                                                          jobject instance) {
     Monero::TransactionHistory *history = getHandle<Monero::TransactionHistory>(env, instance);
@@ -2349,8 +2352,6 @@ JNIEXPORT jobject JNICALL Java_io_anonero_model_TransactionHistory_refreshJ(JNIE
     }
 }
 
-// TransactionInfo is implemented in Java - no need here
-
 JNIEXPORT jint JNICALL Java_io_anonero_model_PendingTransaction_getStatusJ(JNIEnv *env,
                                                                            jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
@@ -2404,7 +2405,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getFee(JNIEnv *
     return tx == nullptr ? 0 : static_cast<jlong>(tx->fee());
 }
 
-//Unsigned tx java implementation
+// Unsigned transaction objects are loaded for review and released through
+// Wallet.disposeUnsignedTransaction after signing or abandoning the review.
 
 JNIEXPORT jint JNICALL Java_io_anonero_model_UnsignedTransaction_getStatusJ(JNIEnv *env,
                                                                             jobject instance) {
@@ -2457,7 +2459,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getFee(JNIEnv 
     return static_cast<jlong>(arr[0]);
 }
 
-// TODO this returns a vector of strings - deal with this later - for now return first one
+// Despite the historical JNI name, this accessor returns the first payment ID.
 JNIEXPORT jstring JNICALL
 Java_io_anonero_model_UnsignedTransaction_getFirstTxIdJ(JNIEnv *env, jobject instance) {
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
@@ -2476,9 +2478,8 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getTxCount(JNI
     return tx == nullptr ? 0 : static_cast<jlong>(tx->txCount());
 }
 
-// wallet2's own summary of the set, built at load time from splitted_dsts -- the
-// outputs sign() actually constructs -- not from the advisory dests the getters
-// above read. Same text monero-wallet-cli prints before signing.
+// wallet2 builds this summary at load time from splitted_dsts, the outputs
+// used by sign(). The review screen uses this summary for the full loaded set.
 JNIEXPORT jstring JNICALL
 Java_io_anonero_model_UnsignedTransaction_confirmationMessageJ(JNIEnv *env, jobject instance) {
     Monero::UnsignedTransaction *tx = getHandle<Monero::UnsignedTransaction>(env, instance);
@@ -2487,8 +2488,8 @@ Java_io_anonero_model_UnsignedTransaction_confirmationMessageJ(JNIEnv *env, jobj
     return env->NewStringUTF(tx->confirmationMessage().c_str());
 }
 
-// Signs THIS loaded object. Wallet.signAndExportJ re-loads the unsigned file from
-// disk and signs whatever is there at that moment; this signs what was reviewed.
+// Sign the object retained for review. Reloading the path at confirmation
+// time could sign a different file from the one shown to the user.
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_UnsignedTransaction_signJ(JNIEnv *env,
                                                                            jobject instance,
                                                                            jstring output_file) {
@@ -2515,7 +2516,7 @@ JNIEXPORT void JNICALL Java_io_anonero_model_Wallet_disposeUnsignedTransaction(J
         delete tx;
 }
 
-// TODO this returns a vector of strings - deal with this later - for now return first one
+// This accessor exposes a single ID. Use getTxCount to identify a split transaction.
 JNIEXPORT jstring JNICALL Java_io_anonero_model_PendingTransaction_getFirstTxIdJ(JNIEnv *env,
                                                                                  jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
@@ -2534,12 +2535,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getTxCount(JNIE
     return tx == nullptr ? 0 : static_cast<jlong>(tx->txCount());
 }
 
-// these are all in Monero::Wallet - which I find wrong, so they are here!
-//static void init(const char *argv0, const char *default_log_base_name);
-//static void debug(const std::string &category, const std::string &str);
-//static void info(const std::string &category, const std::string &str);
-//static void warning(const std::string &category, const std::string &str);
-//static void error(const std::string &category, const std::string &str);
+// Kotlin groups process-wide wallet2 logging controls under WalletManager.
 JNIEXPORT void JNICALL Java_io_anonero_model_WalletManager_initLogger(
     JNIEnv *env, jclass, jstring argv0, jstring default_log_base_name) {
     if (argv0 == nullptr || default_log_base_name == nullptr)
