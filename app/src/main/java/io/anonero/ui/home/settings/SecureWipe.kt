@@ -19,7 +19,6 @@
 package io.anonero.ui.home.settings
 
 import AnonNeroTheme
-import android.app.Activity
 import android.content.SharedPreferences
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
@@ -74,45 +73,43 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
-import androidx.core.content.edit
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.anonero.AnonConfig
 import io.anonero.R
+import io.anonero.model.Wallet
+import io.anonero.model.WalletManager
 import io.anonero.model.node.NodeFields
 import io.anonero.services.AnonWalletHandler
 import io.anonero.store.LogRepository
 import io.anonero.store.NodesRepository
 import io.anonero.ui.MainActivity
-import io.anonero.util.KeyStoreHelper
-import io.anonero.util.PREFS_PASSPHRASE_HASH
 import io.anonero.util.SecureClipboard
 import io.anonero.util.ShakeConfig
-import io.anonero.util.WALLET_PREFERENCES
 import io.anonero.util.WALLET_PROXY
 import io.anonero.util.WALLET_PROXY_PORT
-import io.anonero.util.WalletProfileStore
+import io.anonero.util.WalletProfile
+import io.anonero.util.WalletSession
 import io.anonero.util.backup.BackupHelper
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
-import org.koin.compose.koinInject
-import org.koin.core.qualifier.named
 import timber.log.Timber
 
 private const val TAG = "SecureWipe"
 
 /**
- * Executes a profile-scoped secure wipe after the UI has verified the seed passphrase.
+ * Executes a profile-scoped secure wipe after the handler verifies the profile passphrase.
  *
  * It stops the foreground service, closes the active wallet, removes only that profile's
  * files/Keystore secret/hashes, clears shared non-credential state (nodes, logs, cache), and
@@ -130,33 +127,38 @@ class SecureWipeViewModel(
     private val _wipeProgress = MutableLiveData(0.1f)
     val wipeProgress: LiveData<Float> = _wipeProgress
 
-    @Volatile
-    var lastWipeFailed: Boolean = false
-        private set
+    internal enum class WipeResult { REJECTED, FAILED, COMPLETED }
 
-    fun wipe(
+    internal fun wipe(
+        wallet: Wallet,
+        profile: WalletProfile,
         passPhrase: String,
-        activity: Activity,
-    ): Job {
-        lastWipeFailed = false
-        return viewModelScope.launch(Dispatchers.IO) {
+        activity: MainActivity,
+    ): Deferred<WipeResult> =
+        viewModelScope.async(Dispatchers.IO) {
             try {
                 withContext(NonCancellable) {
-                    (activity as? MainActivity)?.stopNotificationService()
-                    AnonConfig.context?.applicationContext?.let { SecureClipboard.clear(it) }
-                    _wipeProgress.postValue(.3f)
+                    val manager = WalletManager.instance ?: return@withContext WipeResult.FAILED
                     _wipeProgressMessage.postValue(R.string.wiping_wallet)
-                    anonWalletHandler.wipe(passPhrase)
-                    delay(1000)
-                    _wipeProgress.postValue(.5f)
+                    if (!anonWalletHandler.wipe(wallet, profile, passPhrase)) {
+                        _wipeProgressMessage.postValue(null)
+                        return@withContext WipeResult.REJECTED
+                    }
+
+                    fun requireNoReplacement() {
+                        check(manager.isManagedWalletIdle() && WalletSession.profile == profile) { "Wallet session changed during wipe" }
+                    }
                     _wipeProgressMessage.postValue(R.string.wallet_cleared)
-                    delay(1200)
+                    requireNoReplacement()
+                    activity.stopNotificationService()
+                    AnonConfig.context?.applicationContext?.let { SecureClipboard.clear(it) }
                     _wipeProgress.postValue(.6f)
                     _wipeProgressMessage.postValue(R.string.clearing_preferences)
                     // AnonWalletHandler.wipe removed only this profile's keys. Clearing the whole
                     // preference file here would delete the other profile's PIN gate and strand
                     // its wallet files, so only shared, non-credential state is cleared.
-                    sharedPreferences.edit {
+                    val editor = sharedPreferences.edit()
+                    with(editor) {
                         remove("pin_attempts")
                         remove("pin_last_attempt")
                         // Network identity is shared by both profiles. Clear it on every
@@ -178,32 +180,30 @@ class SecureWipeViewModel(
                         remove(WALLET_PROXY)
                         remove(WALLET_PROXY_PORT)
                     }
-                    delay(800)
+                    check(editor.commit()) { "Could not clear shared preferences" }
+                    requireNoReplacement()
                     _wipeProgress.postValue(.7f)
                     _wipeProgressMessage.postValue(R.string.clearing_nodes)
                     nodesRepository.clearAll()
-                    delay(1200)
+                    requireNoReplacement()
                     _wipeProgressMessage.postValue(R.string.clearing_logs)
-                    delay(1000)
                     logRepository.clear()
-                    // cache holds the last exported backup and any extracted restore
+                    _wipeProgressMessage.postValue(R.string.logs_cleared)
+                    requireNoReplacement()
                     BackupHelper.cleanCacheDir()
                     AnonConfig.disposeState()
-                    _wipeProgress.postValue(.8f)
-                    _wipeProgressMessage.postValue(R.string.logs_cleared)
-                    delay(1200)
                     _wipeProgress.postValue(1f)
                     _wipeProgressMessage.postValue(R.string.wallet_wiped_successfully)
+                    WipeResult.COMPLETED
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (e: Exception) {
-                lastWipeFailed = true
-                Timber.tag(TAG).e(e, "secure wipe failed")
+            } catch (_: Exception) {
+                Timber.tag(TAG).e("Secure wipe failed")
                 _wipeProgressMessage.postValue(R.string.wipe_failed)
+                WipeResult.FAILED
             }
         }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -214,7 +214,6 @@ fun SecureWipe(
     requestClearScreen: (bool: Boolean) -> Unit = {},
     goToHome: () -> Unit = {},
 ) {
-    val prefs = koinInject<SharedPreferences>(named(WALLET_PREFERENCES))
     val secureWipeViewModel = koinViewModel<SecureWipeViewModel>()
     val focusRequester = remember { FocusRequester() }
     var passPhraseDialog by remember { mutableStateOf(true) }
@@ -228,9 +227,7 @@ fun SecureWipe(
     val view = LocalView.current
     val activity = LocalActivity.current
 
-    BackHandler {
-        wipeStarted || progressMessage != null
-    }
+    BackHandler(enabled = wipeStarted) {}
 
     val animatedProgress by animateFloatAsState(
         targetValue = wipeProgress,
@@ -248,71 +245,56 @@ fun SecureWipe(
         label = "blur-radius",
     )
 
-    LaunchedEffect(true) {
-        scope.launch {
+    LaunchedEffect(passPhraseDialog, wipeStarted) {
+        if (passPhraseDialog && !wipeStarted) {
             delay(100)
             focusRequester.requestFocus()
         }
     }
-    LaunchedEffect(progressMessage) {
-        if (progressMessage != null) {
-            requestClearScreen.invoke(false)
-        }
-    }
 
     fun clearWallet() {
-        scope.launch(Dispatchers.IO) {
-            requestClearScreen(true)
-            val appContext = AnonConfig.context?.applicationContext ?: return@launch
-            val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
-            val hashedPass =
-                KeyStoreHelper.getCrazyPass(appContext, passPhrase)
-            if (hash == hashedPass) {
-                val seed = getWalletSeed(passPhrase)?.split(" ")
-                if (seed != null) {
-                    wipeStarted = true
-                    passPhraseDialog = false
-                    HapticFeedbackConstants.CONTEXT_CLICK
-                    activity?.let { activity ->
-                        secureWipeViewModel
-                            .wipe(passPhrase, activity)
-                            .invokeOnCompletion {
-                                if (it == null && !secureWipeViewModel.lastWipeFailed) {
-                                    view.performHapticFeedback(
-                                        HapticFeedbackConstants.CONTEXT_CLICK,
-                                    )
-                                    scope.launch(Dispatchers.Main) {
-                                        goToHome()
-                                    }
-                                } else {
-                                    it?.let { failure ->
-                                        Timber.tag(TAG).e(failure)
-                                    }
-                                    errorRes = R.string.wipe_failed
-                                    requestClearScreen(false)
-                                }
-                            }
+        if (wipeStarted) return
+        val mainActivity = activity as? MainActivity ?: return
+        val wallet = WalletManager.instance?.wallet ?: return
+        val profile = WalletSession.profile
+        val candidate = passPhrase
+        wipeStarted = true
+        errorRes = null
+        requestClearScreen(false)
+        scope.launch {
+            try {
+                when (secureWipeViewModel.wipe(wallet, profile, candidate, mainActivity).await()) {
+                    SecureWipeViewModel.WipeResult.REJECTED -> {
+                        errorShake.shake(ShakeConfig(6, translateX = 5f))
+                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    }
+
+                    SecureWipeViewModel.WipeResult.FAILED -> {
+                        passPhraseDialog = false
+                        passPhrase = ""
+                        errorRes = R.string.wipe_failed
+                    }
+
+                    SecureWipeViewModel.WipeResult.COMPLETED -> {
+                        passPhraseDialog = false
+                        passPhrase = ""
+                        val idle = withContext(Dispatchers.IO) { WalletManager.instance?.isManagedWalletIdle() == true }
+                        if (idle && WalletManager.instance?.wallet == null && WalletSession.profile == profile) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                            goToHome()
+                        } else {
+                            errorRes = R.string.wipe_failed
+                        }
                     }
                 }
-            } else {
-                errorShake.shake(
-                    ShakeConfig(
-                        6,
-                        translateX = 5f,
-                    ),
-                )
-                repeat(6) {
-                    delay(50)
-                    view.performHapticFeedback(
-                        HapticFeedbackConstants.CONTEXT_CLICK,
-                    )
-                }
-                delay(100)
+            } finally {
+                wipeStarted = false
+                requestClearScreen(true)
             }
         }
     }
 
-    if (passPhraseDialog) {
+    if (passPhraseDialog && !wipeStarted) {
         AlertDialog(
             modifier =
                 Modifier

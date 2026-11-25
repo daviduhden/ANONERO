@@ -90,17 +90,20 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import io.anonero.AnonConfig
 import io.anonero.R
 import io.anonero.model.NeroKeyPayload
+import io.anonero.model.Wallet
 import io.anonero.model.WalletManager
 import io.anonero.services.WalletState
 import io.anonero.ui.components.qr.QrCodeColors
 import io.anonero.ui.components.qr.QrCodeView
 import io.anonero.util.KeyStoreHelper
-import io.anonero.util.PREFS_PASSPHRASE_HASH
 import io.anonero.util.ShakeConfig
 import io.anonero.util.WALLET_PREFERENCES
+import io.anonero.util.WalletProfile
 import io.anonero.util.WalletProfileStore
+import io.anonero.util.WalletSession
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -114,11 +117,20 @@ import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import kotlin.random.Random
 
-/** Blocking wallet2 seed read; call only from a background dispatcher. */
-fun getWalletSeed(passPhrase: String): String? = WalletManager.instance?.wallet?.getSeed(passPhrase)
+private data class SeedDisplayOwner(
+    val wallet: Wallet,
+    val profile: WalletProfile,
+) {
+    fun isCurrent(walletState: WalletState): Boolean =
+        !walletState.backgroundSync && !walletState.backgroundSyncRunning &&
+            WalletManager.instance?.wallet === wallet && WalletSession.profile == profile
 
-/** Blocking wallet2 legacy-seed read; call only from a background dispatcher. */
-fun getLegacySeed(passPhrase: String): String? = WalletManager.instance?.wallet?.getLegacySeed(passPhrase)
+    fun matchesBackingFile(walletState: WalletState): Boolean {
+        val context = AnonConfig.context ?: return false
+        val walletFile = WalletProfileStore.walletFile(context, profile)
+        return isCurrent(walletState) && WalletManager.instance?.managedWalletAt(walletFile) === wallet
+    }
+}
 
 fun generatePlaceHolderSeed(): List<String> =
     (1..16).map {
@@ -148,7 +160,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     var neroPayload by remember { mutableStateOf("") }
     // nothing secret is composed until the passphrase checks out: the blur behind the
     // dialog is a no-op below Android 12
-    var verified by remember { mutableStateOf(false) }
+    var verifiedOwner by remember { mutableStateOf<SeedDisplayOwner?>(null) }
     var viewKeyText by remember { mutableStateOf("") }
     var spendKeyText by remember { mutableStateOf("") }
     var restoreHeightText by remember { mutableStateOf("") }
@@ -156,17 +168,20 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
 
     val walletState = koinInject<WalletState>()
     val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
+    val profile by walletState.profile.collectAsState(WalletSession.profile)
+    val currentWallet = WalletManager.instance?.wallet
+    val verified = !locked && verifiedOwner?.isCurrent(walletState) == true
     val errorShake = rememberShakeController()
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     var seedJob by remember { mutableStateOf<Job?>(null) }
 
-    LaunchedEffect(locked) {
-        if (locked) {
+    LaunchedEffect(locked, profile, currentWallet) {
+        if (locked || !verified) {
             seedJob?.cancel()
             seedJob = null
             seedLoadFailed = false
-            verified = false
+            verifiedOwner = null
             seedWords = placeholderSeed
             legacySeed = placeholderSeed
             passPhrase = ""
@@ -176,43 +191,32 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             restoreHeightText = ""
             primaryAddress = ""
             // Dialogs have their own window and must not cover the PIN overlay.
-            passPhraseDialog = false
-        } else if (!verified) {
-            passPhraseDialog = true
+            passPhraseDialog = !locked
         }
         if (!locked) {
             // wallet2 address access is a native call; keep it off the main thread.
-            primaryAddress =
-                withContext(Dispatchers.IO) {
-                    WalletManager.instance?.wallet?.address ?: ""
-                }
+            val owner = currentWallet?.let { SeedDisplayOwner(it, profile) }
+            val address = withContext(Dispatchers.IO) { owner?.takeIf { it.isCurrent(walletState) }?.wallet?.address }
+            if (owner?.isCurrent(walletState) == true) primaryAddress = address.orEmpty()
         }
     }
 
-    LaunchedEffect(verified, locked) {
-        if (!verified || locked) {
-            viewKeyText = ""
-            spendKeyText = ""
-            restoreHeightText = ""
-            return@LaunchedEffect
-        }
-        // Never read wallet2 keys during composition or on the main thread.
+    LaunchedEffect(verifiedOwner, locked, profile, currentWallet) {
+        val owner = verifiedOwner?.takeIf { it.isCurrent(walletState) } ?: return@LaunchedEffect
         val values =
             withContext(Dispatchers.IO) {
-                val w = WalletManager.instance?.wallet
-                if (w == null) {
-                    Triple("", "", "")
-                } else {
-                    Triple(
-                        runCatching { w.getSecretViewKey() }.getOrDefault(""),
-                        runCatching { w.getSecretSpendKey() }.getOrDefault(""),
-                        runCatching { w.getRestoreHeight().toString() }.getOrDefault(""),
-                    )
-                }
+                if (!owner.matchesBackingFile(walletState)) return@withContext null
+                Triple(
+                    runCatching { owner.wallet.getSecretViewKey() }.getOrDefault(""),
+                    runCatching { owner.wallet.getSecretSpendKey() }.getOrDefault(""),
+                    runCatching { owner.wallet.getRestoreHeight().toString() }.getOrDefault(""),
+                )
             }
-        viewKeyText = values.first
-        spendKeyText = values.second
-        restoreHeightText = values.third
+        if (values != null && verifiedOwner === owner && owner.isCurrent(walletState)) {
+            viewKeyText = values.first
+            spendKeyText = values.second
+            restoreHeightText = values.third
+        }
     }
 
     val backgroundBlur: Float by animateFloatAsState(
@@ -222,25 +226,24 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
 
     fun exportForNero() {
         if (walletState.backgroundSync) return
-        if (!verified) {
+        val owner = verifiedOwner?.takeIf { it.isCurrent(walletState) }
+        if (owner == null) {
             passPhraseDialog = true
             return
         }
-        // Reading the keys and encoding the payload are both off-main; the dialog can stay
-        // open while the native calls complete.
         scope.launch {
             val payload =
                 withContext(Dispatchers.IO) {
-                    val wallet = WalletManager.instance?.wallet ?: return@withContext null
+                    if (!owner.matchesBackingFile(walletState)) return@withContext null
                     try {
-                        Json.encodeToString(NeroKeyPayload.fromWallet(wallet))
-                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        Json.encodeToString(NeroKeyPayload.fromWallet(owner.wallet))
+                    } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
                         null
                     }
                 }
-            if (payload != null) neroPayload = payload
+            if (payload != null && verifiedOwner === owner && owner.isCurrent(walletState)) neroPayload = payload
         }
     }
 
@@ -252,7 +255,9 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     }
 
     fun getSeed() {
-        if (walletState.backgroundSync) return
+        val wallet = WalletManager.instance?.wallet ?: return
+        val owner = SeedDisplayOwner(wallet, WalletSession.profile)
+        if (!owner.isCurrent(walletState)) return
         seedJob?.cancel()
         seedLoadFailed = false
         val enteredPassphrase = passPhrase
@@ -261,35 +266,31 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 val seeds =
                     try {
                         withContext(Dispatchers.IO) {
-                            val hash = prefs.getString(WalletProfileStore.activePassphraseHashKey(), "")
+                            val hash = prefs.getString(WalletProfileStore.passphraseHashKey(owner.profile), null)
                             val appContext = AnonConfig.context?.applicationContext
-                            val hashedPass =
-                                appContext?.let {
-                                    KeyStoreHelper.getCrazyPass(it, enteredPassphrase)
-                                } ?: ""
+                            if (hash.isNullOrEmpty() || appContext == null) return@withContext null
+                            val hashedPass = KeyStoreHelper.getCrazyPass(appContext, enteredPassphrase)
                             currentCoroutineContext().ensureActive()
-                            if (hash == hashedPass && !walletState.backgroundSync) {
-                                val seed = checkNotNull(getWalletSeed(enteredPassphrase)).split(" ")
-                                currentCoroutineContext().ensureActive()
-                                val legacy = getLegacySeed(enteredPassphrase)?.split(" ")
-                                seed to legacy
-                            } else {
-                                null
-                            }
+                            if (hash != hashedPass || !owner.matchesBackingFile(walletState)) return@withContext null
+                            val seed = checkNotNull(owner.wallet.getSeed(enteredPassphrase)).split(" ")
+                            currentCoroutineContext().ensureActive()
+                            if (!owner.isCurrent(walletState)) return@withContext null
+                            val legacy = owner.wallet.getLegacySeed(enteredPassphrase)?.split(" ")
+                            seed to legacy
                         }
-                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    } catch (cancelled: CancellationException) {
                         throw cancelled
-                    } catch (_: IllegalStateException) {
+                    } catch (_: Exception) {
                         currentCoroutineContext().ensureActive()
-                        if (!walletState.backgroundSync) seedLoadFailed = true
+                        if (owner.isCurrent(walletState)) seedLoadFailed = true
                         return@launch
                     }
                 currentCoroutineContext().ensureActive()
-                if (walletState.backgroundSync) return@launch
+                if (!owner.isCurrent(walletState)) return@launch
                 if (seeds != null) {
                     val (seed, legacy) = seeds
                     seedWords = seed
-                    verified = true
+                    verifiedOwner = owner
                     passPhraseDialog = false
                     passPhrase = ""
                     if (legacy != null) {
@@ -312,7 +313,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 }
             }
     }
-    if (neroPayload.isNotEmpty() && !locked) {
+    if (neroPayload.isNotEmpty() && verified) {
         ModalBottomSheet(
             sheetState =
                 rememberModalBottomSheetState(
@@ -420,6 +421,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                             },
                         ),
                     onValueChange = {
+                        seedJob?.cancel()
                         seedLoadFailed = false
                         passPhrase = it
                     },
@@ -517,7 +519,14 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         supportingContent = {
                             SelectionContainer {
                                 Text(
-                                    text = primaryAddress,
+                                    text =
+                                        if (!locked && profile == WalletSession.profile &&
+                                            WalletManager.instance?.wallet === currentWallet
+                                        ) {
+                                            primaryAddress
+                                        } else {
+                                            ""
+                                        },
                                     modifier = Modifier.padding(start = 4.dp),
                                 )
                             }
@@ -655,7 +664,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         supportingContent = {
                             SelectionContainer {
                                 Text(
-                                    text = restoreHeightText,
+                                    text = if (verified) restoreHeightText else "",
                                     modifier = Modifier.padding(start = 4.dp),
                                 )
                             }

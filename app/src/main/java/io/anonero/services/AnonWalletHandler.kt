@@ -31,6 +31,7 @@ import io.anonero.network.TransportAuthorization
 import io.anonero.network.TransportController
 import io.anonero.network.TransportEndpoint
 import io.anonero.store.NodesRepository
+import io.anonero.util.KeyStoreHelper
 import io.anonero.util.LwsConfig
 import io.anonero.util.PREFS_PIN_HASH
 import io.anonero.util.PinHash
@@ -684,37 +685,31 @@ class AnonWalletHandler(
         }
     }
 
-    fun wipe(passPhrase: String): Boolean {
+    @Synchronized
+    internal fun wipe(
+        wallet: Wallet,
+        profile: WalletProfile,
+        passPhrase: String,
+    ): Boolean {
         val context = AnonConfig.context ?: throw UnableToWipeWallet()
         val manager = WalletManager.instance ?: throw UnableToWipeWallet()
-        val wallet = manager.wallet ?: throw UnableToWipeWallet()
-        val walletName = WalletProfileStore.activeWalletName(context)
-        val password =
-            try {
-                if (WalletKey.exists(context, walletName)) {
-                    WalletKey.load(context, walletName)
-                } else {
-                    passPhrase
-                }
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "wipe: wallet password unavailable")
-                throw UnableToWipeWallet()
-            }
+        val walletFile = WalletProfileStore.walletFile(context, profile)
+
+        fun isAuthorizedSession() =
+            WalletSession.profile == profile &&
+                manager.managedWalletAt(walletFile) === wallet &&
+                !walletState.backgroundSync && !walletState.backgroundSyncRunning
+        if (!isAuthorizedSession()) throw UnableToWipeWallet()
+        val hashKey = WalletProfileStore.passphraseHashKey(profile)
+        val hash = prefs.getString(hashKey, null)
+        if (hash.isNullOrEmpty() || KeyStoreHelper.getCrazyPass(context, passPhrase) != hash) return false
+        if (!isAuthorizedSession() || prefs.getString(hashKey, null) != hash) throw UnableToWipeWallet()
+
         wallet.pauseRefresh()
-        if (walletState.backgroundSyncRunning && !wallet.stopBackgroundSync(password)) {
-            // Do not remove profile data while the spend key may still be live.
-            Timber.tag(TAG).e("wipe: stopBackgroundSync failed")
-            throw UnableToWipeWallet()
-        }
-        manager.setDaemon(null)
-        if (!wallet.close()) {
-            throw UnableToCloseWallet()
-        }
-        // Remove only the active profile. Wiping from the decoy must not destroy the
-        // legitimate wallet's files, keys, or PIN. A failed removal is not success.
-        if (!WalletProfileStore.removeProfile(context, prefs, WalletSession.profile)) {
-            throw UnableToWipeWallet()
-        }
+        if (!isAuthorizedSession() || !wallet.close()) throw UnableToCloseWallet()
+
+        // Deletion uses the authenticated profile even if WalletSession changes.
+        if (!WalletProfileStore.removeProfile(context, prefs, profile)) throw UnableToWipeWallet()
         return true
     }
 }

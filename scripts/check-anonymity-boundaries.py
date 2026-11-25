@@ -71,6 +71,25 @@ retry = backup.index("opened = openRestoredWallet(manager, walletFile, pin)", st
 if "if (opened != null && !closeRestoredWallet(manager, opened)) return null" not in backup[start:retry]:
     failures.append("Legacy backup retry must confirm that the previous wallet closed")
 
+seed_display = (JAVA / "ui/home/settings/SeedSettings.kt").read_text(encoding="utf-8")
+if (
+    "WalletProfileStore.passphraseHashKey(owner.profile)" not in seed_display
+    or "WalletManager.instance?.managedWalletAt(walletFile) === wallet" not in seed_display
+    or "owner.wallet.getSeed(enteredPassphrase)" not in seed_display
+    or "activePassphraseHashKey()" in seed_display
+):
+    failures.append("Seed display must authenticate and read the same wallet/profile")
+
+wallet_handler = (JAVA / "services/AnonWalletHandler.kt").read_text(encoding="utf-8")
+wipe = wallet_handler[wallet_handler.index("internal fun wipe("):]
+if (
+    "WalletProfileStore.passphraseHashKey(profile)" not in wipe
+    or "manager.managedWalletAt(walletFile) === wallet" not in wipe
+    or "WalletProfileStore.removeProfile(context, prefs, profile)" not in wipe
+    or "WalletProfileStore.removeProfile(context, prefs, WalletSession.profile)" in wipe
+):
+    failures.append("Wipe must authenticate and delete the captured wallet/profile")
+
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
 app = manifest.find("application")
