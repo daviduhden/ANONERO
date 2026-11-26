@@ -25,50 +25,50 @@ set -euo pipefail
 mkdir -p ci-diagnostics
 
 core_services_ok() {
-    [ "$(timeout 20 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] ||
-        return 1
-    timeout 20 adb shell service check package 2>/dev/null |
-        grep -q "Service package: found" || return 1
-    timeout 20 adb shell service check activity 2>/dev/null |
-        grep -q "Service activity: found" || return 1
+	[ "$(timeout 20 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] ||
+		return 1
+	timeout 20 adb shell service check package 2>/dev/null |
+		grep -q "Service package: found" || return 1
+	timeout 20 adb shell service check activity 2>/dev/null |
+		grep -q "Service activity: found" || return 1
 }
 
 wait_for_core_services() {
-    local deadline=$((SECONDS + 300))
-    while ((SECONDS < deadline)); do
-        if core_services_ok; then
-            return 0
-        fi
-        sleep 5
-    done
-    return 1
+	local deadline=$((SECONDS + 300))
+	while ((SECONDS < deadline)); do
+		if core_services_ok; then
+			return 0
+		fi
+		sleep 5
+	done
+	return 1
 }
 
 capture_diagnostics() {
-    mkdir -p ci-diagnostics
-    {
-        echo "== host =="
-        date -u || true
-        free -m || true
-        df -h / || true
-        nproc || true
-        uptime || true
-        echo "== guest =="
-        timeout 20 adb shell getprop sys.boot_completed 2>&1 || true
-        timeout 20 adb shell cat /proc/meminfo 2>&1 || true
-        timeout 20 adb shell df -h /data 2>&1 || true
-        timeout 20 adb shell service list 2>&1 | grep -E 'package|activity' || true
-        timeout 60 adb logcat -d -b crash -v threadtime 2>&1 || true
-        # system_server aborts and watchdog messages live in the system buffer.
-        timeout 60 adb logcat -d -b system -v threadtime 2>&1 | tail -n 2000 || true
-        timeout 60 adb logcat -d -b main -v threadtime 2>&1 | tail -n 2000 || true
-        timeout 60 adb logcat -d -b events -v threadtime 2>&1 | tail -n 2000 || true
-    } >ci-diagnostics/instrumented-diagnostics.txt 2>&1
+	mkdir -p ci-diagnostics
+	{
+		echo "== host =="
+		date -u || true
+		free -m || true
+		df -h / || true
+		nproc || true
+		uptime || true
+		echo "== guest =="
+		timeout 20 adb shell getprop sys.boot_completed 2>&1 || true
+		timeout 20 adb shell cat /proc/meminfo 2>&1 || true
+		timeout 20 adb shell df -h /data 2>&1 || true
+		timeout 20 adb shell service list 2>&1 | grep -E 'package|activity' || true
+		timeout 60 adb logcat -d -b crash -v threadtime 2>&1 || true
+		# system_server aborts and watchdog messages live in the system buffer.
+		timeout 60 adb logcat -d -b system -v threadtime 2>&1 | tail -n 2000 || true
+		timeout 60 adb logcat -d -b main -v threadtime 2>&1 | tail -n 2000 || true
+		timeout 60 adb logcat -d -b events -v threadtime 2>&1 | tail -n 2000 || true
+	} >ci-diagnostics/instrumented-diagnostics.txt 2>&1
 }
 
 # Require XML evidence for both flavors in addition to their Gradle exit statuses.
 reports_ok() {
-    python3 - <<'PY'
+	python3 - <<'PY'
 import glob
 import sys
 import xml.etree.ElementTree as ET
@@ -115,14 +115,14 @@ PY
 }
 
 if ! timeout 300 adb wait-for-device; then
-    capture_diagnostics
-    echo "::error::adb device did not become available"
-    exit 1
+	capture_diagnostics
+	echo "::error::adb device did not become available"
+	exit 1
 fi
 if ! wait_for_core_services; then
-    capture_diagnostics
-    echo "::error::device lost system_server after boot"
-    exit 1
+	capture_diagnostics
+	echo "::error::device lost system_server after boot"
+	exit 1
 fi
 # The KVM-less software emulator is still settling right after boot. The first
 # instrumentation attach can time out; give ART/package work time to finish.
@@ -131,44 +131,44 @@ sleep 30
 # Separate Gradle invocations preserve each flavor's outcome across retries.
 # Limit workers because host dexing competed with the software-emulated guest.
 run_connected() {
-    ./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true "$1"
+	./gradlew --no-daemon --max-workers=2 --continue --stacktrace -PanonDisableSplits=true "$1"
 }
 
 status=0
 for flavor in anon nero; do
-    case "$flavor" in
-        anon) task=:app:connectedAnonDebugAndroidTest ;;
-        nero) task=:app:connectedNeroDebugAndroidTest ;;
-    esac
+	case "$flavor" in
+	anon) task=:app:connectedAnonDebugAndroidTest ;;
+	nero) task=:app:connectedNeroDebugAndroidTest ;;
+	esac
 
-    if run_connected "$task"; then
-        flavor_status=0
-    else
-        flavor_status=$?
-        # Retry only when the guest still answers and the flavor's XML attributes
-        # every reported failure to instrumentation attachment.
-        if core_services_ok &&
-            python3 scripts/check-instrumented-retry.py app/build/outputs/androidTest-results "$flavor"; then
-            echo "Retrying ${flavor} after an instrumentation attach timeout"
-            if run_connected "$task"; then
-                flavor_status=0
-            else
-                flavor_status=$?
-            fi
-        fi
-    fi
-    if ! core_services_ok; then
-        capture_diagnostics
-        echo "::error::device lost package/activity services during instrumented tests"
-        exit 1
-    fi
-    if ((flavor_status != 0)); then
-        echo "::error::Connected Gradle task for $flavor exited with $flavor_status"
-        status=$flavor_status
-    fi
+	if run_connected "$task"; then
+		flavor_status=0
+	else
+		flavor_status=$?
+		# Retry only when the guest still answers and the flavor's XML attributes
+		# every reported failure to instrumentation attachment.
+		if core_services_ok &&
+			python3 scripts/check-instrumented-retry.py app/build/outputs/androidTest-results "$flavor"; then
+			echo "Retrying ${flavor} after an instrumentation attach timeout"
+			if run_connected "$task"; then
+				flavor_status=0
+			else
+				flavor_status=$?
+			fi
+		fi
+	fi
+	if ! core_services_ok; then
+		capture_diagnostics
+		echo "::error::device lost package/activity services during instrumented tests"
+		exit 1
+	fi
+	if ((flavor_status != 0)); then
+		echo "::error::Connected Gradle task for $flavor exited with $flavor_status"
+		status=$flavor_status
+	fi
 done
 
 if ! reports_ok || ((status != 0)); then
-    capture_diagnostics
-    exit 1
+	capture_diagnostics
+	exit 1
 fi
