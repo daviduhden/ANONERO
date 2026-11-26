@@ -120,3 +120,10 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+For camera-backed AndroidView instances, dispose the exact bound use cases
+and reject results posted by previous compositions. Camera provider completion
+and callbacks can arrive after dismissal or permission loss. Keep image and UR
+processing on the analysis worker and deliver UI and navigation actions on
+the main thread. Test Compose rule migrations with the production effect delays
+and the explicit test clock used by animated QR regressions.

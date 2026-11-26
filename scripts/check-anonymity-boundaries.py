@@ -171,6 +171,15 @@ if (
         "PIN actions must retain the authenticated wallet/profile through credential changes"
     )
 
+scanner = (JAVA / "ui/components/scanner/QrCamera.kt").read_text(encoding="utf-8")
+if (
+    "unbindAll()" in scanner
+    or "provider?.unbind(preview, analysis)" not in scanner
+    or "main.execute { if (active) deliverUr(result) }" not in scanner
+    or "main.execute { if (active) deliverText(text) }" not in scanner
+):
+    failures.append("Camera callbacks and teardown must be scoped to the active preview")
+
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
 app = manifest.find("application")

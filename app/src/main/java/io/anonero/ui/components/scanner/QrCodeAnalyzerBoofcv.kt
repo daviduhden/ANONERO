@@ -19,23 +19,17 @@
 package io.anonero.ui.components.scanner
 
 import android.graphics.ImageFormat
-import android.media.Image
-import androidx.annotation.OptIn
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import boofcv.factory.fiducial.FactoryFiducial
 import boofcv.struct.image.GrayU8
 import com.google.zxing.BarcodeFormat
-import com.google.zxing.ChecksumException
-import com.google.zxing.NotFoundException
 import com.google.zxing.Result
-import timber.log.Timber
 import java.nio.ByteBuffer
 
 /**
  * BoofCV QR decoder for CameraX frames. The camera path uses the YUV luminance
- * plane directly, including its row padding.
+ * plane with its declared row and pixel strides.
  *
  * Calls back on the camera analysis executor. Callers can receive several detections
  * per frame and repeated detections across frames.
@@ -43,44 +37,32 @@ import java.nio.ByteBuffer
 class QrCodeAnalyzerBoofcv(
     private val onQrCodesDetected: (qrCode: Result) -> Unit,
 ) : ImageAnalysis.Analyzer {
-    private fun ByteBuffer.toByteArray(): ByteArray {
-        rewind()
-        val data = ByteArray(remaining())
-        get(data)
-        return data
-    }
-
-    private val yuvFormats = mutableListOf(ImageFormat.YUV_420_888)
-
-    init {
-        yuvFormats.addAll(
-            listOf(
-                ImageFormat.YUV_422_888,
-                ImageFormat.YUV_444_888,
-                ImageFormat.JPEG,
-            ),
-        )
-    }
-
     private val detector = FactoryFiducial.qrcode(null, GrayU8::class.java)
 
-    fun imageToGrayU8(image: Image?): GrayU8 {
-        val planes = image?.planes
-        val yBuffer = planes?.get(0)?.buffer
-        val yData = ByteArray(yBuffer?.remaining() ?: 0)
-        yBuffer?.get(yData)
-
-        val width = image?.width ?: 0
-        val height = image?.height ?: 0
-        val grayU8 = GrayU8(width, height)
-        grayU8.data = yData
-        // BoofCV must advance by the camera row stride to skip alignment padding.
-        grayU8.stride = planes?.get(0)?.rowStride ?: 0
-
-        return grayU8
+    internal fun luminance(
+        buffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        rowStride: Int,
+        pixelStride: Int,
+    ): GrayU8? {
+        if (width <= 0 || height <= 0 || pixelStride <= 0) return null
+        val rowBytes = (width - 1L) * pixelStride + 1
+        if (rowStride < rowBytes || (height - 1L) * rowStride + rowBytes > buffer.remaining()) return null
+        val image = GrayU8(width, height)
+        val source = buffer.duplicate()
+        val start = source.position()
+        for (row in 0 until height) {
+            val offset = start + row * rowStride
+            if (pixelStride == 1) {
+                source.position(offset)
+                source.get(image.data, row * width, width)
+            } else {
+                for (column in 0 until width) image.data[row * width + column] = source.get(offset + column * pixelStride)
+            }
+        }
+        return image
     }
-
-    private var debugI = 0
 
     fun invertGrayU8Image(inputImage: GrayU8): GrayU8 {
         val width = inputImage.width
@@ -99,43 +81,31 @@ class QrCodeAnalyzerBoofcv(
         return invertedImage
     }
 
-    @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
         try {
-            if (debugI % 100 == 10) {
-                Timber.tag("QrCodeAnalyzerBoofcv.kt").d("$debugI analyze(image: ImageProxy)")
+            // CameraX supplies YUV_420_888 by default. JPEG buffers contain encoded bytes.
+            when (imageProxy.format) {
+                ImageFormat.YUV_420_888, ImageFormat.YUV_422_888, ImageFormat.YUV_444_888 -> Unit
+                else -> return
             }
-            debugI++
-            if (imageProxy.format !in yuvFormats) return
-            val image = imageProxy.image ?: return
-            val imgGrayU8: GrayU8 = imageToGrayU8(image)
-
-            try {
-                detector.process(imgGrayU8)
-            } catch (e: NotFoundException) {
-            } catch (e: ChecksumException) {
-            } catch (e: Exception) {
-            }
-            for (det in detector.detections) {
-                onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
-            }
-
-            // Accept light-on-dark QR codes as well as standard dark-on-light codes.
-            val invImgGrayU8: GrayU8 = invertGrayU8Image(imgGrayU8)
-
-            try {
-                detector.process(invImgGrayU8)
-            } catch (e: NotFoundException) {
-            } catch (e: ChecksumException) {
-            } catch (e: Exception) {
-            }
-
-            for (det in detector.detections) {
-                onQrCodesDetected(Result(det.message, det.rawbits, null, BarcodeFormat.QR_CODE))
-            }
+            val plane = imageProxy.planes.firstOrNull() ?: return
+            val gray = luminance(plane.buffer, imageProxy.width, imageProxy.height, plane.rowStride, plane.pixelStride) ?: return
+            detect(gray)
+            detect(invertGrayU8Image(gray))
         } finally {
-            // CameraX needs the proxy released even if an early return or a callback aborts analysis.
             imageProxy.close()
+        }
+    }
+
+    private fun detect(frame: GrayU8) {
+        try {
+            detector.process(frame)
+        } catch (_: RuntimeException) {
+            // A failed pass may leave partial or previous detections in the reusable detector.
+            return
+        }
+        for (detection in detector.detections) {
+            onQrCodesDetected(Result(detection.message, detection.rawbits, null, BarcodeFormat.QR_CODE))
         }
     }
 }

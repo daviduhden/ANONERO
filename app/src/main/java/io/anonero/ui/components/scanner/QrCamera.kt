@@ -70,6 +70,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -147,7 +148,9 @@ fun QRScannerDialog(
                         onDismiss.invoke()
                         onQRCodeScanned.invoke(it)
                     },
-                    onUrRusult = {
+                    onUrRusult = { result ->
+                        onDismiss()
+                        onUrRusult(result)
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -173,13 +176,8 @@ fun QRScanner(
     onUrRusult: (URDecoder.Result) -> Unit = {},
     onDismiss: () -> Unit = {},
 ) {
-    val decoder = remember { URDecoder() }
-
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
-    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
-    var isScanned by remember { mutableStateOf(false) }
     var progrees by remember { mutableFloatStateOf(0.0f) }
     val progressAnimDuration = 800
     val progressAnimation by animateFloatAsState(
@@ -195,15 +193,6 @@ fun QRScanner(
         heightInPx = 240.dp.toPx()
     }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-
-    DisposableEffect(true) {
-        onDispose {
-            cameraProvider?.unbindAll()
-            cameraExecutor.shutdown()
-        }
-    }
-
     Box(
         modifier = modifier.fillMaxSize(),
     ) {
@@ -314,81 +303,15 @@ fun QRScanner(
 
             PermissionStatus.Granted -> {
                 Box {
-                    AndroidView(
-                        modifier = modifier.fillMaxSize(),
-                        factory = { ctx ->
-                            val previewView =
-                                PreviewView(ctx).apply {
-                                    layoutParams =
-                                        ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                        )
-                                }
-                            // Set up CameraX
-                            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                            cameraProviderFuture.addListener({
-                                cameraProvider = cameraProviderFuture.get()
-
-                                // Preview
-                                val preview =
-                                    Preview.Builder().build().also {
-                                        it.surfaceProvider = previewView.surfaceProvider
-                                    }
-
-                                // ImageAnalysis
-                                val imageAnalysis =
-                                    ImageAnalysis
-                                        .Builder()
-                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                        .build()
-                                        .also { analysis ->
-                                            analysis.setAnalyzer(
-                                                cameraExecutor,
-                                                QrCodeAnalyzerBoofcv(onQrCodesDetected = {
-                                                    val result = it.text
-                                                    if (result.lowercase().startsWith("ur:")) {
-                                                        decoder.receivePart(result)
-                                                        val progreesPercentage =
-                                                            decoder.estimatedPercentComplete
-                                                        if (progreesPercentage.toFloat() != progrees) {
-                                                            progrees = progreesPercentage.toFloat()
-                                                            view.performHapticFeedback(
-                                                                HapticFeedbackConstants.KEYBOARD_TAP,
-                                                            )
-                                                        }
-                                                        if (decoder.result != null) {
-                                                            if (!isScanned) {
-                                                                onUrRusult.invoke(decoder.result)
-                                                            }
-                                                            isScanned = true
-                                                        }
-                                                    } else {
-                                                        if (!isScanned) {
-                                                            onQRCodeScanned.invoke(it.text)
-                                                        }
-                                                        isScanned = true
-                                                    }
-                                                }),
-                                            )
-                                        }
-
-                                try {
-                                    // Unbind previous use cases before rebinding
-                                    cameraProvider?.unbindAll()
-                                    cameraProvider?.bindToLifecycle(
-                                        lifecycleOwner,
-                                        CameraSelector.DEFAULT_BACK_CAMERA,
-                                        preview,
-                                        imageAnalysis,
-                                    )
-                                } catch (exc: Exception) {
-                                    Timber.tag(TAG).e(exc)
-                                }
-                            }, ContextCompat.getMainExecutor(ctx))
-                            previewView
+                    ScannerPreview(
+                        onText = onQRCodeScanned,
+                        onUr = onUrRusult,
+                        onProgress = { progress ->
+                            if (progress != progrees) {
+                                progrees = progress
+                                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            }
                         },
-                        update = { },
                     )
                     Canvas(
                         modifier =
@@ -664,6 +587,83 @@ fun QRScanner(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScannerPreview(
+    onText: (String) -> Unit,
+    onUr: (URDecoder.Result) -> Unit,
+    onProgress: (Float) -> Unit,
+) {
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    val owner = LocalLifecycleOwner.current
+    val deliverText by rememberUpdatedState(onText)
+    val deliverUr by rememberUpdatedState(onUr)
+    val deliverProgress by rememberUpdatedState(onProgress)
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { context ->
+            PreviewView(context).also {
+                it.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                previewView = it
+            }
+        },
+    )
+    val surface = previewView ?: return
+    DisposableEffect(surface, owner) {
+        val main = ContextCompat.getMainExecutor(surface.context)
+        val worker = Executors.newSingleThreadExecutor()
+        val preview = Preview.Builder().build().also { it.surfaceProvider = surface.surfaceProvider }
+        val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
+        val decoder = URDecoder()
+        var provider: ProcessCameraProvider? = null
+        // Disposal, camera binding, and UI delivery all run on the main thread.
+        var active = true
+        // The single analysis worker exclusively owns the decoder and completion flag.
+        var complete = false
+        analysis.setAnalyzer(
+            worker,
+            QrCodeAnalyzerBoofcv { code ->
+                if (!complete) {
+                    val text = code.text
+                    if (text.startsWith("ur:", ignoreCase = true)) {
+                        decoder.receivePart(text)
+                        val result = decoder.result
+                        if (result != null) {
+                            complete = true
+                            main.execute { if (active) deliverUr(result) }
+                        } else {
+                            val progress = decoder.estimatedPercentComplete.toFloat()
+                            main.execute { if (active) deliverProgress(progress) }
+                        }
+                    } else {
+                        complete = true
+                        main.execute { if (active) deliverText(text) }
+                    }
+                }
+            },
+        )
+        val future = ProcessCameraProvider.getInstance(surface.context)
+        future.addListener({
+            if (active) {
+                try {
+                    provider = future.get()
+                    provider?.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                } catch (_: Exception) {
+                    Timber.tag(TAG).e("Camera preview could not be started")
+                }
+            }
+        }, main)
+        onDispose {
+            active = false
+            try {
+                analysis.clearAnalyzer()
+                provider?.unbind(preview, analysis)
+            } finally {
+                worker.shutdown()
             }
         }
     }
