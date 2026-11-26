@@ -234,3 +234,27 @@ These are distinct from the configured signing and publication environments.
   instrumented coverage.
 - **Pending:** authorized Release execution, branch protection, and reproducible
   instrumented runs with usable KVM or a device farm.
+
+### INST-001 — Inconsistent instrumentation verdict and overwritten retry evidence
+
+The [API 35 job](https://github.com/daviduhden/ANONERO/actions/runs/45706621403/job/139546185283)
+at `b09f9dc4953465a294521db8fda89a27cb66198d` emitted aggregate
+`testsuites` XML with nested suites and one logcat per case. Ten cases ran per
+flavor. This successful job supplies the report format. It had no observed
+sanitizer failure. Static review found that the retry classifier accepted
+only a single suite, while two independent final checks trusted summary counts.
+An error element with zero reported errors or a sanitizer report in guest output
+could escape both final checks. A retry could overwrite the first XML.
+
+Both final gates now validate the same XML hierarchy, actual testcase and issue
+counts, both flavor exit codes and existing per-case logcat. A sanitizer
+diagnostic in captured XML or guest logs prevents success or retry. The original
+attempt's XML, exit codes and per-test logs are archived before retry. Python
+regressions cover aggregate XML, inconsistent counters, missing cases and
+sanitizer output. The checker accepted the archived XML and logs for this SHA.
+Execution of the modified runner and regression suite still requires manual CI.
+Diagnostics outside the captured buffers and uninstrumented code remain uncovered.
+
+The JVM job also requires passing JUnit XML for each Debug flavor. On the
+archived `b09f9dc` results the shared parser counted 143 cases in 27 suites
+per flavor. JVM reports do not include Android's guest exit-code sidecars.

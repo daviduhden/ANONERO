@@ -23,7 +23,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-attach_only = runpy.run_path(str(ROOT / "scripts/check-instrumented-retry.py"))["attach_only"]
+attach_only = runpy.run_path(str(ROOT / "scripts/check-test-reports.py"))["attach_only"]
 
 
 class InstrumentedRetryTest(unittest.TestCase):
@@ -44,6 +44,63 @@ class InstrumentedRetryTest(unittest.TestCase):
             "</testcase></testsuite>",
         )
         self.assertTrue(attach_only([attach]))
+
+    def test_nested_aggregate_and_sanitizer_in_output(self):
+        case = "<testcase><failure>failed to attach</failure></testcase>"
+        suite = f'<testsuite tests="1" failures="1">{case}</testsuite>'
+        aggregate = f'<testsuites tests="1" failures="1">{suite}</testsuites>'
+        self.assertTrue(attach_only([self.report("nested.xml", aggregate)]))
+        for output in (
+            "ERROR: AddressSanitizer: heap-use-after-free",
+            "SUMMARY: ThreadSanitizer: data race",
+            "wallet.cpp:12:3: runtime error: signed integer overflow",
+        ):
+            mixed = aggregate.replace(
+                "</testsuite>", f"<system-err>{output}</system-err></testsuite>"
+            )
+            self.assertFalse(attach_only([self.report("mixed.xml", mixed)]))
+
+    def test_final_verdict_rejects_missing_cases_and_contradictory_summaries(self):
+        verify = runpy.run_path(str(ROOT / "scripts/check-test-reports.py"))["verify_results"]
+        root = Path(self.temp.name)
+        valid = '<testsuite tests="1"><testcase/></testsuite>'
+        for flavor in ("anon", "nero"):
+            directory = root / "flavors" / flavor
+            directory.mkdir(parents=True)
+            (directory / "test-result-exit-code.txt").write_text("0")
+            (directory / "TEST-result.xml").write_text(valid)
+        verify(root)
+        for case in (
+            "",
+            "<testcase><error/></testcase>",
+            "<testcase><skipped/></testcase>",
+            "<testcase/><system-out>ERROR: LeakSanitizer: detected memory leaks</system-out>",
+        ):
+            (directory / "TEST-result.xml").write_text(valid.replace("<testcase/>", case))
+            with self.assertRaises(ValueError):
+                verify(root)
+
+    def test_success_summary_cannot_mask_guest_sanitizer(self):
+        check_logs = runpy.run_path(str(ROOT / "scripts/check-test-reports.py"))["check_guest_logs"]
+        root = Path(self.temp.name)
+        device = root / "flavors" / "anon" / "device"
+        device.mkdir(parents=True)
+        (device / "logcat-case.txt").write_text("WARNING: ThreadSanitizer: data race")
+        with self.assertRaises(ValueError):
+            check_logs(root, "anon")
+        check_logs(root, "nero")
+
+    def test_unit_result_requires_both_variant_reports(self):
+        verify = runpy.run_path(str(ROOT / "scripts/check-test-reports.py"))["verify_unit_results"]
+        root = Path(self.temp.name)
+        for flavor in ("Anon", "Nero"):
+            variant = root / f"test{flavor}DebugUnitTest"
+            variant.mkdir()
+            (variant / "TEST-case.xml").write_text('<testsuite tests="1"><testcase/></testsuite>')
+            if flavor == "Anon":
+                with self.assertRaises(ValueError):
+                    verify(root)
+        verify(root)
 
     def test_an_attach_failure_cannot_hide_another_failure(self):
         attach = self.report(
@@ -72,8 +129,8 @@ class InstrumentedRetryTest(unittest.TestCase):
         scripts = runner / "scripts"
         scripts.mkdir()
         shutil.copyfile(
-            ROOT / "scripts/check-instrumented-retry.py",
-            scripts / "check-instrumented-retry.py",
+            ROOT / "scripts/check-test-reports.py",
+            scripts / "check-test-reports.py",
         )
         executables = {
             bin_path / "adb": """#!/bin/sh
@@ -96,11 +153,12 @@ reports="app/build/outputs/androidTest-results/connected/flavors/$flavor"
 mkdir -p "$reports"
 if [ "$flavor" = nero ] && [ ! -f nero-retried ]; then
   touch nero-retried
-  echo '<testsuite tests="1" failures="1"><failure>failed to attach</failure></testsuite>' \
+  echo '<testsuite tests="1" failures="1"><testcase><failure>failed to attach</failure></testcase></testsuite>' \
     > "$reports/TEST-fixture.xml"
   exit 1
 fi
-echo '<testsuite tests="1" failures="0"/>' > "$reports/TEST-fixture.xml"
+echo 0 > "$reports/test-result-exit-code.txt"
+echo '<testsuite tests="1" failures="0"><testcase/></testsuite>' > "$reports/TEST-fixture.xml"
 if [ "$flavor" = anon ]; then
   exit 2
 fi

@@ -66,54 +66,6 @@ capture_diagnostics() {
 	} >ci-diagnostics/instrumented-diagnostics.txt 2>&1
 }
 
-# Require XML evidence for both flavors in addition to their Gradle exit statuses.
-reports_ok() {
-	python3 - <<'PY'
-import glob
-import sys
-import xml.etree.ElementTree as ET
-
-files = sorted(
-    glob.glob("app/build/outputs/androidTest-results/**/TEST-*.xml", recursive=True)
-)
-if not files:
-    print("::error::no instrumented test reports were produced")
-    sys.exit(1)
-
-flavors = set()
-bad = False
-for path in files:
-    root = ET.parse(path).getroot()
-    tests = int(root.get("tests", "0"))
-    failures = int(root.get("failures", "0"))
-    errors = int(root.get("errors", "0"))
-    skipped = int(root.get("skipped", "0"))
-    print(f"{path}: tests={tests} failures={failures} errors={errors} skipped={skipped}")
-    if "flavors/" in path:
-        flavors.add(path.split("flavors/", 1)[1].split("/", 1)[0])
-    if failures or errors or skipped or tests == 0:
-        bad = True
-    for testcase in root.iter("testcase"):
-        for failure in testcase.findall("failure"):
-            text = (failure.text or "").lower()
-            if any(
-                marker in text
-                for marker in (
-                    "failed to attach",
-                    "failed to install",
-                    "testrunfailed",
-                    "process crashed",
-                )
-            ):
-                bad = True
-
-if flavors != {"anon", "nero"}:
-    print(f"::error::expected anon and nero reports, got {sorted(flavors)}")
-    bad = True
-sys.exit(1 if bad else 0)
-PY
-}
-
 if ! timeout 300 adb wait-for-device; then
 	capture_diagnostics
 	echo "::error::adb device did not become available"
@@ -148,7 +100,14 @@ for flavor in anon nero; do
 		# Retry only when the guest still answers and the flavor's XML attributes
 		# every reported failure to instrumentation attachment.
 		if core_services_ok &&
-			python3 scripts/check-instrumented-retry.py app/build/outputs/androidTest-results "$flavor"; then
+			python3 scripts/check-test-reports.py app/build/outputs/androidTest-results "$flavor"; then
+			# The next Gradle invocation may replace its XML and guest logs.
+			(cd app/build/outputs/androidTest-results && find . -type f -path "*/flavors/$flavor/*" \
+				\( -name 'TEST-*.xml' -o -name 'test-result-exit-code.txt' -o -name 'logcat-*.txt' \) \
+				-print0) >ci-diagnostics/first-attempt-files
+			tar -cf "ci-diagnostics/${flavor}-first-attempt.tar" -C app/build/outputs/androidTest-results \
+				--null -T ci-diagnostics/first-attempt-files
+			rm ci-diagnostics/first-attempt-files
 			echo "Retrying ${flavor} after an instrumentation attach timeout"
 			if run_connected "$task"; then
 				flavor_status=0
@@ -168,7 +127,7 @@ for flavor in anon nero; do
 	fi
 done
 
-if ! reports_ok || ((status != 0)); then
+if ! python3 scripts/check-test-reports.py app/build/outputs/androidTest-results --verify || ((status != 0)); then
 	capture_diagnostics
 	exit 1
 fi

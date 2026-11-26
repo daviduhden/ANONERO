@@ -207,3 +207,5 @@ failed runs when an exact cache hit still needs a root classpath download.
 For each unsplit Debug APK, verify the packaged adapter for both supported
 ABIs. Test its ELF class and machine as well as the entry name. A successful
 ARM archive build alone cannot establish what was copied into the APK.
+
+Run the common instrumentation report check at both verdict points. Archive the original XML and per-case logcat before a permitted attach retry. Report acceptance alone does not establish sanitizer coverage.

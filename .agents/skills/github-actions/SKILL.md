@@ -210,3 +210,10 @@ resolution can keep every later job dependent on the same remote download.
 Tests uses the pinned setup-java success-only save for Gradle modules and its
 separate wrapper cache. Only the default branch testing its dispatched commit
 may write. Release keeps both setup actions free of Gradle dependency caches.
+
+Use the same result checker inside and after the emulator. Inspect per-case logcat and suite output for sanitizer findings even on a zero exit. Preserve the first attempt before retry overwrites the report tree.
+
+Inspect the Gradle step that assembles androidTest APKs for Kotlin warnings too:
+a deprecated test API only used by that source set can be absent from the lint,
+main assembly, and JVM logs. Confirm each flavor's lint XML and instrumentation
+results against the exact revision when updating the Compose BOM or test rule.
