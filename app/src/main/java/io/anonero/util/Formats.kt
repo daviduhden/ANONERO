@@ -22,6 +22,7 @@ import android.icu.text.CompactDecimalFormat
 import io.anonero.AnonConfig
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.DateTimeException
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -71,9 +72,13 @@ object Formats {
         timestamp: Long,
         pattern: String = "HH:mm\ndd/MM",
     ): String {
-        val instant =
-            Instant.ofEpochSecond(timestamp)
-        val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+        val dateTime =
+            try {
+                LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault())
+            } catch (_: DateTimeException) {
+                // A wallet history timestamp can exceed the calendar range on 64-bit devices.
+                return "—"
+            }
         val formatter = DateTimeFormatter.ofPattern(pattern)
         return dateTime.format(formatter)
     }

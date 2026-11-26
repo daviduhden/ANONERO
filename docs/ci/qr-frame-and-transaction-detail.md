@@ -86,3 +86,14 @@ The API 35 failure-injection case for PinThrottle checks the observable result.
 The [dependency inventory](../architecture/dependencies.md) records the three
 catalog pin changes. Android Lint, Android test compilation and device execution
 of this checkout remain pending.
+
+### TX-DATE-001 — Unrepresentable wallet history timestamp
+
+The history row and detail screen both format wallet2 epoch **seconds** with
+`Formats.formatTransactionTime`. Its signed 64-bit input can exceed the range
+accepted by `Instant` or the local calendar. The formatter now displays an
+unavailable date for a conversion failure. Metadata is neither persisted nor
+logged. The other date conversions in the application accept epoch milliseconds,
+whose signed 64-bit range fits within the supported calendar. No crash was
+observed in the archived runs. The JVM regression checks both extremes and a
+representable date. Device and CI validation are pending.
