@@ -48,10 +48,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -259,8 +260,9 @@ fun QRExchangeScreen(
         scrimColor = MaterialTheme.colorScheme.background,
         contentColor = Color.Transparent,
         sheetState =
-            rememberModalBottomSheetState(
-                skipPartiallyExpanded = true,
+            rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
             ),
         contentWindowInsets = {
             WindowInsets(
@@ -419,9 +421,10 @@ fun QRExchangeDialog(
     navigateToHome: () -> Unit,
 ) {
     val sheetState =
-        rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-        )
+        rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            )
 
     if (show) {
         ModalBottomSheet(

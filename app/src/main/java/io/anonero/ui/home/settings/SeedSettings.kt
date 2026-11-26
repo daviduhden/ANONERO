@@ -59,10 +59,11 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -316,8 +317,9 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     if (neroPayload.isNotEmpty() && verified) {
         ModalBottomSheet(
             sheetState =
-                rememberModalBottomSheetState(
-                    skipPartiallyExpanded = true,
+                rememberBottomSheetState(
+                    initialValue = SheetValue.Hidden,
+                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
                 ),
             scrimColor =
                 MaterialTheme.colorScheme.background.copy(
