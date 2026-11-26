@@ -102,6 +102,8 @@ object EncryptUtil {
         toDecrypt: String,
     ): String {
         val encryptedBytes = Base64.decode(toDecrypt.lines().joinToString(""))
+        require(encryptedBytes.size >= 32 && (encryptedBytes.size - 16) % 16 == 0) { "Invalid legacy backup length" }
+        require(encryptedBytes.copyOfRange(0, 8).contentEquals(SALT_PREFIX.toByteArray())) { "Unknown backup format" }
         val salt = encryptedBytes.copyOfRange(8, 16)
         // Derive 48 byte key
         var keySpec: SecretKeySpec?
@@ -118,20 +120,9 @@ object EncryptUtil {
                 secretKey.fill('*'.code.toByte())
             }
         }
-        val cipherText = encryptedBytes.copyOfRange(16, encryptedBytes.size)
-        // Decrypt the Cipher Text and manually remove padding after
-        val cipher = Cipher.getInstance("AES/CBC/NoPadding")
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
-        val decrypted = cipher.doFinal(cipherText)
-        if (decrypted.isEmpty()) throw IllegalArgumentException("Empty backup payload")
-        // Last byte is PKCS#5/7 padding. Treat it as unsigned; a negative Java byte would
-        // otherwise underflow the copy range.
-        val padding = decrypted.last().toInt() and 0xFF
-        if (padding !in 1..16 || padding > decrypted.size) {
-            throw IllegalArgumentException("Invalid backup padding")
-        }
-        val plaintext = decrypted.copyOfRange(0, decrypted.size - padding)
-        return plaintext.toString(Charsets.UTF_8)
+        return cipher.doFinal(encryptedBytes, 16, encryptedBytes.size - 16).toString(Charsets.UTF_8)
     }
 
     // Envelope layout in bytes: ANONBAK2 || salt(16) || iv(12) || GCM ciphertext and tag.

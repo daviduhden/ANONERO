@@ -149,3 +149,8 @@ Serialize gate writes with provisioning and reject work after the gate changes.
 Upgrade a legacy gate only after the matching PIN authenticates that profile.
 Settings must leave PIN-encrypted files intact if device-key migration is still
 incomplete. The next authenticated open owns migration and its rollback.
+
+Cross-check legacy string and file readers for the same envelope marker, salt
+layout and complete provider padding validation. CBC padding can detect some
+malformed data but cannot authenticate a backup. For GCM, verify the input is
+consumed through cipher finalization before handing staged plaintext to a parser.

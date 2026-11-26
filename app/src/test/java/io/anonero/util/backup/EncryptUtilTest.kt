@@ -22,12 +22,16 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.params.KeyParameter
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.Base64
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -95,5 +99,22 @@ class EncryptUtilTest {
         val dec = tmp.newFile("dec")
         EncryptUtil.decryptFile("passphrase", legacy, dec)
         assertArrayEquals(payload, dec.readBytes())
+        val encoded = Base64.getEncoder()
+        val bytes = legacy.readBytes()
+        assertEquals(payload.decodeToString(), EncryptUtil.decrypt("passphrase", encoded.encodeToString(bytes)))
+        assertThrows(IllegalArgumentException::class.java) {
+            EncryptUtil.decrypt("passphrase", encoded.encodeToString(bytes.copyOf(16)))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            EncryptUtil.decrypt("passphrase", encoded.encodeToString(bytes.copyOf().also { it[0] = 0 }))
+        }
+
+        // Encode one block whose last byte claims two padding bytes, but only one is present.
+        val raw = Cipher.getInstance("AES/CBC/NoPadding")
+        raw.init(Cipher.ENCRYPT_MODE, SecretKeySpec(secret.copyOfRange(0, 32), "AES"), IvParameterSpec(secret.copyOfRange(32, 48)))
+        val inconsistent = raw.doFinal(ByteArray(16).also { it[15] = 2 })
+        assertThrows(BadPaddingException::class.java) {
+            EncryptUtil.decrypt("passphrase", encoded.encodeToString(bytes.copyOf(16) + inconsistent))
+        }
     }
 }

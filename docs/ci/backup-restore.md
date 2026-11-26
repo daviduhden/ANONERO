@@ -62,3 +62,26 @@ credential, archive format or network disclosure is introduced. The JVM cases
 exercise file replay and cleanup. Android Keystore invalidation, process death
 and wallet2 reopen require device validation. Retain legacy snapshot readers
 and any remaining fallback files if the migration code is rolled back.
+
+## BK-002 — Legacy string envelope and CBC padding
+
+At `b09f9dc`, the public legacy string decoder ignored the eight-byte format
+marker and interpreted only the final byte of decrypted CBC data as a padding
+length. This permitted malformed legacy input to produce a successful string
+result. There is no call to that reader from the active restore flow. The file
+reader already checks the marker and uses JCA PKCS padding. Preserve the v1
+salt, key/IV derivation and character encoding, and delegate full-block padding
+validation to the same cipher transformation as the v1 writer. Reject unknown
+or incomplete envelopes before deriving a key. This protects error reporting
+and compatibility; v1 remains unauthenticated and valid padding cannot establish
+integrity. There is no new network destination, secret output or on-disk format.
+The JVM fixture checks valid legacy data, unknown markers, truncated envelopes
+and inconsistent padding. A rollback requires retaining strict framing and a
+complete padding check in the replacement reader.
+
+The GCM file reader copies through EOF before the caller opens the ZIP in
+private scratch. At EOF Android libcore calls doFinal and propagates a padding
+or tag failure as IOException on the reviewed API 29 and 35 implementations.
+The JVM suite already covers tampering and a wrong passphrase. Provider-specific
+device behavior remains unverified. See [Android 10 CipherInputStream](https://android.googlesource.com/platform/libcore/+/refs/tags/android-10.0.0_r1/ojluni/src/main/java/javax/crypto/CipherInputStream.java)
+and [Android 15 CipherInputStream](https://android.googlesource.com/platform/libcore/+/refs/tags/android-15.0.0_r1/ojluni/src/main/java/javax/crypto/CipherInputStream.java).
