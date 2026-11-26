@@ -110,7 +110,7 @@ class WalletStateSessionTest {
             assertEquals(emptyList<Any>(), state.coins.first())
             assertNull(state.balanceInfo.first())
             assertNull(state.unLockedBalance.first())
-            assertNull(state.nextAddress.first())
+            assertNull(state.receiveAccount.first())
             assertNull(state.daemonInfo.first())
         }
 }

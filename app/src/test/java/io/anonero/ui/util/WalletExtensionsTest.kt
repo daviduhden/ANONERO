@@ -18,19 +18,39 @@
 package io.anonero.ui.util
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class WalletExtensionsTest {
     @Test
-    fun `next index follows created subaddresses even without payments`() {
-        // Only the primary address exists.
-        assertEquals(1, nextSubaddressIndex(lastUsed = 0, count = 1))
-        // Three addresses exist (indices 0, 1, 2) but index 2 never received funds.
-        assertEquals(3, nextSubaddressIndex(lastUsed = 0, count = 3))
+    fun `successive requests append once each before either address receives payment`() {
+        var count = 1
+        var stores = 0
+        val issued =
+            List(2) {
+                appendStoredSubaddress(0, { count }, { index ->
+                    assertEquals(count, index)
+                    count++
+                }, {
+                    stores++
+                    true
+                })
+            }
+        assertEquals(listOf(1, 2), issued)
+        assertEquals(2, stores)
     }
 
     @Test
-    fun `next index follows the highest used index when it is ahead`() {
-        assertEquals(6, nextSubaddressIndex(lastUsed = 5, count = 3))
+    fun `ahead of count observations and invalid counts cannot issue an address`() {
+        for ((used, count) in listOf(5 to 3, 0 to 0, 0 to Int.MAX_VALUE)) {
+            assertNull(appendStoredSubaddress(used, { count }, { error("unexpected append") }, { error("unexpected store") }))
+        }
+    }
+
+    @Test
+    fun `void append and failed store cannot publish an index`() {
+        assertNull(appendStoredSubaddress(0, { 1 }, {}, { error("unexpected store") }))
+        var count = 1
+        assertNull(appendStoredSubaddress(0, { count }, { count++ }, { false }))
     }
 }

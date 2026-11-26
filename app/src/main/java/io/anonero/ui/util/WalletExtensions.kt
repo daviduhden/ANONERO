@@ -21,38 +21,44 @@ package io.anonero.ui.util
 import io.anonero.model.Subaddress
 import io.anonero.model.Wallet
 
-fun Wallet.getLastUnusedIndex(): Int {
-    // The number of created subaddresses, not only received payments, determines the
-    // next index. Otherwise creating several addresses without receiving funds reuses
-    // index 1 and links them.
-    var lastIndex = this.numSubAddresses - 1
-    for (info in this.history?.all ?: listOf()) {
-        if (info.addressIndex > lastIndex) lastIndex = info.addressIndex
-    }
-    return lastIndex
+/** Append exactly one index and expose it only after wallet2 confirms the count and store. */
+internal fun appendStoredSubaddress(
+    highestObserved: Int,
+    count: () -> Int,
+    append: (Int) -> Unit,
+    store: () -> Boolean,
+): Int? {
+    val next = count()
+    if (next <= 0 || next == Int.MAX_VALUE || highestObserved >= next) return null
+    append(next)
+    return next.takeIf { count() == next + 1 && store() }
 }
 
-internal fun nextSubaddressIndex(
-    lastUsed: Int,
-    count: Int,
-): Int = maxOf(lastUsed, count - 1) + 1
-
-fun Wallet.getLatestSubAddress(): Subaddress {
-    val nextIndex = nextSubaddressIndex(getLastUnusedIndex(), this.numSubAddresses)
-    // Create the next address if the wallet does not have it yet.
-    if (nextIndex >= this.numSubAddresses) {
-        this.addSubaddress(getAccountIndex(), "Subaddress #$nextIndex")
-        this.store()
-    }
-    return this.getSubaddressObject(nextIndex)
+internal fun Wallet.issueSubaddress(account: Int): Subaddress? {
+    val transactions = history?.takeIf { it.accountIndex == account }?.all ?: return null
+    val highestTransaction = transactions.asSequence().filter { it.accountIndex == account }.maxOfOrNull { it.addressIndex } ?: 0
+    val highestOutput =
+        coins
+            ?.all
+            ?.asSequence()
+            ?.filter { it.subaddrAccount == account }
+            ?.maxOfOrNull { it.subaddrIndex } ?: 0
+    val next =
+        appendStoredSubaddress(
+            highestObserved = maxOf(highestTransaction, highestOutput),
+            count = { getNumSubaddressesFor(account) },
+            append = { index -> addSubaddress(account, "Subaddress #$index") },
+            store = { store() },
+        ) ?: return null
+    return getSubaddressObject(account, next).takeIf { validateAddress(it.address) }
 }
 
 fun Wallet.getAllUsedSubAddresses(): List<Subaddress> {
+    val account = getAccountIndex()
     val subAddresses = arrayListOf<Subaddress>()
-    for (i in 0 until this.numSubAddresses) {
-        subAddresses.add(this.getSubaddressObject(i))
+    for (i in 0 until getNumSubaddressesFor(account)) {
+        subAddresses.add(getSubaddressObject(account, i))
     }
-    // Do not call getLatestSubAddress() here: getters must not create or store addresses.
     return subAddresses
         .apply {
             this.removeIf { it.addressIndex == 0 && it.totalAmount != 0L }

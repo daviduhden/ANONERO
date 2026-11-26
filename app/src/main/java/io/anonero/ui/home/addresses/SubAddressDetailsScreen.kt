@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +68,10 @@ import io.anonero.ui.components.SubAddressLabelDialog
 import io.anonero.ui.components.qr.QrCodeView
 import io.anonero.ui.home.TransactionItem
 import io.anonero.util.Formats
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.java.KoinJavaComponent.inject
 
 class SubAddressDetail(
@@ -79,7 +83,7 @@ class SubAddressDetail(
         walletState.transactions
             .map {
                 it.filter { txInfo ->
-                    return@filter txInfo.addressIndex == subAddress.addressIndex &&
+                    return@filter txInfo.accountIndex == subAddress.accountIndex && txInfo.addressIndex == subAddress.addressIndex &&
                         txInfo.direction == TransactionInfo.Direction.Direction_In
                 }
             }.asLiveData()
@@ -106,7 +110,8 @@ fun SubAddressDetailScreen(
     val transactions by subAddressDetailVm.transactions.observeAsState(listOf())
     val hideAmounts by subAddressDetailVm.hideAmounts.observeAsState(false)
     val offline by subAddressDetailVm.offline.observeAsState(false)
-    var addressLabel by remember { mutableStateOf(subAddress.displayLabel) }
+    val scope = rememberCoroutineScope()
+    var addressLabel by remember(subAddress) { mutableStateOf(subAddress.displayLabel) }
     BackHandler {
         onBackPress()
     }
@@ -117,8 +122,9 @@ fun SubAddressDetailScreen(
         SubAddressLabelDialog(
             label = addressLabel,
             onSave = { label ->
-                walletState.updateAddressLabel(label, subAddress.addressIndex)
-                addressLabel = label
+                scope.launch {
+                    if (withContext(Dispatchers.IO) { walletState.updateAddressLabel(label, subAddress) }) addressLabel = label
+                }
                 labelDialog = false
             },
             onCancel = {

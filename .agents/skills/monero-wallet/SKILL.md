@@ -157,3 +157,11 @@ will be submitted against reviewed recipients, amounts, fees and change. For
 pending transactions, verify the reviewed wallet, account, profile and object
 are still current before starting an operation. A point-in-time check does not
 prevent a concurrent close.
+
+Allocate receive subaddresses on explicit requests. A balance, label or history
+refresh can run repeatedly without a user asking to share a new address. Capture
+the wallet and major index, append exactly once at the native count, confirm the
+count advanced by one, store successfully and validate the resulting address
+before showing it. An unpaid address may already have been shared. Never recycle
+it based on empty history. Refuse issuance if the known indices are ahead of the
+native count, and test false or throwing native results on device.

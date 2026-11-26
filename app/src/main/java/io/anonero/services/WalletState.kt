@@ -30,7 +30,7 @@ import io.anonero.model.WalletManager
 import io.anonero.model.node.DaemonInfo
 import io.anonero.ui.home.LockScreenShortCut
 import io.anonero.ui.util.getAllUsedSubAddresses
-import io.anonero.ui.util.getLatestSubAddress
+import io.anonero.ui.util.issueSubaddress
 import io.anonero.util.SecureClipboard
 import io.anonero.util.WalletKey
 import io.anonero.util.WalletPinSession
@@ -53,6 +53,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 data class SyncProgress(
     val progress: Float,
     val left: Long,
+)
+
+internal data class ReceiveAccount(
+    val wallet: Wallet,
+    val index: Int,
 )
 
 private const val TAG = "WalletState"
@@ -94,7 +99,7 @@ class WalletState {
     private val _balanceInfo = MutableStateFlow<Long?>(null)
     private val _unLockedBalance = MutableStateFlow<Long?>(null)
     private val _walletStatus = MutableStateFlow<Wallet.Status?>(null)
-    private val _nextAddress = MutableStateFlow<Subaddress?>(null)
+    private val _receiveAccount = MutableStateFlow<ReceiveAccount?>(null)
     private val _coins = MutableStateFlow<List<CoinsInfo>>(arrayListOf())
     private val _accounts = MutableStateFlow<List<AccountInfo>>(emptyList())
     private val _activeAccount = MutableStateFlow(0)
@@ -122,7 +127,7 @@ class WalletState {
     val walletStatus: Flow<Wallet.Status?> = _walletStatus
     val syncProgress: Flow<SyncProgress?> = _syncProgress
 
-    val nextAddress: Flow<Subaddress?> = _nextAddress
+    internal val receiveAccount: Flow<ReceiveAccount?> = _receiveAccount
     val coins: Flow<List<CoinsInfo>> = _coins
     val subAddresses: Flow<List<Subaddress>> = _subAddresses
     val accounts: Flow<List<AccountInfo>> = _accounts
@@ -187,9 +192,9 @@ class WalletState {
                 }
             }
             if (!backgroundSync) {
-                _nextAddress.update { (wallet.getLatestSubAddress()) }
-                _subAddresses.update { (wallet.getAllUsedSubAddresses()).reversed() }
                 val account = wallet.getAccountIndex()
+                _receiveAccount.value = if (wallet.history?.accountIndex == account) ReceiveAccount(wallet, account) else null
+                refreshSubaddresses(wallet)
                 _activeAccount.update { account }
                 _coins.update {
                     (wallet.coins?.all ?: listOf()).fastFilter {
@@ -241,7 +246,7 @@ class WalletState {
         _coins.value = emptyList()
         _accounts.value = emptyList()
         _activeAccount.value = 0
-        _nextAddress.value = null
+        _receiveAccount.value = null
         _balanceInfo.value = null
         _unLockedBalance.value = null
         _walletStatus.value = null
@@ -273,16 +278,16 @@ class WalletState {
     fun selectAccount(index: Int): Boolean {
         if (backgroundSync || backgroundSyncRunning) return false
         val wallet = getWallet ?: return false
-        if (index < 0 || index >= wallet.getNumAccounts()) return false
-        // Selection can change the local wallet index before native snapshot refresh
-        // fails. Never leave old-account amounts/outputs beneath the current index.
-        _transactions.value = emptyList()
-        _subAddresses.value = emptyList()
-        _coins.value = emptyList()
-        _nextAddress.value = null
-        _balanceInfo.value = null
-        _unLockedBalance.value = null
         return try {
+            if (index < 0 || index >= wallet.getNumAccounts()) return false
+            // Selection can change the local wallet index before native snapshot refresh
+            // fails. Never leave old-account amounts/outputs beneath the current index.
+            _transactions.value = emptyList()
+            _subAddresses.value = emptyList()
+            _coins.value = emptyList()
+            _receiveAccount.value = null
+            _balanceInfo.value = null
+            _unLockedBalance.value = null
             wallet.setAccountIndex(index)
             wallet.refreshHistory()
             wallet.coins?.refresh()
@@ -524,19 +529,41 @@ class WalletState {
         _offline.update { offline || backgroundSyncFaulted }
     }
 
-    fun getNewAddress(): Boolean {
-        val wallet = getWallet ?: return false
-        wallet.addSubaddress(wallet.getAccountIndex(), "Subaddress #${wallet.numSubAddresses}")
-        if (!wallet.store()) return false
-        wallet.getLatestSubAddress().let { subAddresses ->
-            _nextAddress.update { subAddresses }
-        }
-        wallet.getAllUsedSubAddresses().let { allItems ->
-            _subAddresses.update { allItems.reversed() }
-        }
-        update()
-        return true
+    private fun refreshSubaddresses(wallet: Wallet) {
+        _subAddresses.value =
+            try {
+                wallet.getAllUsedSubAddresses().reversed()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IllegalStateException) {
+                emptyList()
+            } catch (_: ArithmeticException) {
+                emptyList()
+            }
     }
+
+    @Synchronized
+    internal fun issueReceiveAddress(owner: ReceiveAccount): Subaddress? =
+        WalletProfileStore.tryProfileMutation(onBusy = { null }) {
+            if (backgroundSync || backgroundSyncRunning || getWallet !== owner.wallet ||
+                owner.wallet.getAccountIndex() != owner.index || _receiveAccount.value != owner
+            ) {
+                return null
+            }
+            val address =
+                try {
+                    owner.wallet.issueSubaddress(owner.index)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: IllegalStateException) {
+                    null
+                } catch (_: ArithmeticException) {
+                    null
+                } ?: return null
+            if (backgroundSync || getWallet !== owner.wallet || owner.wallet.getAccountIndex() != owner.index) return null
+            refreshSubaddresses(owner.wallet)
+            address
+        }
 
     @Synchronized
     internal fun setTransactionNote(
@@ -563,22 +590,26 @@ class WalletState {
         }
     }
 
+    @Synchronized
     fun updateAddressLabel(
         label: String,
-        addressIndex: Int,
-    ): Boolean {
-        val wallet = getWallet ?: return false
-        wallet.setSubaddressLabel(addressIndex, label)
-        if (!wallet.store()) return false
-        wallet.refreshHistory()
-        wallet.getAllUsedSubAddresses().let { allItems ->
-            _subAddresses.update { allItems.reversed() }
+        address: Subaddress,
+    ): Boolean =
+        WalletProfileStore.tryProfileMutation(onBusy = { false }) {
+            val wallet = getWallet ?: return false
+            if (backgroundSync || backgroundSyncRunning || address.accountIndex != wallet.getAccountIndex()) return false
+            try {
+                if (wallet.getSubaddress(address.accountIndex, address.addressIndex) != address.address) return false
+                wallet.setSubaddressLabel(address.addressIndex, label)
+                if (wallet.getSubaddressLabel(address.addressIndex) != label || !wallet.store()) return false
+                refreshSubaddresses(wallet)
+                true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IllegalStateException) {
+                false
+            }
         }
-        wallet.getLatestSubAddress().let { subAddresses ->
-            _nextAddress.update { subAddresses }
-        }
-        return true
-    }
 
     fun refresh() {
         val wallet = getWallet ?: return

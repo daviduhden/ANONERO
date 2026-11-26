@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.anonero.R
 import io.anonero.icons.AnonIcons
+import io.anonero.model.Subaddress
 import io.anonero.services.WalletState
 import io.anonero.ui.components.SubAddressLabelDialog
 import io.anonero.ui.components.qr.QrCodeColors
@@ -66,6 +67,7 @@ import io.anonero.ui.components.qr.QrCodeView
 import io.anonero.util.SecureClipboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.java.KoinJavaComponent.inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,23 +78,30 @@ fun ReceiveScreen(
     navigateToSubAddresses: () -> Unit = {},
 ) {
     val walletState: WalletState by inject(WalletState::class.java)
-    val nextAddress by walletState.nextAddress.collectAsState(null)
-    var labelDialog by remember { mutableStateOf(false) }
+    val account by walletState.receiveAccount.collectAsState(null)
+    val locked by walletState.backgroundSyncFlow.collectAsState(walletState.backgroundSync)
+    val owner = account.takeUnless { locked }
+    var address by remember(owner) { mutableStateOf<Subaddress?>(null) }
+    var labelDialog by remember(owner) { mutableStateOf(false) }
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
-    LaunchedEffect(nextAddress) {
-        // A profile reset clears nextAddress while the dialog may still be composed.
-        if (nextAddress == null) labelDialog = false
+    LaunchedEffect(owner) {
+        if (owner != null) {
+            address = withContext(Dispatchers.IO) { walletState.issueReceiveAddress(owner) }
+            if (address == null) Toast.makeText(context, R.string.wallet_operation_failed, Toast.LENGTH_SHORT).show()
+        }
     }
-    val address = nextAddress
-    if (labelDialog && address != null) {
+    val issued = address
+    if (labelDialog && issued != null) {
         SubAddressLabelDialog(
-            label = address.displayLabel,
+            label = issued.displayLabel,
             onSave = { label ->
                 labelDialog = false
-                scope.launch(Dispatchers.IO) {
-                    walletState.updateAddressLabel(label, address.addressIndex)
+                scope.launch {
+                    if (withContext(Dispatchers.IO) { walletState.updateAddressLabel(label, issued) }) {
+                        address = Subaddress(issued.accountIndex, issued.addressIndex, issued.address, label)
+                    }
                 }
             },
             onCancel = {
@@ -124,7 +133,7 @@ fun ReceiveScreen(
             )
         },
     ) {
-        if (address != null) {
+        if (issued != null) {
             LazyColumn(
                 modifier =
                     Modifier
@@ -135,7 +144,7 @@ fun ReceiveScreen(
             ) {
                 item {
                     Text(
-                        text = address.displayLabel,
+                        text = issued.displayLabel,
                         textAlign = TextAlign.Center,
                         modifier =
                             Modifier
@@ -156,7 +165,7 @@ fun ReceiveScreen(
                 }
                 item {
                     QrCodeView(
-                        data = address.address,
+                        data = issued.address,
                         colors =
                             QrCodeColors(
                                 background = MaterialTheme.colorScheme.background,
@@ -172,7 +181,7 @@ fun ReceiveScreen(
                     SelectionContainer(
                         modifier =
                             Modifier.clickable {
-                                SecureClipboard.copy(context, address.address)
+                                SecureClipboard.copy(context, issued.address)
                                 Toast
                                     .makeText(
                                         context,
@@ -182,7 +191,7 @@ fun ReceiveScreen(
                             },
                     ) {
                         Text(
-                            address.address,
+                            issued.address,
                             modifier = Modifier.width(300.dp),
                         )
                     }

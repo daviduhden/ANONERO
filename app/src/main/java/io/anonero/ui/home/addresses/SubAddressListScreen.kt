@@ -19,6 +19,7 @@
 package io.anonero.ui.home.addresses
 
 import AnonNeroTheme
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -44,7 +45,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -52,13 +55,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.anonero.R
 import io.anonero.model.Subaddress
+import io.anonero.services.ReceiveAccount
 import io.anonero.services.WalletState
 import io.anonero.util.Formats
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.java.KoinJavaComponent.inject
 
 class SubAddressListViewModel : ViewModel() {
@@ -68,11 +73,13 @@ class SubAddressListViewModel : ViewModel() {
     val hideAmounts = walletState.hideAmountsFlow.asLiveData()
     val offline = walletState.offlineFlow.asLiveData()
 
-    fun getNextAddress() {
-        viewModelScope.launch(Dispatchers.IO) {
-            walletState.getNewAddress()
+    internal val receiveAccount = walletState.receiveAccount.asLiveData()
+
+    internal suspend fun getNextAddress(owner: ReceiveAccount): Boolean =
+        withContext(Dispatchers.IO) {
+            walletState.issueReceiveAddress(owner) !=
+                null
         }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -88,6 +95,9 @@ fun SubAddressesScreen(
         onBackPress()
     }
     val vm = viewModel<SubAddressListViewModel>()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val owner by vm.receiveAccount.observeAsState()
     val addresses by vm.subAddresses.observeAsState(listOf())
     val hideAmounts by vm.hideAmounts.observeAsState(false)
     val offline by vm.offline.observeAsState(false)
@@ -105,8 +115,16 @@ fun SubAddressesScreen(
                 actions = {
                     IconButton(
                         onClick = {
-                            vm.getNextAddress()
+                            val requested = owner
+                            if (requested != null) {
+                                scope.launch {
+                                    if (!vm.getNextAddress(requested)) {
+                                        Toast.makeText(context, R.string.wallet_operation_failed, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
                         },
+                        enabled = owner != null,
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                     }
