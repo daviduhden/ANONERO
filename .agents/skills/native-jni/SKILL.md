@@ -157,3 +157,9 @@ the historical callback and both account and all-account paths. Check sums at
 both the payment-array boundary and Kotlin consumers. Reject negative metadata
 before converting it to wallet2's unsigned formatter. The native compile-time
 boundary assertion and formatter device tests do not exercise a live large wallet.
+
+Address/account readers and mutations must preserve pending JVM errors and
+translate wallet2 failures into a fixed Java exception. Check account and
+subaddress counts before narrowing to Int. wallet2's void account creation
+and label setters can return after a rejected operation, so verify count or
+raw label before the Kotlin caller stores and publishes success.

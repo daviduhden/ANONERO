@@ -287,6 +287,26 @@ for signature, expected in (
     if code[start : code.index("\n}\n", start)].count("checkedAtomicAmount(") != expected:
         failures.append(f"{signature}: check all monetary conversions to Kotlin Long")
 
+# Invalid handles and native failures must not look like an empty wallet or a
+# successful address edit. Counts also cross a size_t to signed Int boundary.
+for name in (
+    "getAddressJ",
+    "getNumAccounts",
+    "getNumSubaddresses",
+    "getSubaddressLabel",
+    "setSubaddressLabel",
+    "addAccount",
+    "addSubaddress",
+):
+    start = code.index(f"Java_io_anonero_model_Wallet_{name}(")
+    body = code[start : code.index("\n}\n", start)]
+    if body.count("throwWalletOperationFailure(") < 2 or "catch (...)" not in body:
+        failures.append(f"Wallet.{name}: require a Java failure for unavailable address operations")
+    if name.startswith("getNum") and "std::numeric_limits<jint>::max()" not in body:
+        failures.append(f"Wallet.{name}: native counts must fit Kotlin Int")
+    if name == "addAccount" and "wallet->numSubaddressAccounts() != before + 1" not in body:
+        failures.append("Wallet.addAccount: verify native account creation before storing")
+
 # wallet2 does not serialize listener pointer swaps against callback delivery.
 listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")
 listener_end = code.index("\n}\n", listener_start)

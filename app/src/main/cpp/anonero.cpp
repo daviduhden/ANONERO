@@ -1136,11 +1136,21 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getAddressJ(JNIEnv *env, 
                                                                    jint addressIndex) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr || accountIndex < 0 || addressIndex < 0) {
-        return env->NewStringUTF("");
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
+        return nullptr;
     }
-    return env->NewStringUTF(
-        wallet->address(static_cast<uint32_t>(accountIndex), static_cast<uint32_t>(addressIndex))
-            .c_str());
+    try {
+        const auto address = wallet->address(static_cast<uint32_t>(accountIndex),
+                                             static_cast<uint32_t>(addressIndex));
+        if (address.empty()) {
+            throwWalletOperationFailure(env, "Wallet address unavailable");
+            return nullptr;
+        }
+        return env->NewStringUTF(address.c_str());
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
+        return nullptr;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getPath(JNIEnv *env, jobject instance) {
@@ -2249,15 +2259,27 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getTxKey(JNIEnv *env, job
 JNIEXPORT void JNICALL Java_io_anonero_model_Wallet_addAccount(JNIEnv *env, jobject instance,
                                                                jstring label) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
-        return;
-    if (label == nullptr) {
-        wallet->addSubaddressAccount("");
+    if (wallet == nullptr) {
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
         return;
     }
     ScopedUtfChars labelChars(env, label);
-    if (labelChars.get() != nullptr) {
-        wallet->addSubaddressAccount(labelChars.get());
+    if (label != nullptr && labelChars.get() == nullptr) {
+        throwWalletOperationFailure(env, "Wallet address label unavailable");
+        return;
+    }
+    try {
+        const std::string text(label == nullptr ? "" : labelChars.get());
+        const auto before = wallet->numSubaddressAccounts();
+        if (before >= static_cast<size_t>(std::numeric_limits<jint>::max())) {
+            throwWalletOperationFailure(env, "Wallet account count exceeds Android range");
+            return;
+        }
+        wallet->addSubaddressAccount(text);
+        if (wallet->numSubaddressAccounts() != before + 1)
+            throwWalletOperationFailure(env, "Wallet account creation failed");
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
     }
 }
 
@@ -2268,67 +2290,112 @@ JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getSubaddressLabel(JNIEnv
                                                                           jint addressIndex) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr || accountIndex < 0 || addressIndex < 0) {
-        return env->NewStringUTF("");
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
+        return nullptr;
     }
-    std::string label = wallet->getSubaddressLabel(static_cast<uint32_t>(accountIndex),
-                                                   static_cast<uint32_t>(addressIndex));
-    return env->NewStringUTF(label.c_str());
+    try {
+        const auto label = wallet->getSubaddressLabel(static_cast<uint32_t>(accountIndex),
+                                                      static_cast<uint32_t>(addressIndex));
+        if (wallet->status() != Monero::Wallet::Status_Ok) {
+            throwWalletOperationFailure(env, "Wallet address label unavailable");
+            return nullptr;
+        }
+        return env->NewStringUTF(label.c_str());
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
+        return nullptr;
+    }
 }
 
 //virtual void setSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex, const std::string &label) = 0;
 JNIEXPORT void JNICALL Java_io_anonero_model_Wallet_setSubaddressLabel(
     JNIEnv *env, jobject instance, jint accountIndex, jint addressIndex, jstring label) {
-    if (accountIndex < 0 || addressIndex < 0)
-        return;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
-        return;
-    if (label == nullptr) {
-        wallet->setSubaddressLabel(static_cast<uint32_t>(accountIndex),
-                                   static_cast<uint32_t>(addressIndex), "");
+    if (wallet == nullptr || accountIndex < 0 || addressIndex < 0) {
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
         return;
     }
     ScopedUtfChars labelChars(env, label);
-    if (labelChars.get() != nullptr) {
-        wallet->setSubaddressLabel(static_cast<uint32_t>(accountIndex),
-                                   static_cast<uint32_t>(addressIndex), labelChars.get());
+    if (label != nullptr && labelChars.get() == nullptr) {
+        throwWalletOperationFailure(env, "Wallet address label unavailable");
+        return;
+    }
+    try {
+        const std::string text(label == nullptr ? "" : labelChars.get());
+        const auto major = static_cast<uint32_t>(accountIndex);
+        const auto minor = static_cast<uint32_t>(addressIndex);
+        wallet->setSubaddressLabel(major, minor, text);
+        // The label getter clears the previous wallet2 status before reading.
+        if (wallet->status() != Monero::Wallet::Status_Ok ||
+            wallet->getSubaddressLabel(major, minor) != text ||
+            wallet->status() != Monero::Wallet::Status_Ok)
+            throwWalletOperationFailure(env, "Wallet address label change failed");
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
     }
 }
 
 // virtual size_t numSubaddressAccounts() const = 0;
 JNIEXPORT jint JNICALL Java_io_anonero_model_Wallet_getNumAccounts(JNIEnv *env, jobject instance) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    return wallet == nullptr ? 0 : static_cast<jint>(wallet->numSubaddressAccounts());
+    if (wallet == nullptr) {
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
+        return 0;
+    }
+    try {
+        const auto count = wallet->numSubaddressAccounts();
+        if (count > static_cast<size_t>(std::numeric_limits<jint>::max())) {
+            throwWalletOperationFailure(env, "Wallet address count exceeds Android range");
+            return 0;
+        }
+        return static_cast<jint>(count);
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
+        return 0;
+    }
 }
 
 //virtual size_t numSubaddresses(uint32_t accountIndex) const = 0;
 JNIEXPORT jint JNICALL Java_io_anonero_model_Wallet_getNumSubaddresses(JNIEnv *env,
                                                                        jobject instance,
                                                                        jint accountIndex) {
-    if (accountIndex < 0)
-        return 0;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (wallet == nullptr || accountIndex < 0) {
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
         return 0;
-    return static_cast<jint>(wallet->numSubaddresses(static_cast<uint32_t>(accountIndex)));
+    }
+    try {
+        const auto count = wallet->numSubaddresses(static_cast<uint32_t>(accountIndex));
+        if (count > static_cast<size_t>(std::numeric_limits<jint>::max())) {
+            throwWalletOperationFailure(env, "Wallet address count exceeds Android range");
+            return 0;
+        }
+        return static_cast<jint>(count);
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
+        return 0;
+    }
 }
 
 //virtual void addSubaddress(uint32_t accountIndex, const std::string &label) = 0;
 JNIEXPORT void JNICALL Java_io_anonero_model_Wallet_addSubaddress(JNIEnv *env, jobject instance,
                                                                   jint accountIndex,
                                                                   jstring label) {
-    if (accountIndex < 0)
-        return;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
-        return;
-    if (label == nullptr) {
-        wallet->addSubaddress(static_cast<uint32_t>(accountIndex), "");
+    if (wallet == nullptr || accountIndex < 0) {
+        throwWalletOperationFailure(env, "Wallet address operation unavailable");
         return;
     }
     ScopedUtfChars labelChars(env, label);
-    if (labelChars.get() != nullptr) {
-        wallet->addSubaddress(static_cast<uint32_t>(accountIndex), labelChars.get());
+    if (label != nullptr && labelChars.get() == nullptr) {
+        throwWalletOperationFailure(env, "Wallet address label unavailable");
+        return;
+    }
+    try {
+        const std::string text(label == nullptr ? "" : labelChars.get());
+        wallet->addSubaddress(static_cast<uint32_t>(accountIndex), text);
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet address operation failed");
     }
 }
 

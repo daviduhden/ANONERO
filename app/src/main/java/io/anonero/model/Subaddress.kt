@@ -22,7 +22,7 @@ import java.util.regex.Pattern
 
 @Serializable
 class Subaddress(
-    private val accountIndex: Int,
+    val accountIndex: Int,
     val addressIndex: Int,
     val address: String,
     var label: String,
@@ -35,7 +35,7 @@ class Subaddress(
     }
 
     val squashedAddress: String
-        get() = address.substring(0, 8) + "…" + address.substring(address.length - 8)
+        get() = if (address.length <= 16) address else address.take(8) + "…" + address.takeLast(8)
 
     val displayLabel: String
         get() =

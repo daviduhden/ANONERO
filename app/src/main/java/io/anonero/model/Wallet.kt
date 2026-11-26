@@ -656,9 +656,8 @@ class Wallet {
         var label = getSubaddressLabel(accountIndex, 0)
         if (label == NEW_ACCOUNT_NAME) {
             val address = getAddress(accountIndex)
-            val len = address.length
-            label = address.substring(0, 6) +
-                "\u2026" + address.substring(len - 6, len)
+            check(address.length >= 12) { "Account address unavailable" }
+            label = address.take(6) + "\u2026" + address.takeLast(6)
         }
         return label
     }
