@@ -339,7 +339,7 @@ class AnonWalletHandler(
         walletState.update()
         try {
             if (lwsActive) {
-                wallet.setTrustedDaemon(false)
+                check(wallet.setTrustedDaemon(false)) { "Could not apply daemon trust policy" }
                 // The LWS receives the view key. Its destination must match the
                 // selected transport network and clearnet servers must use TLS unless
                 // they are local. This is the same fail-closed policy as RPC.
@@ -416,16 +416,13 @@ class AnonWalletHandler(
                 if (host.isNotEmpty()) requireAppliedProxy(wallet)
                 if (lwsActive) {
                     // Keep the remote index untrusted even when login fails or throws.
-                    wallet.setTrustedDaemon(false)
                     // Registers the public address + view key with the LWS and asks it to
                     // create the account if needed. wallet2 sends only these two values.
-                    if (!wallet.lightWalletLogin()) {
+                    if (!wallet.loginToUntrustedLws()) {
                         throw Exception("LWS login failed")
                     }
-                    // A light server is a remote index, not a trusted daemon.
-                    wallet.setTrustedDaemon(false)
                 } else {
-                    wallet.setTrustedDaemon(true)
+                    check(wallet.setTrustedDaemon(true)) { "Could not apply daemon trust policy" }
                 }
                 wallet.refreshHistory()
                 if (host.isNotEmpty()) {
@@ -514,7 +511,7 @@ class AnonWalletHandler(
         wallet.pauseRefresh()
         wallet.setOffline(true)
         walletState.setOffline(true)
-        wallet.setTrustedDaemon(false)
+        check(wallet.setTrustedDaemon(false)) { "Could not apply daemon trust policy" }
         applyProxy(wallet, profile)
         if (WalletManager.instance !== manager || manager.wallet !== wallet || WalletSession.profile != profile) {
             throw CancellationException("Wallet session changed while preparing LWS")
@@ -541,9 +538,7 @@ class AnonWalletHandler(
             "Wallet network settings changed during LWS initialization"
         }
         requireAppliedProxy(wallet)
-        wallet.setTrustedDaemon(false)
-        check(wallet.lightWalletLogin()) { "LWS login failed" }
-        wallet.setTrustedDaemon(false)
+        check(wallet.loginToUntrustedLws()) { "LWS login failed" }
         wallet.setOffline(false)
         activateAppliedTransport(wallet)
         wallet.startRefresh()
@@ -582,7 +577,7 @@ class AnonWalletHandler(
             requireAppliedProxy(wallet)
             check(wallet.init(0, lightWallet = false)) { "Node initialization failed" }
             requireAppliedProxy(wallet)
-            wallet.setTrustedDaemon(true)
+            check(wallet.setTrustedDaemon(true)) { "Could not apply daemon trust policy" }
         }
         check(
             WalletManager.instance?.wallet === wallet && WalletSession.profile == profile &&
@@ -679,7 +674,7 @@ class AnonWalletHandler(
                     "Node network does not match the selected transport"
                 }
             }
-            if (lwsActive) wallet.setTrustedDaemon(false)
+            if (lwsActive) check(wallet.setTrustedDaemon(false)) { "Could not apply daemon trust policy" }
             manager.setDaemon(node)
             requireAppliedProxy(wallet)
             wallet.setOffline(false)
@@ -690,7 +685,7 @@ class AnonWalletHandler(
                     daemonHeight = 0L,
                 ),
             )
-            wallet.setTrustedDaemon(!lwsActive)
+            check(wallet.setTrustedDaemon(!lwsActive)) { "Could not apply daemon trust policy" }
             walletState.setLoading(false)
         } catch (e: Exception) {
             if (manager.wallet !== wallet) throw e

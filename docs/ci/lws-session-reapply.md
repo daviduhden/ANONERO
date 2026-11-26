@@ -24,3 +24,26 @@ normal active LWS reconnect still succeeds. No live LWS or Tor result is
 available for this change. Snapshot checks cannot establish native I/O
 quiescence. If the reapply path regresses, keep the wallet offline and require
 a wallet restart before applying the selected transport.
+
+## LWS-TRUST-002 — Unchecked wallet2 trust updates
+
+Source review at `b09f9dc` identified unchecked Boolean trust writes in
+startup, network reconfiguration and refresh callback reconnect. A missing
+handle returned false. A wallet2 exception could cross the JNI boundary.
+There is no observed trust-policy failure in Tests 45706621403 and its JVM
+and emulator cases do not perform a live LWS login.
+
+The adapter now reads back the trust flag after setting it and returns false
+for an unavailable handle or native exception. The pinned wallet2 setters and
+getters delegate to the same wallet. All active login paths verify the
+untrusted state before sending the address and view key to the selected LWS,
+and reapply it when login returns or throws. Failure prevents starting
+refresh. Offline cleanup still attempts to clear trust. This change preserves
+the RPC trust policy, transport choice, consent and JNI symbol. An untrusted
+LWS can still correlate the address, view key and requests it legitimately
+receives. These checks cannot establish native handle lifetime during close.
+
+The JVM regressions cover rejection before login, loss of the postcondition
+and an exception during login. Verify both ARM links, trust readback and offline
+behavior against a rejecting LWS on device. If rollback is required, keep LWS
+offline when the untrusted policy cannot be confirmed.

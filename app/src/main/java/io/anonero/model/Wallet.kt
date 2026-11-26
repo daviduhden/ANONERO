@@ -266,7 +266,9 @@ class Wallet {
     ): Boolean
 
     // Registers/logs in this wallet with the LWS server. Only valid in light-wallet mode.
-    external fun lightWalletLogin(): Boolean
+    internal fun loginToUntrustedLws(): Boolean = untrustedLwsLogin({ setTrustedDaemon(false) }, ::lightWalletLogin)
+
+    private external fun lightWalletLogin(): Boolean
 
     external fun getRestoreHeight(): Long
 
@@ -800,5 +802,18 @@ class Wallet {
 
         @JvmStatic
         external fun getMaximumAllowedAmount(): Long
+    }
+}
+
+/** Initialization or login may change wallet2 state. Refuse refresh if the post-login policy cannot be verified. */
+internal inline fun untrustedLwsLogin(
+    setUntrusted: () -> Boolean,
+    login: () -> Boolean,
+): Boolean {
+    if (!setUntrusted()) return false
+    return try {
+        login()
+    } finally {
+        check(setUntrusted()) { "Could not restore untrusted LWS policy" }
     }
 }

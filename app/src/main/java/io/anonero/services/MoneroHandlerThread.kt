@@ -149,18 +149,15 @@ class MoneroHandlerThread(
             return
         }
         try {
-            if (lightWallet) wallet.setTrustedDaemon(false)
+            if (lightWallet) check(wallet.setTrustedDaemon(false)) { "Could not apply daemon trust policy" }
             check(wallet.init(0, lightWallet = lightWallet)) { "Wallet initialization failed" }
             check(canUseTransport) { "Wallet transport changed during reconnect" }
             if (lightWallet) {
                 // Login must succeed after every init before refresh is restarted.
-                wallet.setTrustedDaemon(false)
-                check(wallet.lightWalletLogin()) { "LWS login failed" }
-                // LWS stays untrusted after a successful login as well.
-                wallet.setTrustedDaemon(false)
+                check(wallet.loginToUntrustedLws()) { "LWS login failed" }
             } else {
                 // Preserve the existing full-node trust policy after init.
-                wallet.setTrustedDaemon(true)
+                check(wallet.setTrustedDaemon(true)) { "Could not apply daemon trust policy" }
             }
             check(canUseTransport) { "Wallet transport changed before restarting refresh" }
             wallet.startRefresh()

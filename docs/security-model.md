@@ -396,3 +396,8 @@ Saved-node diagnostics omit hosts and credentials. LWS startup and transport rea
 check that proxy acquisition did not outlive the wallet profile and operator settings
 used to authorize login. A full lifecycle lease is still required to serialize changes
 during native calls. See [Kotlin, JNI and transport hardening](development-iteration-modernization.md).
+
+For LWS login, the adapter checks wallet2's trust flag after writing it.
+Startup, reconfiguration and callback reconnect reject login or refresh when
+the untrusted state cannot be confirmed. Device and native fault coverage is
+tracked in [the LWS audit](ci/lws-session-reapply.md).

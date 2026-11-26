@@ -130,6 +130,7 @@ for owner, operation, call in (
     ("WalletManager", "setProxyJ", "->setProxy("),
     ("Wallet", "setProxyJ", "->setProxy("),
     ("Wallet", "initJ", "->init("),
+    ("Wallet", "setTrustedDaemon", "->setTrustedDaemon("),
     ("Wallet", "lightWalletLogin", "->lightWalletLogin("),
     ("Wallet", "startBackgroundSync", "->startBackgroundSync("),
     ("Wallet", "stopBackgroundSync", "->stopBackgroundSync("),

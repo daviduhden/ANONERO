@@ -119,7 +119,7 @@ required_lws_order = (
     "LwsConfig.load(prefs, profile)",
     "applyProxy(wallet, profile)",
     "updateDaemon(wallet, node, lightWallet = true)",
-    "wallet.lightWalletLogin()",
+    "wallet.loginToUntrustedLws()",
 )
 lws_positions = [reapply.find(marker) for marker in required_lws_order]
 if (

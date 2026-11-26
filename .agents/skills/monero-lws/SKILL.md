@@ -171,3 +171,8 @@ both before dispatch. After waiting for settings persistence and for the
 network mutex, reject a changed owner or inactive LWS backend. Bind shared
 proxy and daemon helpers to that same wallet. An enabled preference on an
 active full-node wallet takes effect only at the intended wallet restart.
+
+Treat applying daemon trust as a checked operation. All LWS logins use
+Wallet.loginToUntrustedLws so a failure before login prevents disclosure
+and a failure restoring the untrusted state prevents refresh. Offline cleanup
+may attempt to clear trust after pausing the wallet.

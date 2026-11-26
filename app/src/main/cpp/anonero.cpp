@@ -1317,8 +1317,13 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_setTrustedDaemon(JNIEnv 
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    wallet->setTrustedDaemon(arg);
-    return JNI_TRUE;
+    try {
+        const bool trusted = arg == JNI_TRUE;
+        wallet->setTrustedDaemon(trusted);
+        return wallet->trustedDaemon() == trusted ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
 }
 
 //virtual void setOffline(bool offline) = 0;
