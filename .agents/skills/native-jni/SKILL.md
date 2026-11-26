@@ -163,3 +163,9 @@ translate wallet2 failures into a fixed Java exception. Check account and
 subaddress counts before narrowing to Int. wallet2's void account creation
 and label setters can return after a rejected operation, so verify count or
 raw label before the Kotlin caller stores and publishes success.
+
+Transaction-note reads and transaction-key reads return nullable Kotlin strings.
+Keep missing inputs, unavailable handles and native exceptions distinguishable
+from a successful empty wallet2 value. Note writes must report failure before
+their caller stores the wallet. Keep note text, transaction IDs and keys out of
+diagnostics.

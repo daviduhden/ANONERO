@@ -56,3 +56,21 @@ required for runtime evidence. A false re-key or store result cannot establish
 that the files on disk are untouched. Keep the caller's rollback logic and
 snapshots when revisiting these exports. Rollback of the adapter and its source
 guards requires no data migration.
+
+## JNI-PREVENTIVE-TX-METADATA-01
+
+Static inspection of `Wallet_setUserNote`, `Wallet_getUserNote` and
+`Wallet_getTxKey` found wallet2 calls and implicit string allocations outside
+a C++ exception boundary. A failure could terminate the wallet process while
+loading history, opening transaction details or saving a note. No CI run or
+crash log established that this had happened. The adapter now returns false for
+a failed write and null for unavailable data. Wallet2 can still return a valid
+empty string for a successful read. The Kotlin callers accept nullable strings,
+and a failed write short-circuits the following store. Nothing is logged or
+sent externally. Message signing and verification already catch native
+exceptions around byte conversion and the wallet2 call.
+
+The manual native diagnostics gate checks all three calls. Failure injection
+on both ARM targets is outstanding. These guards do not serialize wallet close
+with a concurrent reader. Rolling back the adapter and its static guards
+requires no wallet file or ABI migration.

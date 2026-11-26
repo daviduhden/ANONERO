@@ -125,6 +125,7 @@ if re.search(
 # conversion and wallet2 failures must stay inside the export's catch boundary.
 for owner, operation, call in (
     ("WalletManager", "verifyWalletPassword", "->verifyWalletPassword("),
+    ("Wallet", "setUserNote", "->setUserNote("),
     ("Wallet", "setPassword", "->setPassword("),
     ("Wallet", "store", "->store("),
     ("WalletManager", "setProxyJ", "->setProxy("),
@@ -306,6 +307,17 @@ for name in (
         failures.append(f"Wallet.{name}: native counts must fit Kotlin Int")
     if name == "addAccount" and "wallet->numSubaddressAccounts() != before + 1" not in body:
         failures.append("Wallet.addAccount: verify native account creation before storing")
+
+# Notes and transaction keys are nullable on failure in the Kotlin API.
+for reader in ("getUserNote", "getTxKey"):
+    start = code.index(f"Java_io_anonero_model_Wallet_{reader}(")
+    body = code[start : code.index("\n}\n", start)]
+    guarded, _, failure = body.partition("catch (...)")
+    if (
+        f"wallet->{reader}(" not in guarded.partition("try {")[2]
+        or "return nullptr;" not in failure
+    ):
+        failures.append(f"Wallet.{reader}: contain wallet2 exceptions and report unavailable data")
 
 # wallet2 does not serialize listener pointer swaps against callback delivery.
 listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")

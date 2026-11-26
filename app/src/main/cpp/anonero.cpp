@@ -2223,36 +2223,45 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_setUserNote(JNIEnv *env,
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
         return JNI_FALSE;
-    bool success = wallet->setUserNote(txidChars.get(), noteChars.get());
-    return static_cast<jboolean>(success);
+    try {
+        return static_cast<jboolean>(wallet->setUserNote(txidChars.get(), noteChars.get()));
+    } catch (...) {
+        return JNI_FALSE;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getUserNote(JNIEnv *env, jobject instance,
                                                                    jstring txid) {
     if (txid == nullptr)
-        return env->NewStringUTF("");
+        return nullptr;
     ScopedUtfChars txidChars(env, txid);
     if (txidChars.get() == nullptr)
-        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
+        return nullptr;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
-        return env->NewStringUTF("");
-    std::string note = wallet->getUserNote(txidChars.get());
-    return env->NewStringUTF(note.c_str());
+        return nullptr;
+    try {
+        return env->NewStringUTF(wallet->getUserNote(txidChars.get()).c_str());
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getTxKey(JNIEnv *env, jobject instance,
                                                                 jstring txid) {
     if (txid == nullptr)
-        return env->NewStringUTF("");
+        return nullptr;
     ScopedUtfChars txidChars(env, txid);
     if (txidChars.get() == nullptr)
-        return env->ExceptionCheck() ? nullptr : env->NewStringUTF("");
+        return nullptr;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
     if (wallet == nullptr)
-        return env->NewStringUTF("");
-    std::string txKey = wallet->getTxKey(txidChars.get());
-    return env->NewStringUTF(txKey.c_str());
+        return nullptr;
+    try {
+        return env->NewStringUTF(wallet->getTxKey(txidChars.get()).c_str());
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 //virtual void addSubaddressAccount(const std::string& label) = 0;
