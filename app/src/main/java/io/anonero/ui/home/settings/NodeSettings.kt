@@ -542,7 +542,7 @@ fun NodeListItem(
                 ).clickable(enabled = !active) {
                     menu = !menu
                 },
-        headlineContent = {
+        content = {
             Text(
                 node.toNodeString(),
                 style =
@@ -640,7 +640,7 @@ fun NodeForm(
             verticalArrangement = Arrangement.Top,
         ) {
             ListItem(
-                headlineContent = {
+                content = {
                     Text(
                         text = stringResource(R.string.node_label),
                         color = MaterialTheme.colorScheme.primary,
@@ -672,7 +672,7 @@ fun NodeForm(
                 },
             )
             ListItem(
-                headlineContent = {
+                content = {
                     Text(
                         text = stringResource(R.string.username),
                         color = MaterialTheme.colorScheme.primary,
@@ -701,7 +701,7 @@ fun NodeForm(
                 },
             )
             ListItem(
-                headlineContent = {
+                content = {
                     Text(
                         text = stringResource(R.string.password),
                         color = MaterialTheme.colorScheme.primary,

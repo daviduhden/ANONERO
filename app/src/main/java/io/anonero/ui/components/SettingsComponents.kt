@@ -64,7 +64,7 @@ fun SettingsSwitchItem(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(),
                 ) { onCheckedChange(!checked) },
-        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        content = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = {
             if (supporting != null) {
                 Text(supporting, style = MaterialTheme.typography.bodySmall)
@@ -92,7 +92,7 @@ fun SettingsActionItem(
                     indication = ripple(),
                     onClick = onClick,
                 ),
-        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        content = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = {
             if (supporting != null) {
                 Text(supporting, style = MaterialTheme.typography.bodySmall)

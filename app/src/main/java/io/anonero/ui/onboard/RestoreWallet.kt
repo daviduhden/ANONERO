@@ -162,7 +162,7 @@ fun RestoreWallet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.enter_seed),
                             color = MaterialTheme.colorScheme.primary,
@@ -202,7 +202,7 @@ fun RestoreWallet(
                     },
                 )
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.restore_height),
                             color = MaterialTheme.colorScheme.primary,

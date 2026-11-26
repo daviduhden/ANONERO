@@ -398,7 +398,7 @@ fun RestorePreview(
                                         ),
                                     shape = MaterialTheme.shapes.medium,
                                 ).padding(8.dp),
-                        headlineContent = {
+                        content = {
                             Text(
                                 stringResource(R.string.wallet_title),
                                 textAlign = TextAlign.Center,
@@ -489,7 +489,7 @@ fun RestorePreview(
                                         ),
                                     shape = MaterialTheme.shapes.medium,
                                 ).padding(8.dp),
-                        headlineContent = {
+                        content = {
                             Text(
                                 stringResource(R.string.node).lowercase(),
                                 textAlign = TextAlign.Center,
@@ -676,7 +676,7 @@ fun ListWidget(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    ListItem(headlineContent = {
+    ListItem(content = {
         Text(
             title,
             style =

@@ -151,7 +151,7 @@ fun LwsSettingsScreen(
         ) {
             item {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.use_lws)) },
+                    content = { Text(stringResource(R.string.use_lws)) },
                     supportingContent = {
                         Text(stringResource(R.string.lws_supporting))
                     },
@@ -186,7 +186,7 @@ fun LwsSettingsScreen(
             }
             item {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.lws_tls)) },
+                    content = { Text(stringResource(R.string.lws_tls)) },
                     supportingContent = { Text(stringResource(R.string.lws_tls_supporting)) },
                     trailingContent = {
                         Switch(checked = useTls, onCheckedChange = { useTls = it })

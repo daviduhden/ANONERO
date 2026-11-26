@@ -198,7 +198,7 @@ fun AccountsScreen(
                             )
                         }
                     },
-                    headlineContent = {
+                    content = {
                         Text(
                             account.label,
                             fontWeight = if (account.index == active) FontWeight.Bold else FontWeight.Normal,

@@ -503,7 +503,7 @@ fun ReviewTransactionScreen(
                                 // nothing else -- the advisory getters are never a fallback
                                 item {
                                     ListItem(
-                                        headlineContent = { Text(stringResource(R.string.what_will_be_signed), style = titleStyle) },
+                                        content = { Text(stringResource(R.string.what_will_be_signed), style = titleStyle) },
                                         supportingContent = { Text(rawSummary, style = subTitleStyle) },
                                     )
                                 }
@@ -516,7 +516,7 @@ fun ReviewTransactionScreen(
                                     reviewParams.addresses.forEachIndexed { index, address ->
                                         item {
                                             ListItem(
-                                                headlineContent = {
+                                                content = {
                                                     Text(
                                                         stringResource(
                                                             R.string.address_index_of_count,
@@ -545,7 +545,7 @@ fun ReviewTransactionScreen(
                                     destinations.forEachIndexed { index, destination ->
                                         item {
                                             ListItem(
-                                                headlineContent = {
+                                                content = {
                                                     Text(
                                                         if (destinations.size == 1) {
                                                             stringResource(R.string.address)
@@ -571,7 +571,7 @@ fun ReviewTransactionScreen(
                                 } else {
                                     item {
                                         ListItem(
-                                            headlineContent = { Text(stringResource(R.string.address), style = titleStyle) },
+                                            content = { Text(stringResource(R.string.address), style = titleStyle) },
                                             supportingContent = {
                                                 Text(
                                                     reviewModel!!.address ?: reviewParams.toAddress,
@@ -583,7 +583,7 @@ fun ReviewTransactionScreen(
                                 }
                                 item {
                                     ListItem(
-                                        headlineContent = { Text(stringResource(R.string.amount), style = titleStyle) },
+                                        content = { Text(stringResource(R.string.amount), style = titleStyle) },
                                         supportingContent = {
                                             Text(
                                                 Formats.getExactDisplayAmount(
@@ -596,7 +596,7 @@ fun ReviewTransactionScreen(
                                 }
                                 item {
                                     ListItem(
-                                        headlineContent = { Text(stringResource(R.string.fee), style = titleStyle) },
+                                        content = { Text(stringResource(R.string.fee), style = titleStyle) },
                                         supportingContent = {
                                             Text(
                                                 Formats.getExactDisplayAmount(
@@ -609,7 +609,7 @@ fun ReviewTransactionScreen(
                                 }
                                 item {
                                     ListItem(
-                                        headlineContent = { Text(stringResource(R.string.total), style = titleStyle) },
+                                        content = { Text(stringResource(R.string.total), style = titleStyle) },
                                         supportingContent = {
                                             Text(
                                                 Formats.getExactDisplayAmount(

@@ -419,7 +419,7 @@ fun DetailItem(
                     },
                 ),
         trailingContent = trailing,
-        headlineContent = {
+        content = {
             Text(
                 title,
                 style =

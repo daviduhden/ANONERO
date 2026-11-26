@@ -569,7 +569,7 @@ fun SettingsMenuItem(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(),
                 ),
-        headlineContent = {
+        content = {
             Text(
                 title,
                 style = settingsMenuStyle,

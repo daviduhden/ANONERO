@@ -161,7 +161,7 @@ fun SetupNodeComposable(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text =
                                 stringResource(R.string.node)
@@ -197,7 +197,7 @@ fun SetupNodeComposable(
                 )
 
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.username),
                             color = MaterialTheme.colorScheme.primary,
@@ -226,7 +226,7 @@ fun SetupNodeComposable(
                     },
                 )
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.password),
                             color = MaterialTheme.colorScheme.primary,

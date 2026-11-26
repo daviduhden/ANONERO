@@ -509,7 +509,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             LazyColumn {
                 item {
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = stringResource(id = R.string.primary_address),
                                 color = MaterialTheme.colorScheme.primary,
@@ -540,7 +540,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 }
                 item {
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text =
                                     if (showLegacy) {
@@ -608,7 +608,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 }
                 item {
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = stringResource(id = R.string.view_key),
                                 color = MaterialTheme.colorScheme.primary,
@@ -631,7 +631,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 }
                 item {
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = stringResource(id = R.string.spend_key),
                                 color = MaterialTheme.colorScheme.primary,
@@ -654,7 +654,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 }
                 item {
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = stringResource(id = R.string.restore_height),
                                 color = MaterialTheme.colorScheme.primary,

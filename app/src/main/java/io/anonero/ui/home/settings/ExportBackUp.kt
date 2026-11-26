@@ -477,7 +477,7 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                                                 ),
                                             shape = MaterialTheme.shapes.medium,
                                         ),
-                                headlineContent = {
+                                content = {
                                     Text(
                                         "${backupFile?.name}",
                                         style =

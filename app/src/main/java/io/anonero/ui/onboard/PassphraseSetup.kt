@@ -132,7 +132,7 @@ fun SetupPassphrase(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.passphrase),
                             color = MaterialTheme.colorScheme.primary,
@@ -158,7 +158,7 @@ fun SetupPassphrase(
                     },
                 )
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.confirm_passphrase),
                             color = MaterialTheme.colorScheme.primary,

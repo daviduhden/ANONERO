@@ -226,7 +226,7 @@ fun CoinsScreen(
                             ).clickable {
                                 selectCoin(coin)
                             },
-                    headlineContent = {
+                    content = {
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth(),

@@ -611,7 +611,7 @@ fun SendScreen(
                 ) {
                     WalletProgressIndicator()
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = stringResource(R.string.address),
                                 color = MaterialTheme.colorScheme.primary,
@@ -649,7 +649,7 @@ fun SendScreen(
                     )
 
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = stringResource(R.string.amount),
                                 color = MaterialTheme.colorScheme.primary,

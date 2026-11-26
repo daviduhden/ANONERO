@@ -148,7 +148,7 @@ fun SubAddressesScreen(
                                 ).clickable {
                                     navigateToDetails(address)
                                 },
-                        headlineContent = {
+                        content = {
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxWidth(),

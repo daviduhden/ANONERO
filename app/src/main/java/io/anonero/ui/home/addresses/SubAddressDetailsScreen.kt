@@ -197,7 +197,7 @@ fun SubAddressDetailScreen(
                                     horizontal = 4.dp,
                                     vertical = 6.dp,
                                 ),
-                        headlineContent = {
+                        content = {
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxWidth(),

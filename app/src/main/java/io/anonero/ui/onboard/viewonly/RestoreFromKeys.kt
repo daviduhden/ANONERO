@@ -155,7 +155,7 @@ fun RestoreFromKeys(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.primary_address),
                             color = MaterialTheme.colorScheme.primary,
@@ -182,7 +182,7 @@ fun RestoreFromKeys(
                 )
 
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.private_view_key),
                             color = MaterialTheme.colorScheme.primary,
@@ -205,7 +205,7 @@ fun RestoreFromKeys(
                     },
                 )
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(
                             text = stringResource(R.string.restore_height),
                             color = MaterialTheme.colorScheme.primary,
