@@ -18,6 +18,7 @@
 
 package io.anonero.util
 
+import android.annotation.SuppressLint
 import android.content.SharedPreferences
 
 /*
@@ -62,7 +63,11 @@ const val PREFS_DECOY_LWS_HOST = "decoyLwsHost"
 const val PREFS_DECOY_LWS_PORT = "decoyLwsPort"
 const val PREFS_DECOY_LWS_TLS = "decoyLwsTls"
 
-/** Commits one editor batch and returns Android's disk-write result to the caller. */
+/**
+ * Returns Android's disk-write result to the caller. AndroidX edit(commit = true)
+ * returns Unit, so its lint quick fix cannot preserve this contract.
+ */
+@SuppressLint("UseKtx")
 internal inline fun SharedPreferences.commitEdit(update: SharedPreferences.Editor.() -> Unit): Boolean {
     val editor = edit()
     editor.update()

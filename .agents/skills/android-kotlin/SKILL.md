@@ -130,3 +130,8 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+Keep the UseKtx exception confined to the implementation of commitEdit. The
+AndroidX extension returns Unit for synchronous edits. PIN, transport and wipe
+callers must observe a false disk-write result. Review Android test variant
+compiler logs even when unit tests and main source compilations are clean.

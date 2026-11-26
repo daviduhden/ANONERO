@@ -93,6 +93,7 @@ import io.anonero.util.WALLET_PROXY_PORT
 import io.anonero.util.WalletProfile
 import io.anonero.util.WalletSession
 import io.anonero.util.backup.BackupHelper
+import io.anonero.util.commitEdit
 import io.anonero.util.rememberShakeController
 import io.anonero.util.shake
 import kotlinx.coroutines.CancellationException
@@ -157,30 +158,30 @@ class SecureWipeViewModel(
                     // AnonWalletHandler.wipe removed only this profile's keys. Clearing the whole
                     // preference file here would delete the other profile's PIN gate and strand
                     // its wallet files, so only shared, non-credential state is cleared.
-                    val editor = sharedPreferences.edit()
-                    with(editor) {
-                        remove("pin_attempts")
-                        remove("pin_last_attempt")
-                        // Network identity is shared by both profiles. Clear it on every
-                        // wipe so the decoy cannot inherit the main node endpoint.
-                        // Profile-specific LWS settings were removed with that profile.
-                        remove(NodeFields.RPC_HOST.value)
-                        remove(NodeFields.RPC_PORT.value)
-                        remove(NodeFields.RPC_USERNAME.value)
-                        remove(NodeFields.RPC_PASSWORD.value)
-                        remove(NodeFields.RPC_NETWORK.value)
-                        remove(NodeFields.NODE_NAME.value)
-                        remove(NodeFields.NODE_TLS.value)
-                        remove(io.anonero.network.PREFS_TRANSPORT_MODE)
-                        remove(io.anonero.network.PREFS_TRANSPORT_HOST)
-                        remove(io.anonero.network.PREFS_TRANSPORT_PORT)
-                        remove(io.anonero.network.PREFS_TRANSPORT_NETWORK)
-                        remove(io.anonero.network.PREFS_NODE_AUTO_SELECT)
-                        remove(io.anonero.network.PREFS_NODE_PREFER_TRUSTED)
-                        remove(WALLET_PROXY)
-                        remove(WALLET_PROXY_PORT)
-                    }
-                    check(editor.commit()) { "Could not clear shared preferences" }
+                    val cleared =
+                        sharedPreferences.commitEdit {
+                            remove("pin_attempts")
+                            remove("pin_last_attempt")
+                            // Network identity is shared by both profiles. Clear it on every
+                            // wipe so the decoy cannot inherit the main node endpoint.
+                            // Profile-specific LWS settings were removed with that profile.
+                            remove(NodeFields.RPC_HOST.value)
+                            remove(NodeFields.RPC_PORT.value)
+                            remove(NodeFields.RPC_USERNAME.value)
+                            remove(NodeFields.RPC_PASSWORD.value)
+                            remove(NodeFields.RPC_NETWORK.value)
+                            remove(NodeFields.NODE_NAME.value)
+                            remove(NodeFields.NODE_TLS.value)
+                            remove(io.anonero.network.PREFS_TRANSPORT_MODE)
+                            remove(io.anonero.network.PREFS_TRANSPORT_HOST)
+                            remove(io.anonero.network.PREFS_TRANSPORT_PORT)
+                            remove(io.anonero.network.PREFS_TRANSPORT_NETWORK)
+                            remove(io.anonero.network.PREFS_NODE_AUTO_SELECT)
+                            remove(io.anonero.network.PREFS_NODE_PREFER_TRUSTED)
+                            remove(WALLET_PROXY)
+                            remove(WALLET_PROXY_PORT)
+                        }
+                    check(cleared) { "Could not clear shared preferences" }
                     requireNoReplacement()
                     _wipeProgress.postValue(.7f)
                     _wipeProgressMessage.postValue(R.string.clearing_nodes)
