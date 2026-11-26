@@ -173,3 +173,5 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+During backup compatibility review, verify both the complete four-file flat layout and rejection before materializing an oversized ZIP directory. Decompressed byte limits alone do not bound entry allocation.

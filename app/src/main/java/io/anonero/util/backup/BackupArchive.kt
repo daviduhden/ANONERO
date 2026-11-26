@@ -35,6 +35,8 @@ import java.util.zip.ZipFile
  * ZIP file attributes. On failure it attempts to remove only that staging tree.
  */
 internal object BackupArchive {
+    // Metadata, wallet cache, keys and optional address sidecar exhaust the flat layout.
+    private const val MAX_ENTRIES = 4
     private const val METADATA_NAME = "anon.json"
     private const val MAX_ENTRY_BYTES = 256L * 1024 * 1024
     private const val MAX_TOTAL_BYTES = 512L * 1024 * 1024
@@ -100,6 +102,7 @@ internal object BackupArchive {
             throw IOException("Backup extraction requires a fresh directory")
         }
         ZipFile(archive).use { zip ->
+            if (zip.size() > MAX_ENTRIES) throw IOException("Too many backup archive entries")
             val entries = zip.entries().asSequence().toList()
             val names = HashSet<String>()
             // Validate the whole directory before writing any plaintext, including

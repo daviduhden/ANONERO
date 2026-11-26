@@ -172,3 +172,5 @@ the rationale to `ROADMAP.md`.
 - [ ] Validate the [approved safety changes](docs/development-iteration-approved-safety.md)
       on CI for their own revision. Exercise stale payment review, transport loss,
       listener replacement/close and the release instrumentation gate.
+
+- [ ] Measure peak memory and scratch storage for legacy and current backup readers on API 29 before setting an encrypted-input limit. Include a large valid wallet and an oversized provider stream.

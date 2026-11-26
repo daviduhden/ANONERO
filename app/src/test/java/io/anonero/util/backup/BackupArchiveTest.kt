@@ -100,6 +100,19 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun `oversized directory is rejected before extraction`() {
+        val source = archive("anon.json", "anon.keys", "anon", "anon.address.txt", "extra")
+        val destination = File(tmp.root, "oversized")
+        try {
+            BackupArchive.extract(source, destination, "anon")
+            fail("Oversized directory must be rejected")
+        } catch (failure: IOException) {
+            assertEquals("Too many backup archive entries", failure.message)
+        }
+        assertFalse(destination.exists())
+    }
+
+    @Test
     fun `missing exact metadata or wallet keys is rejected`() {
         listOf(arrayOf("anon.json"), arrayOf("anon.keys"), arrayOf("anon.json", "anon.other.keys"))
             .forEachIndexed { index, names ->

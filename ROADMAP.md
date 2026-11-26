@@ -140,3 +140,5 @@ track the remaining work on signed-file binding, native lifetime, backup
 credentials, dependency verification and device coverage.
 
 Use instrumented ARM builds and a device capable of executing them for dedicated sanitizer coverage. The report checker can recognize captured diagnostics independently of whether the current build enables instrumentation.
+
+Validate backup restore resource budgets across the supported formats and the lowest-memory supported device, including allocations made before ZIP enumeration.

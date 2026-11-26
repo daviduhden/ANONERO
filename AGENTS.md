@@ -530,3 +530,5 @@ module are exempt from the synchronization gate to avoid recursive requirements.
 See [the validation contract](docs/agent-knowledge-validation.md) for rules and limits.
 
 For instrumentation diagnoses, reconcile aggregate and nested XML counts with actual test cases, per-flavor exit codes and captured guest output. Preserve the initial evidence before any eligible retry.
+
+When a parser has a finite allowlist, review allocations before validation as well as the accepted payload. Record which allocations the platform performs before application limits apply.

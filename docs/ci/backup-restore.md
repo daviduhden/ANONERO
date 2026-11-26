@@ -85,3 +85,7 @@ or tag failure as IOException on the reviewed API 29 and 35 implementations.
 The JVM suite already covers tampering and a wrong passphrase. Provider-specific
 device behavior remains unverified. See [Android 10 CipherInputStream](https://android.googlesource.com/platform/libcore/+/refs/tags/android-10.0.0_r1/ojluni/src/main/java/javax/crypto/CipherInputStream.java)
 and [Android 15 CipherInputStream](https://android.googlesource.com/platform/libcore/+/refs/tags/android-15.0.0_r1/ojluni/src/main/java/javax/crypto/CipherInputStream.java).
+
+### BACKUP-DIR-001 — Restore directory cardinality (static finding)
+
+The restore path previously materialized every ZIP entry before validating names. A supplied archive could allocate an application-side list proportional to its directory even though only four distinct names can pass validation. `BackupArchive.extract` now checks the central-directory count before enumeration. This preserves every previously accepted layout and performs the check before creating plaintext staging files. The platform ZIP reader still opens the archive first. The encrypted URI copy and the provider's own directory and decryption allocations remain separate resource limits to investigate. No runtime incident was observed. The maximum-layout and oversized-directory JVM fixtures require manual CI. Reverting the count check would restore the earlier allocation behavior without changing the backup format.
