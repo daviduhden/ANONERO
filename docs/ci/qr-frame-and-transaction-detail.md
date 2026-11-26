@@ -97,3 +97,18 @@ logged. The other date conversions in the application accept epoch milliseconds,
 whose signed 64-bit range fits within the supported calendar. No crash was
 observed in the archived runs. The JVM regression checks both extremes and a
 representable date. Device and CI validation are pending.
+
+### QR-UR-001 — Terminal UR failure and sheet dismissal
+
+The camera delivers terminal UR results, including failures. The spend/import
+sheet read the payload type before its view model checked success. A failed
+decoder result with a null payload could therefore crash the main thread.
+Both Send and Transactions use this sheet. Its progress label now accepts an
+absent type, leaving the existing invalid-QR result path available. Dismissal
+now calls the parent once while idle and respects the loader guard during an
+import. The native import, wallet files and transaction review are unchanged.
+Static inspection identified these paths. Device validation should cover a
+failed multipart decode, dismissal while idle and dismissal during import.
+The outputs import also resets its loader in `finally`, matching the key-image
+and unsigned import paths. An exception during native import must release the
+sheet's busy state.

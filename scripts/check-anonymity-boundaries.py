@@ -180,6 +180,10 @@ if (
 ):
     failures.append("Camera callbacks and teardown must be scoped to the active preview")
 
+ur_scanner = (JAVA / "ui/home/spend/qr/QRScanner.kt").read_text(encoding="utf-8")
+if "it.ur.type" in ur_scanner:
+    failures.append("The scanner must handle a terminal UR decode failure without a payload")
+
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
 app = manifest.find("application")

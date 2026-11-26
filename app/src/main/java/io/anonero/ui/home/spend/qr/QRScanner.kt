@@ -125,7 +125,6 @@ class QRScannerVM : ViewModel() {
                         try {
                             _loaderState.postValue(true)
                             val status = wallet.importOutputs(filePath)
-                            _loaderState.postValue(false)
                             if (status?.lowercase() == "imported") {
                                 Timber.tag(TAG).i("Imported outputs")
                                 // save the imported outputs
@@ -142,6 +141,7 @@ class QRScannerVM : ViewModel() {
                         } catch (error: Exception) {
                             return Result.failure(error)
                         } finally {
+                            _loaderState.postValue(false)
                             _currentImportState.postValue(null)
                         }
                     }
@@ -279,7 +279,6 @@ fun URQRScanner(
                 Box(modifier = Modifier.height(0.dp))
             },
             onDismissRequest = {
-                onDismiss.invoke()
                 if (loaderState == false) {
                     onDismiss.invoke()
                     qrScannerVM.reset()
@@ -297,7 +296,7 @@ fun URQRScanner(
                         qrScannerVM.reset()
                     },
                     onUrRusult = {
-                        detectedUR = it.ur.type
+                        detectedUR = it.ur?.type
                         qrScannerVM.viewModelScope.launch(Dispatchers.IO) {
                             val result = qrScannerVM.processUrCode(it)
                             withContext(Dispatchers.Main) {
