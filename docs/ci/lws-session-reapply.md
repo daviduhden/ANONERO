@@ -47,3 +47,20 @@ The JVM regressions cover rejection before login, loss of the postcondition
 and an exception during login. Verify both ARM links, trust readback and offline
 behavior against a rejecting LWS on device. If rollback is required, keep LWS
 offline when the untrusted policy cannot be confirmed.
+
+## TOR-LISTENER-001 — Listener publication after an embedded Tor stop
+
+Static inspection identified a race between the listener callback reading
+`wanted` and writing the endpoint. A concurrent stop could clear the endpoint,
+then the callback could publish the old port while the daemon was unwanted.
+The protected asset is the route used by wallet RPC and LWS. A stale local port
+can be unavailable or reassigned. Publishing it does not establish that any
+wallet request actually used it.
+
+Serialize listener acceptance, revocation and revision changes. Cover both
+callback orders and same-port reuse in JVM regressions for both flavors.
+The change adds no network destination, logged value or persisted field.
+A listener snapshot cannot authenticate a local process or prove upstream
+event ordering across multiple daemon sessions. Device checks should exercise
+rapid start, stop and restart with a real daemon. Rollback must retain endpoint
+revocation under the same lock before allowing wallet traffic.

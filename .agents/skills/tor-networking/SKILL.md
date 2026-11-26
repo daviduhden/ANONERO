@@ -161,3 +161,8 @@ Require the current wallet's applied transport authorization immediately before
 networked transaction construction or broadcast. Settings validity alone does
 not establish that wallet2 uses the selected provider. Treat that check as an
 entry guard and validate in-flight shutdown and DNS routing on a device.
+
+Serialize embedded Tor listener acceptance and publication with intentional stop
+and dispose. A volatile desired-state read before locking the endpoint can let a
+late listener callback republish a revoked port. Verify both callback orders
+and same-port reuse before accepting a listener-lifecycle change.
