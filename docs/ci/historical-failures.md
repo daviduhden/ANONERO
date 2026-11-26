@@ -1129,3 +1129,12 @@ during a live external rate limit remains unverified. The JNI job passed
 assembly log. The native archives still report W-006/W-010 dependency
 warnings, including `-Wnonnull`, deprecated declarations and 32-bit shift
 diagnostics. SDK metadata and Node Buffer warnings W-011/W-012 still occur.
+
+### REPORT-002 — Instrumentation evidence from separate output trees
+
+Static review found that the final verdict pooled XML and device exit codes from every
+output directory for each flavor. An incomplete report tree could therefore borrow a
+successful exit from another tree. The checker now requires both pieces of evidence in
+each flavor output. A split-directory fixture covers this case in the existing manual
+Python regression job. Both archived flavor reports in run 45848781860 satisfy the revised
+checker. No historical incorrect verdict has been demonstrated.

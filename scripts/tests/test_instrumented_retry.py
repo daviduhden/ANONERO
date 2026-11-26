@@ -80,6 +80,21 @@ class InstrumentedRetryTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify(root)
 
+    def test_device_exit_and_xml_must_belong_to_the_same_flavor_output(self):
+        verify = runpy.run_path(str(ROOT / "scripts/check-test-reports.py"))["verify_results"]
+        root = Path(self.temp.name)
+        for flavor in ("anon", "nero"):
+            directory = root / "first" / "flavors" / flavor
+            directory.mkdir(parents=True)
+            (directory / "TEST-result.xml").write_text(
+                '<testsuite tests="1"><testcase/></testsuite>'
+            )
+            other = root / "second" / "flavors" / flavor
+            other.mkdir(parents=True)
+            (other / "test-result-exit-code.txt").write_text("0")
+        with self.assertRaises(ValueError):
+            verify(root)
+
     def test_success_summary_cannot_mask_guest_sanitizer(self):
         check_logs = runpy.run_path(str(ROOT / "scripts/check-test-reports.py"))["check_guest_logs"]
         root = Path(self.temp.name)

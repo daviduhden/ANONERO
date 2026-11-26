@@ -113,12 +113,16 @@ def verify_results(root: Path) -> None:
     reports = set(root.rglob("TEST-*.xml"))
     for flavor in ("anon", "nero"):
         check_guest_logs(root, flavor)
-        selected = sorted(root.glob(f"**/flavors/{flavor}/**/TEST-*.xml"))
-        codes = sorted(root.glob(f"**/flavors/{flavor}/**/test-result-exit-code.txt"))
-        if not selected or not codes or any(code.read_text().strip() != "0" for code in codes):
-            raise ValueError(f"Missing reports or unsuccessful device exit for {flavor}")
-        require_passing_suites(selected, flavor)
-        reports.difference_update(selected)
+        directories = sorted(root.glob(f"**/flavors/{flavor}"))
+        if not directories:
+            raise ValueError(f"Missing instrumented results for {flavor}")
+        for directory in directories:
+            selected = sorted(directory.rglob("TEST-*.xml"))
+            codes = sorted(directory.rglob("test-result-exit-code.txt"))
+            if not codes or any(code.read_text().strip() != "0" for code in codes):
+                raise ValueError(f"Missing or unsuccessful device exit for {flavor}")
+            require_passing_suites(selected, flavor)
+            reports.difference_update(selected)
     if reports:
         raise ValueError("Unexpected instrumentation report outside the two flavor directories")
 

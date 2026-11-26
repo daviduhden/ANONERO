@@ -221,3 +221,5 @@ results against the exact revision when updating the Compose BOM or test rule.
 On a module-cache miss, compare the lint restore timestamp with the JVM job's
 post-job save and distinguish wrapper hits from dependency hits. Keep the lint
 verdict independent of JVM test success when ordering those jobs.
+
+When an artifact includes multiple Gradle result trees, check XML and device exit status within each flavor output before aggregating totals.
