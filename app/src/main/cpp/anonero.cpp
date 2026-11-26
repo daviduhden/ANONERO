@@ -25,6 +25,8 @@
 #include <atomic>
 #include <memory>
 #include <new>
+#include <limits>
+#include <stdexcept>
 #include "anonero.h"
 #include "wallet2_api.h"
 
@@ -77,6 +79,22 @@ extern "C" {
  * - The seed and private-key accessors return sensitive values to Kotlin. Keep those
  *   values, passwords, and proxy credentials out of native diagnostics.
  */
+static constexpr uint64_t maxAndroidAmount =
+    static_cast<uint64_t>(std::numeric_limits<jlong>::max());
+
+static constexpr bool fitsAndroidAmount(uint64_t amount) {
+    return amount <= maxAndroidAmount;
+}
+
+static_assert(fitsAndroidAmount(maxAndroidAmount) && !fitsAndroidAmount(maxAndroidAmount + 1),
+              "Wallet amounts must fit Kotlin Long");
+
+static jlong checkedAtomicAmount(uint64_t amount) {
+    if (!fitsAndroidAmount(amount))
+        throw std::overflow_error("Wallet amount exceeds Android range");
+    return static_cast<jlong>(amount);
+}
+
 static JavaVM *cachedJVM;
 static jclass class_ArrayList;
 static jclass class_WalletListener;
@@ -312,6 +330,8 @@ struct MyWalletListener : Monero::WalletListener {
         }
         ScopedLocalRef listenerRef(jenv, listener);
 
+        if (!fitsAndroidAmount(amount))
+            return; // This notification cannot represent the amount.
         jlong amountLong = static_cast<jlong>(amount);
         jstring jstring1 = jenv->NewStringUTF(txId.c_str());
         ScopedLocalRef txIdRef(jenv, jstring1);
@@ -432,11 +452,14 @@ std::vector<std::uint64_t> java2cpp_long(JNIEnv *env, jlongArray longArray) {
     if (env->ExceptionCheck())
         return result;
     result.reserve(len);
+    jlong total = 0;
     for (jsize i = 0; i < len; i++) {
         jlong amount = 0;
         env->GetLongArrayRegion(longArray, i, 1, &amount);
-        if (env->ExceptionCheck() || amount <= 0)
+        if (env->ExceptionCheck() || amount <= 0 ||
+            amount > std::numeric_limits<jlong>::max() - total)
             return {};
+        total += amount;
         result.emplace_back(static_cast<std::uint64_t>(amount));
     }
     return result;
@@ -1328,31 +1351,62 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_setProxyJ(JNIEnv *env, j
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getBalance(JNIEnv *env, jobject instance,
                                                                 jint accountIndex) {
-    if (accountIndex < 0)
-        return 0;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    return wallet == nullptr ? 0 : static_cast<jlong>(wallet->balance((uint32_t)accountIndex));
+    if (wallet == nullptr || accountIndex < 0) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
+    try {
+        return checkedAtomicAmount(wallet->balance(static_cast<uint32_t>(accountIndex)));
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getBalanceAll(JNIEnv *env, jobject instance) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    return wallet == nullptr ? 0 : static_cast<jlong>(wallet->balanceAll());
+    if (wallet == nullptr) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
+    try {
+        return checkedAtomicAmount(wallet->balanceAll());
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getUnlockedBalance(JNIEnv *env,
                                                                         jobject instance,
                                                                         jint accountIndex) {
-    if (accountIndex < 0)
-        return 0;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    return wallet == nullptr ? 0
-                             : static_cast<jlong>(wallet->unlockedBalance((uint32_t)accountIndex));
+    if (wallet == nullptr || accountIndex < 0) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
+    try {
+        return checkedAtomicAmount(wallet->unlockedBalance(static_cast<uint32_t>(accountIndex)));
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_getUnlockedBalanceAll(JNIEnv *env,
                                                                            jobject instance) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    return wallet == nullptr ? 0 : static_cast<jlong>(wallet->unlockedBalanceAll());
+    if (wallet == nullptr) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
+    try {
+        return checkedAtomicAmount(wallet->unlockedBalanceAll());
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_isWatchOnly(JNIEnv *env, jobject instance) {
@@ -1434,7 +1488,17 @@ JNIEXPORT jbyteArray JNICALL Java_io_anonero_util_KeyStoreHelper_slowHash(JNIEnv
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_getDisplayAmount(JNIEnv *env, jclass,
                                                                         jlong amount) {
-    return env->NewStringUTF(Monero::Wallet::displayAmount(amount).c_str());
+    if (amount < 0) {
+        throwWalletOperationFailure(env, "Negative wallet amount");
+        return nullptr;
+    }
+    try {
+        return env->NewStringUTF(
+            Monero::Wallet::displayAmount(static_cast<uint64_t>(amount)).c_str());
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet amount formatting failed");
+        return nullptr;
+    }
 }
 
 JNIEXPORT jstring JNICALL Java_io_anonero_model_Wallet_generatePaymentId(JNIEnv *env, jclass) {
@@ -1649,7 +1713,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_estimateTransactionFeeJ(
         }
         Monero::PendingTransaction::Priority _priority =
             static_cast<Monero::PendingTransaction::Priority>(priority);
-        return static_cast<jlong>(wallet->estimateTransactionFee(dest_vector, _priority));
+        return checkedAtomicAmount(wallet->estimateTransactionFee(dest_vector, _priority));
     } catch (...) {
         LOGE("estimateTransactionFeeJ failed");
         return 0;
@@ -1825,20 +1889,32 @@ JNIEXPORT jboolean JNICALL Java_io_anonero_model_Wallet_hasUnknownKeyImages(JNIE
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_viewOnlyBalance(JNIEnv *env,
                                                                      jobject instance) {
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (wallet == nullptr) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
         return 0;
-    return static_cast<jlong>(wallet->viewOnlyBalance(0)); // legacy default account
+    }
+    try {
+        return checkedAtomicAmount(wallet->viewOnlyBalance(0));
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
 }
 
 JNIEXPORT jlong JNICALL Java_io_anonero_model_Wallet_viewOnlyBalanceFor(JNIEnv *env,
                                                                         jobject instance,
                                                                         jint accountIndex) {
-    if (accountIndex < 0)
-        return 0;
     Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
-    if (wallet == nullptr)
+    if (wallet == nullptr || accountIndex < 0) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
         return 0;
-    return static_cast<jlong>(wallet->viewOnlyBalance(static_cast<uint32_t>(accountIndex)));
+    }
+    try {
+        return checkedAtomicAmount(wallet->viewOnlyBalance(static_cast<uint32_t>(accountIndex)));
+    } catch (...) {
+        throwWalletOperationFailure(env, "Wallet balance unavailable");
+        return 0;
+    }
 }
 
 //virtual bool importOutputs(const std::string &filename) = 0;
@@ -1973,7 +2049,7 @@ jobject newCoinsInfo(JNIEnv *env, Monero::CoinsInfo *info) {
         return nullptr;
     jobject result = env->NewObject(
         class_CoinsInfo, c, static_cast<jlong>(info->globalOutputIndex()), info->spent(),
-        _key_image, static_cast<jlong>(info->amount()), _hash, _pub_key, info->frozen(),
+        _key_image, checkedAtomicAmount(info->amount()), _hash, _pub_key, info->frozen(),
         static_cast<jlong>(info->internalOutputIndex()), info->unlocked(),
         static_cast<jint>(info->subaddrAccount()), static_cast<jint>(info->subaddrIndex()),
         static_cast<jlong>(info->blockHeight()), _address, _address_label, info->keyImageKnown());
@@ -2306,7 +2382,7 @@ jobject newTransferInstance(JNIEnv *env, uint64_t amount, const std::string &add
     ScopedLocalRef _addressRef(env, _address);
     if (_address == nullptr || env->ExceptionCheck())
         return nullptr;
-    jobject transfer = env->NewObject(class_Transfer, c, static_cast<jlong>(amount), _address);
+    jobject transfer = env->NewObject(class_Transfer, c, checkedAtomicAmount(amount), _address);
     if (env->ExceptionCheck())
         return nullptr;
     return transfer;
@@ -2382,7 +2458,7 @@ jobject newTransactionInfo(JNIEnv *env, Monero::TransactionInfo *info) {
     }
     jobject result = env->NewObject(
         class_TransactionInfo, c, info->direction(), info->isPending(), info->isFailed(),
-        static_cast<jlong>(info->amount()), static_cast<jlong>(info->fee()),
+        checkedAtomicAmount(info->amount()), checkedAtomicAmount(info->fee()),
         static_cast<jlong>(info->blockHeight()), _hash, static_cast<jlong>(info->timestamp()),
         _paymentId, static_cast<jint>(info->subaddrAccount()), static_cast<jint>(subaddrIndex),
         static_cast<jlong>(info->confirmations()), _label, transfers);
@@ -2493,7 +2569,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getAmount(JNIEn
                                                                            jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
     try {
-        return tx == nullptr ? 0 : static_cast<jlong>(tx->amount());
+        return tx == nullptr ? 0 : checkedAtomicAmount(tx->amount());
     } catch (...) {
         throwTransactionReviewFailure(env);
         return 0;
@@ -2504,7 +2580,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getDust(JNIEnv 
                                                                          jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
     try {
-        return tx == nullptr ? 0 : static_cast<jlong>(tx->dust());
+        return tx == nullptr ? 0 : checkedAtomicAmount(tx->dust());
     } catch (...) {
         throwTransactionReviewFailure(env);
         return 0;
@@ -2515,7 +2591,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_PendingTransaction_getFee(JNIEnv *
                                                                         jobject instance) {
     Monero::PendingTransaction *tx = getHandle<Monero::PendingTransaction>(env, instance);
     try {
-        return tx == nullptr ? 0 : static_cast<jlong>(tx->fee());
+        return tx == nullptr ? 0 : checkedAtomicAmount(tx->fee());
     } catch (...) {
         throwTransactionReviewFailure(env);
         return 0;
@@ -2577,7 +2653,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getAmount(JNIE
         std::vector<uint64_t> arr = tx->amount();
         if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
             return 0;
-        return static_cast<jlong>(arr[0]);
+        return checkedAtomicAmount(arr[0]);
     } catch (...) {
         throwTransactionReviewFailure(env);
         return 0;
@@ -2593,7 +2669,7 @@ JNIEXPORT jlong JNICALL Java_io_anonero_model_UnsignedTransaction_getFee(JNIEnv 
         std::vector<uint64_t> arr = tx->fee();
         if (arr.empty()) // size_t: "0 > size() - 1" underflowed on empty input and never fired
             return 0;
-        return static_cast<jlong>(arr[0]);
+        return checkedAtomicAmount(arr[0]);
     } catch (...) {
         throwTransactionReviewFailure(env);
         return 0;

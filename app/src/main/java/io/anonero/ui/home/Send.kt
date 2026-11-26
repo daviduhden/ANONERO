@@ -272,19 +272,31 @@ class SendViewModel : ViewModel() {
     // null means an explicit selection is unresolved or invalid. An empty set
     // allows the wallet to select outputs from the account's unlocked balance.
     val balance =
-        MediatorLiveData<Long>().apply {
+        MediatorLiveData<Long?>().apply {
             addSource(_balance) { updateComputedBalance() }
             addSource(_coinsSelected) { updateComputedBalance() }
         }
 
-    private fun MediatorLiveData<Long>.updateComputedBalance() {
+    private fun MediatorLiveData<Long?>.updateComputedBalance() {
         val selectedCoins = _coinsSelected.value
-        val unlockedBal = _balance.value ?: 0L
+        val unlockedBal = _balance.value
         value =
             when {
-                selectedCoins == null -> 0L
-                selectedCoins.isEmpty() -> unlockedBal
-                else -> selectedCoins.sumOf { it.amount }
+                selectedCoins == null -> {
+                    null
+                }
+
+                selectedCoins.isEmpty() -> {
+                    unlockedBal
+                }
+
+                else -> {
+                    try {
+                        selectedCoins.fold(0L) { total, coin -> Math.addExact(total, coin.amount) }
+                    } catch (_: ArithmeticException) {
+                        null
+                    }
+                }
             }
     }
 
@@ -423,9 +435,10 @@ fun SendScreen(
     // A result can still belong to the previous edit while validation is running.
     val addressValid = checkedAddress?.takeIf { it.first == addressField }?.second
     val amountAtomic = MoneroAmount.parseExact(amountField)
+    val availableBalance = unlockedBalance
     val validSpend =
-        addressValid == true && coinSelection != null && !showIndefiniteLoading &&
-            (sweep || (amountAtomic != null && amountAtomic < (unlockedBalance ?: 0L)))
+        addressValid == true && coinSelection != null && availableBalance != null && !showIndefiniteLoading &&
+            (sweep || (amountAtomic != null && amountAtomic < availableBalance))
     val resources = LocalResources.current
 
     fun prepare(checkKeyImages: Boolean = false) {

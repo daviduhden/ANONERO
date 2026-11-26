@@ -34,7 +34,9 @@ object MoneroAmount {
     /** Returns positive atomic units, or null for invalid precision, syntax or range. */
     fun parseExact(text: String): Long? {
         val value = text.trim()
-        if (!PATTERN.matches(value)) return null
+        // Long.MAX_VALUE is 9223372.036854775807 XMR. Bound work on QR and URI input
+        // before constructing a BigInteger for a value outside the supported domain.
+        if (value.length > 20 || !PATTERN.matches(value)) return null
         val parts = value.split('.', limit = 2)
         val whole = parts[0]
         val fraction = parts.getOrNull(1).orEmpty().padEnd(DECIMALS, '0')

@@ -69,6 +69,7 @@ class MoneroAmountTest {
             1_000_000_000_000L,
             12_345_678_901_234L,
             Long.MAX_VALUE / 2,
+            Long.MAX_VALUE,
         )) {
             assertEquals(value, MoneroAmount.parseExact(MoneroAmount.format(value)))
         }
@@ -78,5 +79,6 @@ class MoneroAmountTest {
     fun `values that overflow the wallet atomic range are rejected`() {
         // 2^63 atomic units would sign-wrap the jlong JNI boundary.
         assertNull(MoneroAmount.parseExact("9223372.036854775808"))
+        assertNull(MoneroAmount.parseExact("9".repeat(4096)))
     }
 }

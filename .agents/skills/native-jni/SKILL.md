@@ -150,3 +150,10 @@ record reusable constraints, root causes and remaining verification limits. Chec
 closest AGENTS.md and the skills index for stale guidance. Run the read-only
 `python3 scripts/validate-agent-knowledge.py --scope worktree` before review; inspect
 AK004 warnings for relevance and run regression tests only in authorized CI.
+
+Range-check every wallet2 atomic amount, balance, fee and dust value against the
+signed Kotlin Long domain before publishing a model or transaction review. Cover
+the historical callback and both account and all-account paths. Check sums at
+both the payment-array boundary and Kotlin consumers. Reject negative metadata
+before converting it to wallet2's unsigned formatter. The native compile-time
+boundary assertion and formatter device tests do not exercise a live large wallet.

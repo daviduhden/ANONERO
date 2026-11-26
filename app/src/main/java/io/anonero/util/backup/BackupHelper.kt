@@ -464,6 +464,7 @@ object BackupHelper {
                 }
                 val json = File(extractDestination, "anon.json").readText()
                 val backup = Json.decodeFromString<BackupPayload>(json)
+                require(backup.backup.wallet.balanceAll >= 0L) { "Invalid backup wallet balance" }
                 if (backup.backup.meta.network != AnonConfig.getNetworkType().toStringForBackUp()) {
                     throw NetworkMismatchException()
                 }

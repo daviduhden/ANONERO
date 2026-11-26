@@ -142,16 +142,20 @@ class WalletState {
         if (_blockUpdates.get()) return
         getWallet?.let { wallet ->
             if (wallet.isInitialized) {
-                _balanceInfo.update {
-                    if (AnonConfig.viewOnly) viewOnlyTotal(wallet) else wallet.balance
-                }
-                _unLockedBalance.update {
-                    if (AnonConfig.viewOnly) {
-                        wallet.viewOnlyBalanceFor(wallet.getAccountIndex())
-                    } else {
-                        wallet.unlockedBalance
+                _balanceInfo.value =
+                    try {
+                        if (AnonConfig.viewOnly) viewOnlyTotal(wallet) else wallet.balance
+                    } catch (_: ArithmeticException) {
+                        null
+                    } catch (_: IllegalStateException) {
+                        null
                     }
-                }
+                _unLockedBalance.value =
+                    try {
+                        if (AnonConfig.viewOnly) wallet.viewOnlyBalanceFor(wallet.getAccountIndex()) else wallet.unlockedBalance
+                    } catch (_: IllegalStateException) {
+                        null
+                    }
                 val status = wallet.status
                 status.connectionStatus = _connectionStatus.value
                 _walletStatus.value = status
@@ -198,11 +202,9 @@ class WalletState {
     }
 
     private fun viewOnlyTotal(wallet: Wallet): Long =
-        runCatching {
-            (0 until wallet.getNumAccounts()).sumOf { index ->
-                wallet.viewOnlyBalanceFor(index)
-            }
-        }.getOrDefault(0L)
+        (0 until wallet.getNumAccounts()).fold(0L) { total, index ->
+            Math.addExact(total, wallet.viewOnlyBalanceFor(index))
+        }
 
     private fun readAccounts(wallet: Wallet): List<AccountInfo> {
         val count = runCatching { wallet.getNumAccounts() }.getOrDefault(0)

@@ -255,6 +255,37 @@ for owner, operations in (
                 f"{owner}.{operation}: review read must fail through the Java error path"
             )
 
+# Signed jlong amounts must not wrap on the way out of wallet2. Count model
+# constructor fields separately because a transaction snapshot includes its fee.
+for signature, expected in (
+    ("jobject newCoinsInfo(", 1),
+    ("jobject newTransferInstance(", 1),
+    ("jobject newTransactionInfo(", 2),
+    *(
+        (f"Java_io_anonero_model_Wallet_{name}(", 1)
+        for name in (
+            "getBalance",
+            "getBalanceAll",
+            "getUnlockedBalance",
+            "getUnlockedBalanceAll",
+            "viewOnlyBalance",
+            "viewOnlyBalanceFor",
+            "estimateTransactionFeeJ",
+        )
+    ),
+    *(
+        (f"Java_io_anonero_model_PendingTransaction_{name}(", 1)
+        for name in ("getAmount", "getFee", "getDust")
+    ),
+    *(
+        (f"Java_io_anonero_model_UnsignedTransaction_{name}(", 1)
+        for name in ("getAmount", "getFee")
+    ),
+):
+    start = code.index(signature)
+    if code[start : code.index("\n}\n", start)].count("checkedAtomicAmount(") != expected:
+        failures.append(f"{signature}: check all monetary conversions to Kotlin Long")
+
 # wallet2 does not serialize listener pointer swaps against callback delivery.
 listener_start = code.index("Java_io_anonero_model_Wallet_setListenerJ(")
 listener_end = code.index("\n}\n", listener_start)

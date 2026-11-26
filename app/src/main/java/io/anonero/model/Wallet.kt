@@ -142,40 +142,24 @@ class Wallet {
         Subaddress(
             accountIndex,
             subAddressIndex,
-            getAddressJ(accountIndex, subAddressIndex),
+            getAddressJ(accountIndex, subAddressIndex).also { check(it.isNotBlank()) { "Subaddress unavailable" } },
             getSubaddressLabel(accountIndex, subAddressIndex),
         )
 
-    fun getSubaddressObject(subAddressIndex: Int): Subaddress {
-        val subaddress = buildSubaddressObject(accountIndex, subAddressIndex)
-        var amount: Long = 0
-        history?.let { history ->
-            for (info in history.all) {
-                if (info.accountIndex == accountIndex &&
-                    info.addressIndex == subAddressIndex &&
-                    info.direction == TransactionInfo.Direction.Direction_In
-                ) {
-                    amount += info.amount
-                }
-            }
-        }
-
-        subaddress.amount = amount
-        return subaddress
-    }
+    fun getSubaddressObject(subAddressIndex: Int): Subaddress = getSubaddressObject(accountIndex, subAddressIndex)
 
     fun getSubaddressObject(
         accountIndex: Int,
         subAddressIndex: Int,
     ): Subaddress {
         val subaddress = buildSubaddressObject(accountIndex, subAddressIndex)
-        subaddress.amount = history
-            ?.all
-            ?.filter {
-                it.accountIndex == accountIndex &&
-                    it.addressIndex == subAddressIndex &&
-                    it.direction == TransactionInfo.Direction.Direction_In
-            }?.sumOf { it.amount } ?: 0L
+        for (info in history?.all.orEmpty()) {
+            if (info.accountIndex == accountIndex && info.addressIndex == subAddressIndex &&
+                info.direction == TransactionInfo.Direction.Direction_In
+            ) {
+                subaddress.amount = Math.addExact(subaddress.amount, info.amount)
+            }
+        }
         return subaddress
     }
 
