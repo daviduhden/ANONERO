@@ -58,6 +58,11 @@ class ReleaseSuiteSynchronizationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cache/ref format"):
             SYNC.synchronize(source, self.release)
 
+    def test_lint_waits_for_unit_cache_and_keeps_independent_verdict(self):
+        lint = self.source.split("\n  lint:\n", 1)[1].split("    runs-on:", 1)[0]
+        self.assertIn("    needs: [authorize, unit]\n", lint)
+        self.assertIn("    if: ${{ !cancelled() && needs.authorize.result == 'success' }}\n", lint)
+
     def test_release_excludes_gradle_dependency_caches(self):
         block = SYNC.generated_block(self.source)
         self.assertNotIn("cache: gradle", block)

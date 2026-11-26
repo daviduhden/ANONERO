@@ -58,3 +58,33 @@ completed the four Gradle jobs and packaged both adapters. The successful JVM
 job saved a cache that assembly and instrumentation subsequently restored.
 Reuse after eviction, changed dependency pins or a new rate limit still depends
 on a successful fetch.
+
+## CI-039 recurrence on 9734264
+
+The [Android Lint job](https://github.com/daviduhden/ANONERO/actions/runs/45848781860/job/140009561945)
+tested `9734264fd465817357847f9aafa73f3390948c33`. It restored the wrapper,
+missed the module cache and received HTTP 429 on the Kotlin Gradle plugin
+2.4.21 POM during root classpath resolution on both attempts. At 15:27 UTC
+it exited before either flavor produced a lint XML report. The independent
+[JVM job](https://github.com/daviduhden/ANONERO/actions/runs/45848781860/job/140009561952)
+also missed the module cache, resolved the plugin and saved the module cache
+at 15:32 UTC. The cause of the original cache miss is unknown.
+
+Tests now schedules lint after the JVM job completes its cache save. This
+lets lint reuse common classpath artifacts when a successful writer populates
+a cold cache. Lint still runs after a JVM failure on an authorized,
+uncancelled run. Release shares this ordering and keeps caching disabled.
+The shared CI regression checks the ordering and independent verdict.
+Validation requires an authorized cold-cache run with a successful save,
+a corresponding restore, and lint XML from both flavors. Lint-only artifacts,
+eviction and read-only dispatches can still require upstream access.
+
+The last available pair of [lint reports on b09f9dc](https://github.com/daviduhden/ANONERO/actions/runs/45706621403/job/139533120768)
+contains identical diagnostics: three Lifecycle modules requested 2.11.1, the
+Compose BOM requested 2026.11.01 and four CameraX modules requested 1.7.0.
+Commit `640ea2e` selected those exact versions. Both XMLs also flagged
+editor acquisition in `Prefs.kt` and `SecureWipe.kt`. Commit `11c8b68`
+routes wipe writes through `SharedPreferences.commitEdit` and documents the
+scoped UseKtx exception there. The helper returns the synchronous disk-write
+verdict needed by its callers. These changes address all ten historical sites
+in source. The missing reports on `9734264` leave current lint results unknown.

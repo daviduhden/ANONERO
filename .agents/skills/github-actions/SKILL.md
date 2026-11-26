@@ -217,3 +217,7 @@ Inspect the Gradle step that assembles androidTest APKs for Kotlin warnings too:
 a deprecated test API only used by that source set can be absent from the lint,
 main assembly, and JVM logs. Confirm each flavor's lint XML and instrumentation
 results against the exact revision when updating the Compose BOM or test rule.
+
+On a module-cache miss, compare the lint restore timestamp with the JVM job's
+post-job save and distinguish wrapper hits from dependency hits. Keep the lint
+verdict independent of JVM test success when ordering those jobs.

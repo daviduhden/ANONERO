@@ -209,3 +209,6 @@ ABIs. Test its ELF class and machine as well as the entry name. A successful
 ARM archive build alone cannot establish what was copied into the APK.
 
 Run the common instrumentation report check at both verdict points. Archive the original XML and per-case logcat before a permitted attach retry. Report acceptance alone does not establish sanitizer coverage.
+
+Keep lint eligible after an authorized JVM job fails. Waiting for a successful
+job's cache save on cold runners must preserve independent diagnostics.

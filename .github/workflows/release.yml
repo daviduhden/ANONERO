@@ -151,7 +151,8 @@ jobs:
 
   lint:
     name: Android Lint
-    needs: authorize
+    needs: [authorize, unit]
+    if: ${{ !cancelled() && needs.authorize.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
