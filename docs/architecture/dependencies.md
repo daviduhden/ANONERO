@@ -1,7 +1,6 @@
 # Dependency inventory and update record
 
-Audit date: 2026-11-09. Refresh: 2026-11-13 (lint-driven serialization and Bouncy Castle
-updates). Base commit: `ed8b097`.
+Audit date: 2026-11-09. Refresh: 2026-11-26 (AndroidX lint advisories). Base commit: `ed8b097`.
 
 This record covers direct and relevant transitive dependencies, toolchains, native
 pins, GitHub Actions, and container inputs. Versions were checked against official
@@ -29,14 +28,14 @@ enumerated; `kotlinx.coroutines` was promoted to a direct declaration.
 | Android Gradle Plugin | 9.3.3 | **9.5.1** | 9.5.1 | Updated |
 | Gradle wrapper | 9.7.0 | **9.9.0** | 9.9.0 | Updated, SHA-256 pinned |
 | Kotlin / KGP / Compose compiler / serialization plugin | 2.4.21 | 2.4.21 | 2.4.21 (2.5.0-Beta2 excluded) | Already latest stable |
-| Compose BOM | 2026.09.00 | 2026.09.00 | 2026.09.00 | Already latest stable |
+| Compose BOM | 2026.09.00 | **2026.11.01** | 2026.11.01 | November lint advisory |
 | `androidx.core:core-ktx` | 1.19.1 | 1.19.1 | 1.19.1 | Already latest stable |
-| `androidx.lifecycle` | 2.11.0 | 2.11.0 | 2.11.0 (2.12.0-alpha05 excluded) | Already latest stable |
+| `androidx.lifecycle` | 2.11.0 | **2.11.1** | 2.11.1 | November lint advisory |
 | `androidx.activity:activity-compose` | 1.13.0 | 1.13.0 | 1.13.0 (1.14.0-alpha03 excluded) | Already latest stable |
 | `androidx.navigation:navigation-compose` | 2.10.2 | 2.10.2 | 2.10.2 | Already latest stable |
 | `androidx.datastore:datastore-preferences` | 1.3.0 | 1.3.0 | 1.3.0 | Already latest stable |
 | `androidx.core:core-splashscreen` | 1.2.0 | 1.2.0 | 1.2.0 | Already latest stable |
-| CameraX | 1.6.2 | 1.6.2 | 1.6.2 (1.7.0-rc02 excluded) | Already latest stable |
+| CameraX | 1.6.2 | **1.7.0** | 1.7.0 | November lint advisory |
 | `androidx.test.ext:junit` | 1.3.0 | 1.3.0 | 1.3.0 (1.4.0-alpha03 excluded) | Already latest stable |
 | Espresso | 3.7.0 | 3.7.0 | 3.7.0 (3.8.0-alpha03 excluded) | Already latest stable |
 | JUnit 4 | 4.13.2 | 4.13.2 | 4.13.2 | Already latest stable |
@@ -221,3 +220,19 @@ The build applies a narrow Configure patch on Android to select the exact
 API 29 NDK wrapper without passing a second definition of `__ANDROID_API__`.
 The generated configuration is checked before building. OpenSSL and NDK pins
 are unchanged. See [W-008](../ci/openssl-android-api.md).
+
+### November 26 AndroidX advisory review
+
+The lint reports for both flavors at `b09f9dc` identified eight newer artifacts
+sharing three version pins. The catalog now selects Lifecycle 2.11.1, Compose
+BOM 2026.11.01 and CameraX 1.7.0. Google Maven AAR manifests for the three
+Lifecycle components require API 23. All four CameraX components now require
+API 24 and add no uses-permission entries. The BOM maps Compose UI and its
+JUnit4 test library to 1.13.0. Compose UI's AAR requires API 24 at runtime,
+compile SDK 37.1 and AGP 9.1.0, within the app's API 29 floor and configured
+toolchain. These checks cover direct artifacts. Resolution of the transitive
+graph, merged manifests, both APK links and the manual API 35 suite still
+require CI on this revision. The scanner and QR tests also need physical
+camera and API 29 coverage. See the [Compose BOM](https://dl.google.com/android/maven2/androidx/compose/compose-bom/2026.11.01/compose-bom-2026.11.01.pom),
+[Lifecycle POM](https://dl.google.com/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.11.1/lifecycle-runtime-compose-2.11.1.pom)
+and [CameraX POM](https://dl.google.com/android/maven2/androidx/camera/camera-core/1.7.0/camera-core-1.7.0.pom).

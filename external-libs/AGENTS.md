@@ -138,3 +138,8 @@ The container builds it from the checksum-pinned OpenSSL release and checks the
 generated NDK compiler and macro flags before compiling. Keep API 29 for both
 Android targets and validate application of the patch against the pinned source
 after any OpenSSL update. See [W-008](../docs/ci/openssl-android-api.md).
+
+AndroidX library updates are resolved in the Android application. Check their
+AAR manifest floors and compile SDK requirements against API 29 and the Android
+toolchain. An AndroidX advisory alone does not require a change to Monero's ABI
+list, the native API selector or the NDK pin.
