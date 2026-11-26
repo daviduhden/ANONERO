@@ -448,6 +448,9 @@ Keep instructions close to the code they govern:
 
 Rules for documentation:
 
+- In document tables, show the full repository-relative path as the link text. Resolve
+  the link target from the Markdown file containing the table and verify it exists.
+
 - Reference real paths and symbols. Do not invent files, commands, or APIs.
 - Describe what exists, not what is planned. Mark proposals explicitly.
 - Avoid duplicating large procedures across files; link to the owning skill.

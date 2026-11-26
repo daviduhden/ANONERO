@@ -10,23 +10,23 @@ replace them.
 
 | Document | Audience | Contents |
 | --- | --- | --- |
-| [`../README.md`](../README.md) | Users and new contributors | What ANONERO is, design priorities, features, platform, downloads, build entry points |
-| [`architecture/overview.md`](architecture/overview.md) | Android and wallet developers | Modules, state flow, lifecycle, persistence, transports, build boundaries |
-| [`architecture/network-transport.md`](architecture/network-transport.md) | Android, wallet, and anonymity reviewers | Transport providers, anonymity/trust model, proxy policy, node-network matrix, VPN/I2P limits |
-| [`architecture/anonymity-audit-2026-11.md`](architecture/anonymity-audit-2026-11.md) | Anonymity and security reviewers | Source-audit findings, implemented controls, regression requirements, residual risks |
-| [`architecture/jni-boundary.md`](architecture/jni-boundary.md) | Native and Kotlin developers | Kotlin/C++/wallet2 contracts, handles, memory, errors, callbacks |
-| [`security-model.md`](security-model.md) | Security and anonymity reviewers | Priority hierarchy, adversaries, assets, trust boundaries, invariants, limits |
-| [`features.md`](features.md) | Product and QA | Implemented wallet features, anonymity/privacy/security contribution, limitations |
-| [`development.md`](development.md) | Contributors | Repository layout, conventions, static checks, extension recipes |
-| [`build-and-release.md`](build-and-release.md) | Build and release engineers | Gradle, native archives, CI, signing, releases |
-| [`android-release-signing.md`](android-release-signing.md) | Release owners | Android signing custody, recovery and developer registration |
-| [`ci/README.md`](ci/README.md) | CI owners and maintainers | Historical failures, warnings, root causes, regression checks |
-| [`development-iteration-approved-safety.md`](development-iteration-approved-safety.md) | Maintainers | Approved safety proposals, source changes and validation still required |
-| [`architecture/repository-state.md`](architecture/repository-state.md) | Maintainers | Audited state, evidence, decisions, known gaps |
-| [`architecture/dependencies.md`](architecture/dependencies.md) | Maintainers | Dependency inventory, update record, blocked upgrades |
-| [`../PROGRESS.md`](../PROGRESS.md) | Maintainers | Current cycle progress, fixed issues, pending validation |
-| [`../ROADMAP.md`](../ROADMAP.md) | Maintainers | Prioritized themes and out-of-scope work |
-| [`../TODO.md`](../TODO.md) | Contributors | Actionable checkboxes |
+| [`README.md`](../README.md) | Users and new contributors | What ANONERO is, design priorities, features, platform, downloads, build entry points |
+| [`docs/architecture/overview.md`](architecture/overview.md) | Android and wallet developers | Modules, state flow, lifecycle, persistence, transports, build boundaries |
+| [`docs/architecture/network-transport.md`](architecture/network-transport.md) | Android, wallet, and anonymity reviewers | Transport providers, anonymity/trust model, proxy policy, node-network matrix, VPN/I2P limits |
+| [`docs/architecture/anonymity-audit-2026-11.md`](architecture/anonymity-audit-2026-11.md) | Anonymity and security reviewers | Source-audit findings, implemented controls, regression requirements, residual risks |
+| [`docs/architecture/jni-boundary.md`](architecture/jni-boundary.md) | Native and Kotlin developers | Kotlin/C++/wallet2 contracts, handles, memory, errors, callbacks |
+| [`docs/security-model.md`](security-model.md) | Security and anonymity reviewers | Priority hierarchy, adversaries, assets, trust boundaries, invariants, limits |
+| [`docs/features.md`](features.md) | Product and QA | Implemented wallet features, anonymity/privacy/security contribution, limitations |
+| [`docs/development.md`](development.md) | Contributors | Repository layout, conventions, static checks, extension recipes |
+| [`docs/build-and-release.md`](build-and-release.md) | Build and release engineers | Gradle, native archives, CI, signing, releases |
+| [`docs/android-release-signing.md`](android-release-signing.md) | Release owners | Android signing custody, recovery and developer registration |
+| [`docs/ci/README.md`](ci/README.md) | CI owners and maintainers | Historical failures, warnings, root causes, regression checks |
+| [`docs/development-iteration-approved-safety.md`](development-iteration-approved-safety.md) | Maintainers | Approved safety proposals, source changes and validation still required |
+| [`docs/architecture/repository-state.md`](architecture/repository-state.md) | Maintainers | Audited state, evidence, decisions, known gaps |
+| [`docs/architecture/dependencies.md`](architecture/dependencies.md) | Maintainers | Dependency inventory, update record, blocked upgrades |
+| [`PROGRESS.md`](../PROGRESS.md) | Maintainers | Current cycle progress, fixed issues, pending validation |
+| [`ROADMAP.md`](../ROADMAP.md) | Maintainers | Prioritized themes and out-of-scope work |
+| [`TODO.md`](../TODO.md) | Contributors | Actionable checkboxes |
 
 ## Current architecture in one paragraph
 
@@ -49,7 +49,8 @@ Its regression module is CI-only; local invocation is static analysis.
 ## Documentation rules
 
 - English is used for technical documentation, comments, and commit messages.
-- Paths are relative to the repository root unless stated otherwise.
+- Paths are relative to the repository root unless stated otherwise. In documentation
+  tables, always display each document’s repository-root-relative path as its link text.
 - Implemented behavior is described as implemented. Planned or blocked work is marked as
   such.
 - Static analysis cannot prove runtime behavior; anonymity, privacy, and security claims
