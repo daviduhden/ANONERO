@@ -5,6 +5,8 @@ records progress; it is not a release note and does not claim CI validation.
 
 ## November 26 CI audit
 
+Tests 45848781860 on `9734264` passed JVM, API 35 instrumentation and APK assembly. Android Lint stopped during Gradle dependency resolution after HTTP 429. Agent Knowledge Validation 45848787057 passed. The artifacts contain 147 JVM and 13 API 35 cases per flavor. Local corrections cover backup ZIP cardinality, history date formatting, JNI transaction metadata, Tor listener revocation, scanner results, Compose deprecations and instrumentation report validation. These changes await CI.
+
 At `b09f9dc`, Tests 45706621403 passed with 143 JVM and ten API 35 tests per flavor. Lint reported ten warnings per flavor. Source fixes cover the Compose test rule, camera session ownership, exact atomic amounts, explicit subaddress issuance, LWS trust verification and legacy backup parsing. The new report checker accepted the archived XML and per-test logs. The modified app and tests await a new CI run. See [CI evidence](docs/ci/README.md).
 
 ## November 25 CI and preventive follow-up

@@ -71,7 +71,24 @@ Broken pipe (32)/adb 224 and no reports. Do not interpret it as executed/passing
 or evidence for the uncommitted working tree. Current CI source uses only workflow_dispatch;
 release embeds synchronized required jobs. See [iteration](../development-iteration-2026-11.md).
 
+The [job inventory](run-jobs.tsv) joins to the [historical toolchain pins](run-configurations.tsv)
+by full head SHA. The latter reads the version catalog, Gradle wrapper, app configuration,
+native build script and Monero gitlink from each of the 44 distinct Git trees. An
+`unknown` cell means the literal pin was unavailable in that source. A configured
+toolchain alone cannot identify the compiler actually invoked by an interrupted job.
+The [diagnostic inventory](historical-failures.md) records observed versions where logs
+provide them.
+
 ## Latest evidence
+
+- [Tests 45848781860](https://github.com/daviduhden/ANONERO/actions/runs/45848781860)
+  at `9734264` passed eight of nine jobs. Maven Central HTTP 429 stopped
+  Android Lint during configuration on both attempts. The debug APKs linked
+  both ARM ABIs. Archived reports confirm 147 JVM tests and 13 API 35 tests
+  per flavor. Kotlin emitted deprecation warnings at 57 distinct project
+  source locations. [W-014](historical-failures.md#w-014--deprecated-compose-calls-in-successful-compilations)
+  lists the affected APIs. [Knowledge validation](https://github.com/daviduhden/ANONERO/actions/runs/45848787057)
+  passed at the same SHA.
 
 - [Tests 45706621403](https://github.com/daviduhden/ANONERO/actions/runs/45706621403)
   at `b09f9dc` passed all nine jobs. Archived XML recorded 143 JVM cases and

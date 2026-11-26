@@ -1,4 +1,15 @@
 run	workflow	head_sha	run_result	job	job_id	job_result
+45848787057	Agent Knowledge Validation	9734264fd465817357847f9aafa73f3390948c33	success	Owner authorization	140009359512	success
+45848787057	Agent Knowledge Validation	9734264fd465817357847f9aafa73f3390948c33	success	Agent knowledge and Python regressions	140009625212	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Owner authorization	140009346427	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Localization resources	140009561818	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Android Lint	140009561945	failure
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	JVM unit tests	140009561952	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	JNI symbol contract	140009561957	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Kotlin and C++ architecture policy	140009562081	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Build native Monero/JNI archives	140009562123	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Assemble debug APKs and link JNI	140030701780	success
+45848781860	Tests	9734264fd465817357847f9aafa73f3390948c33	failure	Instrumented tests (API 35)	140032877453	success
 45706626778	Agent Knowledge Validation	b09f9dc4953465a294521db8fda89a27cb66198d	success	Owner authorization	139530165559	success
 45706626778	Agent Knowledge Validation	b09f9dc4953465a294521db8fda89a27cb66198d	success	Agent knowledge and Python regressions	139531028008	success
 45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Owner authorization	139530149312	success

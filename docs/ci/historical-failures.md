@@ -2,12 +2,14 @@
 
 ## Run inventory
 
-[Job inventory](run-jobs.tsv) records the API result of each of the 406 jobs
-across these 53 runs, including skips and cancellations, with exact commit and
+[Job inventory](run-jobs.tsv) records the API result of each of the 417 jobs
+across these 55 runs, including skips and cancellations, with exact commit and
 job IDs. The platform and dependency pins for those revisions are described below.
 
 | Run | Workflow | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| [45848787057](https://github.com/daviduhden/ANONERO/actions/runs/45848787057) | Agent Knowledge Validation | `9734264` | `workflow_dispatch` | success | none | Nine Python regressions passed. The range check emitted its advisory AK004 for manual relevance review. |
+| [45848781860](https://github.com/daviduhden/ANONERO/actions/runs/45848781860) | Tests | `9734264` | `workflow_dispatch` | failure | Android Lint | CI-039 recurred before lint analysis. The other eight jobs passed. See W-014 for warnings in successful compilation. |
 | [45706626778](https://github.com/daviduhden/ANONERO/actions/runs/45706626778) | Agent Knowledge Validation | `b09f9dc` | `workflow_dispatch` | success | none | Both jobs passed, including nine validator regression tests. |
 | [45706621403](https://github.com/daviduhden/ANONERO/actions/runs/45706621403) | Tests | `b09f9dc` | `workflow_dispatch` | success | none | Nine jobs passed, with 143 JVM and ten API 35 cases per flavor. Both lint reports retain ten warnings. Instrumented Kotlin compilation reported W-013. |
 | [45691880970](https://github.com/daviduhden/ANONERO/actions/runs/45691880970) | Agent Knowledge Validation | `bf1cf25` | `workflow_dispatch` | success | none | Both owner and validation jobs passed. |
@@ -62,21 +64,21 @@ job IDs. The platform and dependency pins for those revisions are described belo
 | [`42552892586`](https://github.com/daviduhden/ANONERO/actions/runs/42552892586) | Tests | `ed8b097` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 | [`42547686992`](https://github.com/daviduhden/ANONERO/actions/runs/42547686992) | Tests | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
-No release, sanitizer, or fuzz run is recorded in the API history. Current full Tests
-evidence is on `b09f9dc`. Earlier green and cancelled runs remain historical baselines.
+No release, sanitizer, or fuzz run is recorded in the API history. The most recent fully passing Tests
+run is on `b09f9dc`. Earlier green and cancelled runs remain historical baselines.
 The two historical `push` triggers are no longer present.
 
 ### Provenance and platform coverage
 
-The paginated API returned 53 runs on 2026-11-26: 44 Tests runs (30 failed,
-nine succeeded and five cancelled) and nine successful Agent Knowledge
+The paginated API returned 55 runs on 2026-11-26: 45 Tests runs (31 failed,
+nine succeeded and five cancelled) and ten successful Agent Knowledge
 Validation runs. Every returned record is listed above, including the two
 historical push events. All records show attempt 1. The release workflow has no
 returned runs. The API supplied job inventories and readable log archives for
 the previous 49 records, but archives cannot supply steps that were skipped, cancelled
 before logging, or never uploaded. During the prior audit `gh run view --log`
 could not retrieve particular cancelled job logs for `42692271873` and
-`43632817394`. The JVM failure in the latter was available by job ID. The latest API listing counts 51 artifacts, including five for Tests 45706621403. Previously listed
+`43632817394`. The JVM failure in the latter was available by job ID. The latest API listing counts 55 artifacts, including four for Tests 45848781860. Previously listed
 artifacts absent from this snapshot are unavailable via the current listing.
 Logs and selected reports were kept outside the repository.
 
@@ -97,7 +99,7 @@ dispatched Tests revisions use CMake 4.4.5, Boost 1.92.0 and zlib 1.4. Both pin
 OpenSSL 3.5.9. The individual run's exact inputs can be resolved from the linked
 SHA using `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties`,
 `app/build.gradle.kts`, `external-libs/build.sh` and the Monero gitlink.
-The [last fully green Tests log](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
+The [Tests log for 2ca0edb](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
 records Clang 21.0.0 for native compilation and API 29 ARM target wrappers. The
 emulator used API 35 `google_apis` x86_64 and completed boot in 30.9 seconds.
 Agent Knowledge Validation has two jobs and runs Python only, so Android and
@@ -1129,6 +1131,32 @@ during a live external rate limit remains unverified. The JNI job passed
 assembly log. The native archives still report W-006/W-010 dependency
 warnings, including `-Wnonnull`, deprecated declarations and 32-bit shift
 diagnostics. SDK metadata and Node Buffer warnings W-011/W-012 still occur.
+
+### W-014 — Deprecated Compose calls in successful compilations
+
+[Tests 45848781860](https://github.com/daviduhden/ANONERO/actions/runs/45848781860)
+on `9734264fd465817357847f9aafa73f3390948c33` produced 57 distinct Kotlin
+source locations across its compilation logs. Counting each location once
+across variants and jobs gives 42 legacy Material 3 `ListItem` calls, nine
+`PasswordVisualTransformation` constructors and six deprecated
+`rememberModalBottomSheetState` calls. The diagnostics name application UI
+sources. Review slot semantics, password masking and supported sheet states
+when replacing these APIs. The [Compose migration](compose-api-deprecations.md) records the local changes and device checks. CI confirmation requires compiling both variants
+and inspecting warnings, including the instrumented compilation log.
+
+The [lint job](https://github.com/daviduhden/ANONERO/actions/runs/45848781860/job/140009561945)
+encountered HTTP 429 resolving the Kotlin Gradle plugin 2.4.21 POM. The
+same request failed after the bounded 60-second retry, before lint ran.
+The four artifacts contain unit and device reports, native archives and debug
+APKs. Lint counts for this revision are unavailable. CI-039 records the
+recurring classpath resolution problem.
+
+The archived XML records 147 JVM cases in 28 reports and 13 instrumented
+cases in one report per flavor, with passing device exits and no failures,
+errors or skips. The API 35 x86_64 AVD booted in 31.3 seconds. Native
+compilation identified Clang 21.0.0, and both ARM ABIs linked in the debug
+APKs. W-006/W-010 native dependency diagnostics and W-011 SDK metadata
+warnings remain visible. The JNI gate ran 45 Python regressions.
 
 ### REPORT-002 — Instrumentation evidence from separate output trees
 
