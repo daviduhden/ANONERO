@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -39,7 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,7 +58,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.anonero.R
@@ -66,18 +67,10 @@ fun SetupPassphrase(
     onBackPressed: () -> Unit = {},
     oNextPressed: (passphrase: String) -> Unit = {},
 ) {
-    var passPhraseMatched by remember { mutableStateOf(false) }
-    var passPhrase by remember { mutableStateOf("") }
-    var passPhraseConfirm by remember { mutableStateOf("") }
+    val passPhraseState = remember { TextFieldState() }
+    val passPhraseConfirmState = remember { TextFieldState() }
 
-    LaunchedEffect(passPhraseConfirm, passPhrase) {
-        passPhraseMatched =
-            if (passPhraseConfirm.isNotEmpty()) {
-                passPhraseConfirm == passPhrase
-            } else {
-                false
-            }
-    }
+    val passPhraseMatched = passPhraseConfirmState.text.isNotEmpty() && passPhraseConfirmState.text.contentEquals(passPhraseState.text)
 
     Scaffold { paddingValues ->
         Column(
@@ -140,17 +133,15 @@ fun SetupPassphrase(
                         )
                     },
                     supportingContent = {
-                        OutlinedTextField(
-                            value = passPhrase,
+                        OutlinedSecureTextField(
+                            state = passPhraseState,
                             shape = MaterialTheme.shapes.medium,
-                            onValueChange = {
-                                passPhrase = it
-                            },
-                            visualTransformation = PasswordVisualTransformation(),
+                            textObfuscationMode = TextObfuscationMode.Hidden,
                             keyboardOptions =
                                 KeyboardOptions(
                                     imeAction = ImeAction.Next,
                                     keyboardType = KeyboardType.Password,
+                                    autoCorrectEnabled = false,
                                 ),
                             label = { Text(text = "") },
                             modifier = Modifier.fillMaxWidth(),
@@ -166,25 +157,23 @@ fun SetupPassphrase(
                         )
                     },
                     supportingContent = {
-                        OutlinedTextField(
-                            value = passPhraseConfirm,
+                        OutlinedSecureTextField(
+                            state = passPhraseConfirmState,
                             shape = MaterialTheme.shapes.medium,
                             label = { Text(text = "") },
-                            visualTransformation = PasswordVisualTransformation(),
+                            textObfuscationMode = TextObfuscationMode.Hidden,
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions =
                                 KeyboardOptions(
                                     imeAction = ImeAction.Done,
                                     keyboardType = KeyboardType.Password,
+                                    autoCorrectEnabled = false,
                                 ),
-                            isError = passPhraseConfirm != passPhrase,
+                            isError = !passPhraseConfirmState.text.contentEquals(passPhraseState.text),
                             supportingText = {
-                                if (passPhraseConfirm != passPhrase) {
+                                if (!passPhraseConfirmState.text.contentEquals(passPhraseState.text)) {
                                     Text(text = stringResource(R.string.passphrases_do_not_match))
                                 }
-                            },
-                            onValueChange = {
-                                passPhraseConfirm = it
                             },
                         )
                     },
@@ -192,9 +181,9 @@ fun SetupPassphrase(
             }
 
             AnonOutlineButton(
-                enabled = passPhraseMatched && passPhrase.length >= 4,
+                enabled = passPhraseMatched && passPhraseState.text.length >= 4,
                 onClick = {
-                    oNextPressed(passPhrase)
+                    oNextPressed(passPhraseState.text.toString())
                 },
                 modifier =
                     Modifier

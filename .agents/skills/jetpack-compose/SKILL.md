@@ -127,3 +127,13 @@ and callbacks can arrive after dismissal or permission loss. Keep image and UR
 processing on the analysis worker and deliver UI and navigation actions on
 the main thread. Test Compose rule migrations with the production effect delays
 and the explicit test clock used by animated QR regressions.
+
+Use a composition-local `remember { TextFieldState() }` and explicit
+`TextObfuscationMode.Hidden` for passphrases. The saveable field-state factory
+can restore the secret across recreation, and the default obfuscation mode
+can reveal the last character. Preserve password IME options when overriding
+the action. With asynchronous verification, compare the submitted text and
+session again before publishing the result. For modal sheets that previously
+skipped partial expansion, specify both enabled anchors and start hidden.
+When clearing a secure field, also clear its undo history. Foundation records
+programmatic edits, including clearing the text.

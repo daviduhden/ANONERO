@@ -37,8 +37,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -50,7 +52,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -75,7 +77,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -148,8 +149,8 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
     val exportViewModel = viewModel<ExportBackUpViewModel>()
     val focusRequester = remember { FocusRequester() }
     var passPhraseDialog by remember { mutableStateOf(true) }
-    var passPhrase by remember { mutableStateOf("") }
-    var confirmPassPhrase by remember { mutableStateOf("") }
+    val passPhraseState = remember { TextFieldState() }
+    val confirmPassPhraseState = remember { TextFieldState() }
     val errorShake = rememberShakeController()
     val scope = rememberCoroutineScope()
     val view = LocalView.current
@@ -173,11 +174,11 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
 
     fun createBackUp() {
         if (AnonConfig.viewOnly &&
-            (passPhrase.length < 8 || passPhrase != confirmPassPhrase)
+            (passPhraseState.text.length < 8 || !passPhraseState.text.contentEquals(confirmPassPhraseState.text))
         ) {
             return
         }
-        val candidate = passPhrase
+        val candidate = passPhraseState.text.toString()
         scope.launch {
             val accepted =
                 try {
@@ -198,8 +199,10 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                 }
             if (accepted) {
                 passPhraseDialog = false
-                passPhrase = ""
-                confirmPassPhrase = ""
+                passPhraseState.clearText()
+                passPhraseState.undoState.clearHistory()
+                confirmPassPhraseState.clearText()
+                confirmPassPhraseState.undoState.clearHistory()
                 exportViewModel.createBackUp(candidate)
             } else {
                 errorShake.shake(ShakeConfig(6, translateX = 5f))
@@ -296,16 +299,15 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                     if (AnonConfig.viewOnly) {
                         Text(stringResource(R.string.nero_backup_passphrase_prompt))
                     }
-                    OutlinedTextField(
-                        value = passPhrase,
+                    OutlinedSecureTextField(
+                        state = passPhraseState,
                         shape = MaterialTheme.shapes.small,
-                        singleLine = true,
                         colors =
                             OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = MaterialTheme.colorScheme.onBackground,
                                 unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                             ),
-                        visualTransformation = PasswordVisualTransformation(),
+                        textObfuscationMode = TextObfuscationMode.Hidden,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -319,27 +321,25 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                                 keyboardType = KeyboardType.Password,
                                 autoCorrectEnabled = false,
                             ),
-                        keyboardActions =
-                            KeyboardActions(
-                                onDone = {
-                                    createBackUp()
-                                },
-                            ),
-                        onValueChange = {
-                            passPhrase = it
+                        onKeyboardAction = { performDefaultAction ->
+                            if (AnonConfig.viewOnly) performDefaultAction() else createBackUp()
                         },
                     )
 
                     if (AnonConfig.viewOnly) {
-                        OutlinedTextField(
-                            value = confirmPassPhrase,
-                            onValueChange = { confirmPassPhrase = it },
+                        OutlinedSecureTextField(
+                            state = confirmPassPhraseState,
                             label = { Text(stringResource(R.string.confirm_passphrase)) },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            isError = confirmPassPhrase.isNotEmpty() && passPhrase != confirmPassPhrase,
+                            textObfuscationMode = TextObfuscationMode.Hidden,
+                            isError =
+                                confirmPassPhraseState.text.isNotEmpty() &&
+                                    !passPhraseState.text.contentEquals(
+                                        confirmPassPhraseState.text,
+                                    ),
                             supportingText = {
-                                if (confirmPassPhrase.isNotEmpty() && passPhrase != confirmPassPhrase) {
+                                if (confirmPassPhraseState.text.isNotEmpty() &&
+                                    !passPhraseState.text.contentEquals(confirmPassPhraseState.text)
+                                ) {
                                     Text(stringResource(R.string.passphrases_do_not_match))
                                 }
                             },
@@ -349,7 +349,7 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                                     keyboardType = KeyboardType.Password,
                                     autoCorrectEnabled = false,
                                 ),
-                            keyboardActions = KeyboardActions(onDone = { createBackUp() }),
+                            onKeyboardAction = { createBackUp() },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -372,7 +372,7 @@ fun ExportBackUp(onBackPress: () -> Unit = {}) {
                         ),
                     enabled =
                         !AnonConfig.viewOnly ||
-                            (passPhrase.length >= 8 && passPhrase == confirmPassPhrase),
+                            (passPhraseState.text.length >= 8 && passPhraseState.text.contentEquals(confirmPassPhraseState.text)),
                     onClick = {
                         createBackUp()
                     },

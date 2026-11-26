@@ -41,8 +41,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -56,7 +58,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
@@ -81,7 +83,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -157,7 +159,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     val focusRequester = remember { FocusRequester() }
     var passPhraseDialog by remember { mutableStateOf(true) }
     var seedLoadFailed by remember { mutableStateOf(false) }
-    var passPhrase by remember { mutableStateOf("") }
+    val passPhraseState = remember { TextFieldState() }
     var neroPayload by remember { mutableStateOf("") }
     // nothing secret is composed until the passphrase checks out: the blur behind the
     // dialog is a no-op below Android 12
@@ -176,16 +178,27 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     var seedJob by remember { mutableStateOf<Job?>(null) }
+    var submittedText by remember { mutableStateOf<CharSequence?>(null) }
+
+    LaunchedEffect(passPhraseState.text) {
+        if (submittedText != null && !passPhraseState.text.contentEquals(submittedText)) {
+            seedJob?.cancel()
+            submittedText = null
+            seedLoadFailed = false
+        }
+    }
 
     LaunchedEffect(locked, profile, currentWallet) {
         if (locked || !verified) {
             seedJob?.cancel()
             seedJob = null
+            submittedText = null
             seedLoadFailed = false
             verifiedOwner = null
             seedWords = placeholderSeed
             legacySeed = placeholderSeed
-            passPhrase = ""
+            passPhraseState.clearText()
+            passPhraseState.undoState.clearHistory()
             neroPayload = ""
             viewKeyText = ""
             spendKeyText = ""
@@ -255,13 +268,22 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
         }
     }
 
+    fun dismissPassphrase() {
+        seedJob?.cancel()
+        submittedText = null
+        passPhraseState.clearText()
+        passPhraseState.undoState.clearHistory()
+        passPhraseDialog = false
+    }
+
     fun getSeed() {
         val wallet = WalletManager.instance?.wallet ?: return
         val owner = SeedDisplayOwner(wallet, WalletSession.profile)
         if (!owner.isCurrent(walletState)) return
         seedJob?.cancel()
         seedLoadFailed = false
-        val enteredPassphrase = passPhrase
+        submittedText = passPhraseState.text
+        val enteredPassphrase = passPhraseState.text.toString()
         seedJob =
             scope.launch {
                 val seeds =
@@ -283,17 +305,19 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         throw cancelled
                     } catch (_: Exception) {
                         currentCoroutineContext().ensureActive()
-                        if (owner.isCurrent(walletState)) seedLoadFailed = true
+                        if (owner.isCurrent(walletState) && passPhraseState.text.contentEquals(enteredPassphrase)) seedLoadFailed = true
                         return@launch
                     }
                 currentCoroutineContext().ensureActive()
-                if (!owner.isCurrent(walletState)) return@launch
+                if (!owner.isCurrent(walletState) || !passPhraseState.text.contentEquals(enteredPassphrase)) return@launch
                 if (seeds != null) {
                     val (seed, legacy) = seeds
                     seedWords = seed
                     verifiedOwner = owner
                     passPhraseDialog = false
-                    passPhrase = ""
+                    submittedText = null
+                    passPhraseState.clearText()
+                    passPhraseState.undoState.clearHistory()
                     if (legacy != null) {
                         legacySeed = legacy
                     }
@@ -389,8 +413,8 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                 )
             },
             text = {
-                OutlinedTextField(
-                    value = passPhrase,
+                OutlinedSecureTextField(
+                    state = passPhraseState,
                     isError = seedLoadFailed,
                     supportingText = {
                         if (seedLoadFailed) {
@@ -398,13 +422,12 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                         }
                     },
                     shape = MaterialTheme.shapes.small,
-                    singleLine = true,
                     colors =
                         OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onBackground,
                             unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                         ),
-                    visualTransformation = PasswordVisualTransformation(),
+                    textObfuscationMode = TextObfuscationMode.Hidden,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -415,23 +438,13 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
                     keyboardOptions =
                         KeyboardOptions(
                             imeAction = ImeAction.Done,
+                            keyboardType = KeyboardType.Password,
+                            autoCorrectEnabled = false,
                         ),
-                    keyboardActions =
-                        KeyboardActions(
-                            onDone = {
-                                getSeed()
-                            },
-                        ),
-                    onValueChange = {
-                        seedJob?.cancel()
-                        seedLoadFailed = false
-                        passPhrase = it
-                    },
+                    onKeyboardAction = { getSeed() },
                 )
             },
-            onDismissRequest = {
-                passPhraseDialog = false
-            },
+            onDismissRequest = { dismissPassphrase() },
             confirmButton = {
                 Button(
                     shape = MaterialTheme.shapes.small,
@@ -452,7 +465,7 @@ fun SeedSettingsPage(onBackPress: () -> Unit = {}) {
             dismissButton = {
                 Button(
                     onClick = {
-                        passPhraseDialog = false
+                        dismissPassphrase()
                         onBackPress.invoke()
                     },
                     shape = MaterialTheme.shapes.small,

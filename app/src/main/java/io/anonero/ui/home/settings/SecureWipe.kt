@@ -36,15 +36,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -66,7 +68,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -218,7 +220,7 @@ fun SecureWipe(
     val secureWipeViewModel = koinViewModel<SecureWipeViewModel>()
     val focusRequester = remember { FocusRequester() }
     var passPhraseDialog by remember { mutableStateOf(true) }
-    var passPhrase by remember { mutableStateOf("") }
+    val passPhraseState = remember { TextFieldState() }
     var errorRes by remember { mutableStateOf<Int?>(null) }
     var wipeStarted by remember { mutableStateOf(false) }
     val errorShake = rememberShakeController()
@@ -258,7 +260,7 @@ fun SecureWipe(
         val mainActivity = activity as? MainActivity ?: return
         val wallet = WalletManager.instance?.wallet ?: return
         val profile = WalletSession.profile
-        val candidate = passPhrase
+        val candidate = passPhraseState.text.toString()
         wipeStarted = true
         errorRes = null
         requestClearScreen(false)
@@ -272,13 +274,15 @@ fun SecureWipe(
 
                     SecureWipeViewModel.WipeResult.FAILED -> {
                         passPhraseDialog = false
-                        passPhrase = ""
+                        passPhraseState.clearText()
+                        passPhraseState.undoState.clearHistory()
                         errorRes = R.string.wipe_failed
                     }
 
                     SecureWipeViewModel.WipeResult.COMPLETED -> {
                         passPhraseDialog = false
-                        passPhrase = ""
+                        passPhraseState.clearText()
+                        passPhraseState.undoState.clearHistory()
                         val idle = withContext(Dispatchers.IO) { WalletManager.instance?.isManagedWalletIdle() == true }
                         if (idle && WalletManager.instance?.wallet == null && WalletSession.profile == profile) {
                             view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -339,16 +343,15 @@ fun SecureWipe(
                 }
             },
             text = {
-                OutlinedTextField(
-                    value = passPhrase,
+                OutlinedSecureTextField(
+                    state = passPhraseState,
                     shape = MaterialTheme.shapes.small,
-                    singleLine = true,
                     colors =
                         OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onBackground,
                             unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                         ),
-                    visualTransformation = PasswordVisualTransformation(),
+                    textObfuscationMode = TextObfuscationMode.Hidden,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -356,15 +359,10 @@ fun SecureWipe(
                     keyboardOptions =
                         KeyboardOptions(
                             imeAction = ImeAction.Done,
+                            keyboardType = KeyboardType.Password,
+                            autoCorrectEnabled = false,
                         ),
-                    keyboardActions =
-                        KeyboardActions(
-                            onDone = {
-                            },
-                        ),
-                    onValueChange = {
-                        passPhrase = it
-                    },
+                    onKeyboardAction = { },
                 )
             },
             onDismissRequest = {

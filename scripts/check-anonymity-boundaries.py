@@ -17,6 +17,7 @@
 
 """Check selected source policy boundaries; no application or test execution."""
 
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -107,6 +108,25 @@ if (
     or "activePassphraseHashKey()" in seed_display
 ):
     failures.append("Seed display must authenticate and read the same wallet/profile")
+
+# The default secure-field mode may briefly reveal the most recent character.
+# rememberTextFieldState also saves its contents across activity recreation.
+for path in (JAVA / "ui").rglob("*.kt"):
+    screen = path.read_text(encoding="utf-8")
+    fields = re.findall(r"OutlinedSecureTextField\(\s*state\s*=\s*(\w+),", screen)
+    for state in fields:
+        if screen.count(f"{state}.undoState.clearHistory()") < screen.count(f"{state}.clearText()"):
+            failures.append(f"{path.name}: discard passphrase undo history when clearing the field")
+    if "PasswordVisualTransformation(" in screen or (
+        fields
+        and (
+            screen.count("textObfuscationMode = TextObfuscationMode.Hidden") < len(fields)
+            or any(
+                f"val {state} = remember {{ TextFieldState() }}" not in screen for state in fields
+            )
+        )
+    ):
+        failures.append(f"{path.name}: keep password inputs masked and out of saved state")
 
 wallet_handler = (JAVA / "services/AnonWalletHandler.kt").read_text(encoding="utf-8")
 network_settings = (JAVA / "ui/home/settings/NetworkSettings.kt").read_text(encoding="utf-8")

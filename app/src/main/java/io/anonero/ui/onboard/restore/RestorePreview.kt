@@ -33,8 +33,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -48,7 +49,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -70,7 +71,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,7 +111,7 @@ fun RestorePreview(
     oNextPressed: () -> Unit = {},
     navigateTo: (route: Any) -> Unit = {},
 ) {
-    var passPhrase by remember { mutableStateOf<String>("") }
+    val passPhraseState = remember { TextFieldState() }
     var loadingMessage by remember { mutableStateOf<Int?>(R.string.loading) }
     var errorMessage by remember { mutableStateOf<Int?>(null) }
     var backupPayload by remember { mutableStateOf<BackupPayload?>(null) }
@@ -146,7 +147,7 @@ fun RestorePreview(
                 loading = true
                 passphraseDialog = false
                 loadingMessage = R.string.extracting_backup
-                backupPayload = BackupHelper.extractBackUp(previewOwner, backUpPath, passPhrase)
+                backupPayload = BackupHelper.extractBackUp(previewOwner, backUpPath, passPhraseState.text.toString())
                 loading = false
             } catch (e: CancellationException) {
                 throw e
@@ -205,16 +206,15 @@ fun RestorePreview(
                 )
             },
             text = {
-                OutlinedTextField(
-                    value = passPhrase,
+                OutlinedSecureTextField(
+                    state = passPhraseState,
                     shape = MaterialTheme.shapes.small,
-                    singleLine = true,
                     colors =
                         OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onBackground,
                             unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                         ),
-                    visualTransformation = PasswordVisualTransformation(),
+                    textObfuscationMode = TextObfuscationMode.Hidden,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -225,14 +225,10 @@ fun RestorePreview(
                     keyboardOptions =
                         KeyboardOptions(
                             imeAction = ImeAction.Done,
+                            keyboardType = KeyboardType.Password,
+                            autoCorrectEnabled = false,
                         ),
-                    keyboardActions =
-                        KeyboardActions(onDone = {
-                            restoreFromBackup()
-                        }),
-                    onValueChange = {
-                        passPhrase = it
-                    },
+                    onKeyboardAction = { restoreFromBackup() },
                 )
             },
             onDismissRequest = {
@@ -635,7 +631,7 @@ fun RestorePreview(
                     try {
                         loading = true
                         loadingMessage = R.string.restoring_wallet
-                        val success = BackupHelper.restoreBackUp(backupPayload!!, passPhrase, pin)
+                        val success = BackupHelper.restoreBackUp(backupPayload!!, passPhraseState.text.toString(), pin)
                         if (success) {
                             try {
                                 BackupHelper.discardRestorePreview(previewOwner)
