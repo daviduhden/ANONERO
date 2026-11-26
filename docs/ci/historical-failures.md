@@ -2,12 +2,14 @@
 
 ## Run inventory
 
-[Job inventory](run-jobs.tsv) records the API result of each of the 395 jobs
-across these 51 runs, including skips and cancellations, with exact commit and
+[Job inventory](run-jobs.tsv) records the API result of each of the 406 jobs
+across these 53 runs, including skips and cancellations, with exact commit and
 job IDs. The platform and dependency pins for those revisions are described below.
 
 | Run | Workflow | Commit | Event | Result | Failed jobs | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| [45706626778](https://github.com/daviduhden/ANONERO/actions/runs/45706626778) | Agent Knowledge Validation | `b09f9dc` | `workflow_dispatch` | success | none | Both jobs passed, including nine validator regression tests. |
+| [45706621403](https://github.com/daviduhden/ANONERO/actions/runs/45706621403) | Tests | `b09f9dc` | `workflow_dispatch` | success | none | Nine jobs passed, with 143 JVM and ten API 35 cases per flavor. Both lint reports retain ten warnings. Instrumented Kotlin compilation reported W-013. |
 | [45691880970](https://github.com/daviduhden/ANONERO/actions/runs/45691880970) | Agent Knowledge Validation | `bf1cf25` | `workflow_dispatch` | success | none | Both owner and validation jobs passed. |
 | [45691880945](https://github.com/daviduhden/ANONERO/actions/runs/45691880945) | Tests | `bf1cf25` | `workflow_dispatch` | failure | Android Lint; Instrumented tests (API 35) | CI-039 recurred during Gradle configuration in both jobs. Neither produced test or lint reports. Seven jobs passed, including both ARM links and 133 JVM cases per flavor. |
 | [`45679643727`](https://github.com/daviduhden/ANONERO/actions/runs/45679643727) | Agent Knowledge Validation | `2ca0edb` | `workflow_dispatch` | success | none | Owner authorization, nine Python regressions, and worktree and committed-range checks passed. |
@@ -61,20 +63,20 @@ job IDs. The platform and dependency pins for those revisions are described belo
 | [`42547686992`](https://github.com/daviduhden/ANONERO/actions/runs/42547686992) | Tests | `c385630` | `push` | failure | JVM unit tests; native | Historical automatic run; instrumented skipped |
 
 No release, sanitizer, or fuzz run is recorded in the API history. Current full Tests
-evidence is on `2ca0edb`. Earlier green and cancelled runs remain historical baselines.
+evidence is on `b09f9dc`. Earlier green and cancelled runs remain historical baselines.
 The two historical `push` triggers are no longer present.
 
 ### Provenance and platform coverage
 
-The paginated API returned 51 runs on 2026-11-25: 43 Tests runs (30 failed,
-eight succeeded and five cancelled) and eight successful Agent Knowledge
+The paginated API returned 53 runs on 2026-11-26: 44 Tests runs (30 failed,
+nine succeeded and five cancelled) and nine successful Agent Knowledge
 Validation runs. Every returned record is listed above, including the two
 historical push events. All records show attempt 1. The release workflow has no
 returned runs. The API supplied job inventories and readable log archives for
 the previous 49 records, but archives cannot supply steps that were skipped, cancelled
 before logging, or never uploaded. During the prior audit `gh run view --log`
 could not retrieve particular cancelled job logs for `42692271873` and
-`43632817394`. The JVM failure in the latter was available by job ID. The latest API listing counts 52 artifacts, including three for the new Tests run. Previously listed
+`43632817394`. The JVM failure in the latter was available by job ID. The latest API listing counts 51 artifacts, including five for Tests 45706621403. Previously listed
 artifacts absent from this snapshot are unavailable via the current listing.
 Logs and selected reports were kept outside the repository.
 
@@ -1096,3 +1098,34 @@ synchronous commit result. PIN throttling, transport persistence, LWS and node
 selection still observe storage failure. A clock-rebase write failure is covered
 by an instrumented regression. The eight dependency advisories remain under
 upstream review. The next completed lint XML must confirm the new counts.
+
+
+### W-013 — Deprecated Compose test rule in instrumented sources
+
+The [API 35 job](https://github.com/daviduhden/ANONERO/actions/runs/45706621403/job/139546185283)
+on `b09f9dc4953465a294521db8fda89a27cb66198d` compiled the Android test
+sources for each flavor. Both emitted the same warning in
+`AnimatedQrCodeSessionTest.kt:31` for the old JUnit4 `createComposeRule`.
+The compiler recommends the v2 rule, which schedules coroutines on a standard
+test dispatcher. Review synchronization when migrating callers. The existing
+animated QR test passed on this run. A future instrumented compilation and both
+flavor reports are required to validate a migration.
+
+### W-009 and CI-039 — Follow-up on b09f9dc
+
+The [lint job](https://github.com/daviduhden/ANONERO/actions/runs/45706621403/job/139533120768)
+produced both variant XML reports with zero errors, eight `GradleDependency`
+and two `UseKtx` warnings each. The eight are three Lifecycle modules, one
+Compose BOM and four CameraX modules. The remaining project-source sites
+are the editor acquisition in `Prefs.kt:67` and the secure wipe cleanup in
+`SecureWipe.kt:160`. Any fix must preserve the persistence verdict for
+security-sensitive writes. The prior five locations no longer appear.
+
+The module cache saved by the successful JVM job was restored by assembly
+and instrumentation in the same run. Both Gradle tasks completed. This
+exercises a warm cache on downstream jobs. Availability after eviction or
+during a live external rate limit remains unverified. The JNI job passed
+41 Python regressions. No project adapter warning was identified in the
+assembly log. The native archives still report W-006/W-010 dependency
+warnings, including `-Wnonnull`, deprecated declarations and 32-bit shift
+diagnostics. SDK metadata and Node Buffer warnings W-011/W-012 still occur.

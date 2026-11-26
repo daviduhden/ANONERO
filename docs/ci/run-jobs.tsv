@@ -1,4 +1,15 @@
 run	workflow	head_sha	run_result	job	job_id	job_result
+45706626778	Agent Knowledge Validation	b09f9dc4953465a294521db8fda89a27cb66198d	success	Owner authorization	139530165559	success
+45706626778	Agent Knowledge Validation	b09f9dc4953465a294521db8fda89a27cb66198d	success	Agent knowledge and Python regressions	139531028008	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Owner authorization	139530149312	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Kotlin and C++ architecture policy	139533120637	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Build native Monero/JNI archives	139533120655	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Localization resources	139533120658	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	JVM unit tests	139533120691	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Android Lint	139533120768	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	JNI symbol contract	139533120985	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Assemble debug APKs and link JNI	139544181673	success
+45706621403	Tests	b09f9dc4953465a294521db8fda89a27cb66198d	success	Instrumented tests (API 35)	139546185283	success
 45691880970	Agent Knowledge Validation	bf1cf25adb7969ffeebb26dab319593fbfe93819	success	Owner authorization	139479170139	success
 45691880970	Agent Knowledge Validation	bf1cf25adb7969ffeebb26dab319593fbfe93819	success	Agent knowledge and Python regressions	139479223742	success
 45691880945	Tests	bf1cf25adb7969ffeebb26dab319593fbfe93819	failure	Owner authorization	139479170282	success

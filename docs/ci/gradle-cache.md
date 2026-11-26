@@ -52,3 +52,9 @@ Each job consumes its commit output, including jobs that wait for native
 artifacts. This keeps a branch move during the build from mixing an archive
 and Kotlin/JNI sources from different revisions. With an empty input, the
 gate uses the dispatch SHA. The cache write condition compares resolved SHAs.
+
+At `b09f9dc`, [Tests 45706621403](https://github.com/daviduhden/ANONERO/actions/runs/45706621403)
+completed the four Gradle jobs and packaged both adapters. The successful JVM
+job saved a cache that assembly and instrumentation subsequently restored.
+Reuse after eviction, changed dependency pins or a new rate limit still depends
+on a successful fetch.

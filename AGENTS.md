@@ -525,3 +525,5 @@ The validator is read-only, executes Git without a shell, and does not run appli
 code, builds, tests, workflows or network operations. Its own script and regression
 module are exempt from the synchronization gate to avoid recursive requirements.
 See [the validation contract](docs/agent-knowledge-validation.md) for rules and limits.
+
+For instrumentation diagnoses, reconcile aggregate and nested XML counts with actual test cases, per-flavor exit codes and captured guest output. Preserve the initial evidence before any eligible retry.

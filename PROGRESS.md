@@ -3,6 +3,10 @@
 Baseline: `ed8b097`, followed by the hardening commits through `52d67d4`. This file
 records progress; it is not a release note and does not claim CI validation.
 
+## November 26 CI audit
+
+At `b09f9dc`, Tests 45706621403 passed with 143 JVM and ten API 35 tests per flavor. Lint reported ten warnings per flavor. Source fixes cover the Compose test rule, camera session ownership, exact atomic amounts, explicit subaddress issuance, LWS trust verification and legacy backup parsing. The new report checker accepted the archived XML and per-test logs. The modified app and tests await a new CI run. See [CI evidence](docs/ci/README.md).
+
 ## November 25 CI and preventive follow-up
 
 - At `bf1cf25`, 133 JVM tests per flavor passed, including the new managed-slot regressions. Native builds and APK assembly passed. Maven Central throttled Android Lint and instrumented APK preparation before either produced results.

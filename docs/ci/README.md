@@ -35,6 +35,9 @@ validation.
 
 ## Documentation map
 
+- [Signed Android amount range](jni-amount-range.md) and [explicit receive-address issuance](receive-subaddress.md).
+- [LWS trust readback](lws-session-reapply.md#lws-trust-002--unchecked-wallet2-trust-updates) and [JUnit evidence gates](preventive-audit.md#inst-001--inconsistent-instrumentation-verdict-and-overwritten-retry-evidence).
+
 - [`historical-failures.md`](historical-failures.md) — run-by-run inventory and root
   causes.
 - [`preventive-audit.md`](preventive-audit.md) — current static audit, warning policy,
@@ -70,12 +73,20 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
 
 ## Latest evidence
 
+- [Tests 45706621403](https://github.com/daviduhden/ANONERO/actions/runs/45706621403)
+  at `b09f9dc` passed all nine jobs. Archived XML recorded 143 JVM cases and
+  ten API 35 instrumented cases per flavor with zero failures, errors or
+  skips. The x86_64 guest booted in 32.8 seconds. Both Debug APKs passed the
+  two-ABI packaging check. Both lint XML reports contain eight dependency
+  advisories and two `UseKtx` warnings. Instrumented Kotlin compilation also
+  emitted W-013. The [knowledge run](https://github.com/daviduhden/ANONERO/actions/runs/45706626778)
+  passed at the same SHA.
+
 - [Tests 45691880945](https://github.com/daviduhden/ANONERO/actions/runs/45691880945)
   on `bf1cf25` built both ARM native archives with Clang 21 and linked both Debug
   flavors. Archived JUnit XML records 133 cases per flavor with zero failures,
   errors or skips. Android Lint and API 35 instrumentation both stopped at Maven
-  Central HTTP 429 before their tasks ran. Their latest completed reports remain
-  those from `2ca0edb`. See the [CI-039 cache diagnosis](gradle-cache.md). [Knowledge validation](https://github.com/daviduhden/ANONERO/actions/runs/45691880970)
+  Central HTTP 429 before their tasks ran. See the [CI-039 cache diagnosis](gradle-cache.md). [Knowledge validation](https://github.com/daviduhden/ANONERO/actions/runs/45691880970)
   passed at `bf1cf25`.
 
 - [Tests 45679643013](https://github.com/daviduhden/ANONERO/actions/runs/45679643013)
@@ -114,23 +125,24 @@ release embeds synchronized required jobs. See [iteration](../development-iterat
 - [Agent Knowledge Validation 44927810481](https://github.com/daviduhden/ANONERO/actions/runs/44927810481)
   on `75939ea` passed the Python regression and knowledge checks. It did not
   execute Android tests.
-- The [historical inventory](historical-failures.md) covers all 51 API records,
+- The [historical inventory](historical-failures.md) covers all 53 API records,
   including successful runs with warnings, incomplete logs and artifact evidence.
   No production signing, sanitizer, fuzz or device-farm execution was found.
 
 ## Verified platform coverage
 
-| Area | Evidence at `2ca0edb` | Remaining validation |
+| Area | Evidence at `b09f9dc` | Remaining validation |
 | --- | --- | --- |
 | Android floor and toolchain | API 29 manifest floor verified for both debug APKs. Compile SDK 37.2, target 37, Kotlin 2.4.21, AGP 9.5.1 and Gradle 9.9.0 are pinned. | API 29 runtime behavior was not tested in this run. |
 | Native compile and link | Monero ARM archives and the JNI adapter built for `arm64-v8a` and `armeabi-v7a`. Debug ANON and NERO linked with NDK r30. | ARM device execution, JNI fault injection and dedicated CheckJNI coverage remain open. |
-| Android instrumentation | API 35 `google_apis` x86_64 guest ran nine tests per debug flavor. This is a test guest, with no x86_64 production ABI. | No ARM hardware report or other API level report in the current run. |
+| Android instrumentation | API 35 `google_apis` x86_64 guest ran ten tests per debug flavor. This is a test guest, with no x86_64 production ABI. | No ARM hardware report or other API level report in the current run. |
 | Wallet and transport | JVM test XML and API 35 XML cover the cases shipped in this revision, including LWS profile isolation and transport persistence failure. | Live Tor bridges, real LWS/daemon routing and full wallet2 flows require dedicated environment and device coverage. |
 | Release and signing | Manual workflow configuration is present. | No release workflow run, production signing result or signed APK artifact is recorded. |
 | Sanitizers and fuzzing | Archived jobs were reviewed for diagnostic patterns. | No sanitizer or fuzz suite execution is recorded, so these diagnostics have no test verdict. |
 
 ## Preventive source regressions in this audit
 
+- [Receive subaddress issuance](receive-subaddress.md) records the implicit creation regression and wallet/account ownership checks.
 - [Coin selection preflight](coin-selection-preflight.md) records the wallet2
   input-selection threat review, JVM regressions and compatibility scope.
 - [JNI conversion guards](../../app/src/main/cpp/AGENTS.md) prevent additional JNI

@@ -138,3 +138,5 @@ coverage separately from the green API 35 baseline.
 The [approved safety proposals](docs/development-iteration-approved-safety.md)
 track the remaining work on signed-file binding, native lifetime, backup
 credentials, dependency verification and device coverage.
+
+Use instrumented ARM builds and a device capable of executing them for dedicated sanitizer coverage. The report checker can recognize captured diagnostics independently of whether the current build enables instrumentation.

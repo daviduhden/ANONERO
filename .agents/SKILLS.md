@@ -93,3 +93,8 @@ replay and cryptographic-security for credential rollback. For a delayed LWS
 reconnect, use monero-lws to trace the initiating profile through the transport
 wait. For a missing lint or instrumentation report, use github-actions to trace
 the first failed dependency request and the job that wrote its cache.
+
+For monetary narrowing and receive-address issuance, follow the native-jni
+and monero-wallet contracts together. For a green workflow with unexpected
+XML counters or guest sanitizer output, consult github-actions before
+attributing a pass to either flavor.
